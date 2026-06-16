@@ -50,25 +50,29 @@
         "raw": 524287,
         "range": "G2",
         "expected_g": 2.0447193,
+        "expected_mps2": 20.0518465233,
         "description": "524287 * 3.9e-6 g/LSB for ±2g"
       },
       {
         "name": "negative_min_2g",
         "raw": -524288,
         "range": "G2",
-        "expected_g": -2.0447232
+        "expected_g": -2.0447232,
+        "expected_mps2": -20.0518847693
       },
       {
         "name": "positive_max_4g",
         "raw": 524287,
         "range": "G4",
-        "expected_g": 4.0894386
+        "expected_g": 4.0894386,
+        "expected_mps2": 40.1036930467
       },
       {
         "name": "positive_max_8g",
         "raw": 524287,
         "range": "G8",
-        "expected_g": 8.1788772
+        "expected_g": 8.1788772,
+        "expected_mps2": 80.2073860934
       }
     ]
   }
