@@ -23,6 +23,10 @@ static int tests_pass = 0;
 class MockBus : public adxl355::BusInterface {
 public:
     uint8_t regs[128]{};
+    bool fail_reads{false};
+    bool fail_writes{false};
+    size_t read_count{0};
+    size_t write_count{0};
 
     MockBus() {
         regs[ADXL355_REG_DEVID_AD]  = ADXL355_DEVID_AD;
@@ -31,14 +35,29 @@ public:
         regs[ADXL355_REG_RANGE]     = ADXL355_RANGE_2G;
     }
 
+    void setRawX(int32_t raw) {
+        const uint32_t value = static_cast<uint32_t>(raw) & 0xFFFFFU;
+        regs[ADXL355_REG_XDATA3] = static_cast<uint8_t>((value >> 12U) & 0xFFU);
+        regs[ADXL355_REG_XDATA2] = static_cast<uint8_t>((value >> 4U) & 0xFFU);
+        regs[ADXL355_REG_XDATA1] = static_cast<uint8_t>((value & 0x0FU) << 4U);
+    }
+
     int read(void *ctx, uint8_t reg, uint8_t *data, size_t len) override {
         (void)ctx;
+        read_count++;
+        if (fail_reads) {
+            return -1;
+        }
         std::memcpy(data, &regs[reg], len);
         return 0;
     }
 
     int write(void *ctx, uint8_t reg, const uint8_t *data, size_t len) override {
         (void)ctx;
+        write_count++;
+        if (fail_writes) {
+            return -1;
+        }
         std::memcpy(&regs[reg], data, len);
         if (reg == ADXL355_REG_RESET && len > 0 && data[0] == ADXL355_RESET_CODE) {
             regs[ADXL355_REG_RANGE] = ADXL355_RANGE_2G;
@@ -118,6 +137,66 @@ void test_reset_restores_2g_range() {
     }
 }
 
+void test_set_range_preserves_unrelated_bits() {
+    auto bus = std::make_unique<MockBus>();
+    auto *mock = bus.get();
+    mock->regs[ADXL355_REG_RANGE] = 0xC1;
+    adxl355::Device dev(std::move(bus));
+
+    try {
+        dev.probe();
+        const size_t reads_before = mock->read_count;
+        dev.setRange(adxl355::Range::G4);
+        TEST(mock->read_count == reads_before + 1U, "setRange reads RANGE before writing");
+        TEST(mock->regs[ADXL355_REG_RANGE] == 0xC2,
+             "setRange preserves I2C_HS and INT_POL bits");
+    } catch (const adxl355::Error &) {
+        TEST(false, "setRange preserve-bits path failed");
+    }
+}
+
+void test_set_range_read_error_prevents_write() {
+    auto bus = std::make_unique<MockBus>();
+    auto *mock = bus.get();
+    mock->regs[ADXL355_REG_RANGE] = 0xC1;
+    mock->setRawX(256410);
+    adxl355::Device dev(std::move(bus));
+    dev.probe();
+
+    const size_t writes_before = mock->write_count;
+    mock->fail_reads = true;
+    try {
+        dev.setRange(adxl355::Range::G4);
+        TEST(false, "setRange should throw on read failure");
+    } catch (const adxl355::BusError &) {
+        TEST(mock->write_count == writes_before, "read failure prevents RANGE write");
+        TEST(mock->regs[ADXL355_REG_RANGE] == 0xC1, "read failure preserves RANGE register");
+        mock->fail_reads = false;
+        const auto accel = dev.readG();
+        TEST(std::fabs(accel.x - 1.0F) < 0.001F, "read failure preserves cached 2g range");
+    }
+}
+
+void test_set_range_write_error_preserves_state() {
+    auto bus = std::make_unique<MockBus>();
+    auto *mock = bus.get();
+    mock->regs[ADXL355_REG_RANGE] = 0xC1;
+    mock->setRawX(256410);
+    adxl355::Device dev(std::move(bus));
+    dev.probe();
+
+    mock->fail_writes = true;
+    try {
+        dev.setRange(adxl355::Range::G4);
+        TEST(false, "setRange should throw on write failure");
+    } catch (const adxl355::BusError &) {
+        TEST(mock->regs[ADXL355_REG_RANGE] == 0xC1, "write failure preserves RANGE register");
+        mock->fail_writes = false;
+        const auto accel = dev.readG();
+        TEST(std::fabs(accel.x - 1.0F) < 0.001F, "write failure preserves cached 2g range");
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
@@ -131,6 +210,9 @@ int main() {
     test_probe();
     test_probe_synchronizes_range();
     test_reset_restores_2g_range();
+    test_set_range_preserves_unrelated_bits();
+    test_set_range_read_error_prevents_write();
+    test_set_range_write_error_preserves_state();
 
     std::printf("\nResults: %d/%d passed\n", tests_pass, tests_run);
     return (tests_pass == tests_run) ? 0 : 1;

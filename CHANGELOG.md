@@ -15,7 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Breaking (all languages)**: Corrected `FILTER` register — ODR in bits 3:0, HPF in bits 6:4 per datasheet Rev.D Table 38 (ODR mask was 0xF0, now 0x0F)
 - **Breaking (all languages)**: Corrected temperature conversion formula from `raw/100+25` to `25+(raw-1885)/-9.05` per datasheet Rev.D
 - **Breaking**: Changed SPI command format from `reg|0x80` to `(reg<<1)|0x01` per datasheet Rev.D SPI Protocol section
-- Corrected `RANGE` register writes to preserve unrelated bits (INT_POL, I2C_HS)
+- Corrected `RANGE` register writes in every implementation, including the C reference driver, to preserve unrelated bits (`INT_POL`, `I2C_HS`) and update cached state only after successful writes
 - Updated all test assertions to match new enum values and temperature formula
 - Marked all datasheet-derived values with traceable datasheet section references
 

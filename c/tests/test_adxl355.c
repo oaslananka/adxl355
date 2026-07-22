@@ -243,6 +243,68 @@ static void test_set_range_writes_expected_register(void)
     TEST_END();
 }
 
+static void test_set_range_preserves_unrelated_bits(void)
+{
+    TEST_START("set_range_preserves_unrelated_bits");
+    adxl355_mock_bus_t mock;
+    adxl355_mock_bus_init(&mock);
+    adxl355_mock_bus_set_identity_ok(&mock);
+    mock.regs[ADXL355_REG_RANGE] = 0xC1;
+    adxl355_bus_t bus = adxl355_mock_bus_get_interface(&mock);
+    adxl355_t dev;
+    adxl355_init(&dev, &bus);
+    TEST_ASSERT(adxl355_probe(&dev) == ADXL355_OK, "probe should succeed");
+
+    TEST_ASSERT(adxl355_set_range(&dev, ADXL355_RANGE_4G) == ADXL355_OK,
+                "set_range should succeed");
+    TEST_ASSERT(mock.regs[ADXL355_REG_RANGE] == 0xC2,
+                "RANGE should preserve I2C_HS and INT_POL bits");
+    TEST_ASSERT(dev.range == ADXL355_RANGE_4G, "cached range should update after write");
+    TEST_END();
+}
+
+static void test_set_range_read_error_prevents_write(void)
+{
+    TEST_START("set_range_read_error_prevents_write");
+    adxl355_mock_bus_t mock;
+    adxl355_mock_bus_init(&mock);
+    adxl355_mock_bus_set_identity_ok(&mock);
+    mock.regs[ADXL355_REG_RANGE] = 0xC1;
+    adxl355_bus_t bus = adxl355_mock_bus_get_interface(&mock);
+    adxl355_t dev;
+    adxl355_init(&dev, &bus);
+    TEST_ASSERT(adxl355_probe(&dev) == ADXL355_OK, "probe should succeed");
+
+    size_t call_count_before = mock.call_count;
+    mock.force_read_error = 1;
+    TEST_ASSERT(adxl355_set_range(&dev, ADXL355_RANGE_4G) == ADXL355_ERR_BUS,
+                "read failure should return bus error");
+    TEST_ASSERT(mock.call_count == call_count_before, "read failure should prevent a write");
+    TEST_ASSERT(mock.regs[ADXL355_REG_RANGE] == 0xC1, "RANGE register should remain unchanged");
+    TEST_ASSERT(dev.range == ADXL355_RANGE_2G, "cached range should remain unchanged");
+    TEST_END();
+}
+
+static void test_set_range_write_error_preserves_cache(void)
+{
+    TEST_START("set_range_write_error_preserves_cache");
+    adxl355_mock_bus_t mock;
+    adxl355_mock_bus_init(&mock);
+    adxl355_mock_bus_set_identity_ok(&mock);
+    mock.regs[ADXL355_REG_RANGE] = 0xC1;
+    adxl355_bus_t bus = adxl355_mock_bus_get_interface(&mock);
+    adxl355_t dev;
+    adxl355_init(&dev, &bus);
+    TEST_ASSERT(adxl355_probe(&dev) == ADXL355_OK, "probe should succeed");
+
+    mock.force_write_error = 1;
+    TEST_ASSERT(adxl355_set_range(&dev, ADXL355_RANGE_4G) == ADXL355_ERR_BUS,
+                "write failure should return bus error");
+    TEST_ASSERT(mock.regs[ADXL355_REG_RANGE] == 0xC1, "RANGE register should remain unchanged");
+    TEST_ASSERT(dev.range == ADXL355_RANGE_2G, "cached range should remain unchanged");
+    TEST_END();
+}
+
 static void test_read_raw_reads_9_bytes(void)
 {
     TEST_START("read_raw_reads_9_bytes");
@@ -588,6 +650,9 @@ int main(void)
     test_probe_reset_range_converts_one_g();
     test_probe_ok();
     test_set_range_writes_expected_register();
+    test_set_range_preserves_unrelated_bits();
+    test_set_range_read_error_prevents_write();
+    test_set_range_write_error_preserves_cache();
     test_read_raw_reads_9_bytes();
     test_status_string();
     test_set_power_mode();

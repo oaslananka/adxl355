@@ -33,7 +33,9 @@ typedef struct {
 typedef struct {
     uint8_t  regs[ADXL355_MOCK_NUM_REGS];       /**< Simulated register file. */
     int      force_error;                        /**< If non-zero, every bus call fails. */
-    size_t   call_count;                         /**< Number of recorded bus calls. */
+    int      force_read_error;                   /**< If non-zero, reads fail. */
+    int      force_write_error;                  /**< If non-zero, writes fail. */
+    size_t   call_count;                         /**< Number of recorded successful bus calls. */
     adxl355_mock_call_t calls[ADXL355_MOCK_MAX_CALLS]; /**< Call history. */
     void    *delay_ctx;                          /**< Context for delay callback (unused). */
 } adxl355_mock_bus_t;
