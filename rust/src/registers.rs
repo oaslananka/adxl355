@@ -18,7 +18,7 @@ pub mod reg {
     pub const STATUS: u8 = 0x04;
     /// FIFO entry count.
     pub const FIFO_ENTRIES: u8 = 0x05;
-    /// Temperature high byte (12-bit left-aligned).
+    /// Temperature high nibble in bits 3:0; bits 7:4 are reserved.
     pub const TEMP2: u8 = 0x06;
     /// Temperature low byte.
     pub const TEMP1: u8 = 0x07;
@@ -89,6 +89,15 @@ pub mod id {
 
 /// Software reset code (datasheet Rev.D, Table 45).
 pub const RESET_CODE: u8 = 0x52;
+
+/// Temperature sensor constants (datasheet Rev.D, Table 29 and sensor section).
+pub mod temperature {
+    pub const TEMP2_DATA_MASK: u8 = 0x0F;
+    pub const READ_ATTEMPTS: usize = 3;
+    pub const INTERCEPT_LSB: f32 = 1885.0;
+    pub const INTERCEPT_C: f32 = 25.0;
+    pub const SLOPE_LSB_PER_C: f32 = -9.05;
+}
 
 /// Power mode bit (datasheet Rev.D, Table 43: bit 0 = 1 => standby).
 pub const POWER_MODE_BIT: u8 = 0;

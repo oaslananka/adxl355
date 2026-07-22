@@ -12,6 +12,7 @@ Usage:
 """
 
 import json
+import math
 import re
 import sys
 from pathlib import Path
@@ -68,6 +69,7 @@ class SpecValidator:
         self.spec_dir = spec_dir
         self.registers_path = spec_dir / "adxl355.registers.yaml"
         self.constants_path = spec_dir / "adxl355.constants.yaml"
+        self.vectors_path = spec_dir / "test_vectors.json"
         self.errors: list[str] = []
         self.warnings: list[str] = []
 
@@ -85,17 +87,19 @@ class SpecValidator:
 
         registers = self._load_yaml(self.registers_path)
         constants = self._load_yaml(self.constants_path)
-        if registers is None or constants is None:
+        vectors = self._load_json(self.vectors_path)
+        if registers is None or constants is None or vectors is None:
             return False
 
         self._validate_registers(registers)
         self._validate_constants(constants)
         self._validate_cross_references(registers, constants)
+        self._validate_test_vectors(vectors)
 
         return len(self.errors) == 0
 
     def _check_files_exist(self):
-        for p in [self.registers_path, self.constants_path]:
+        for p in [self.registers_path, self.constants_path, self.vectors_path]:
             if not p.exists():
                 self.error(f"File not found: {p}")
 
@@ -109,6 +113,14 @@ class SpecValidator:
             return data
         except yaml.YAMLError as e:
             self.error(f"{path.name}: YAML parse error: {e}")
+            return None
+
+    def _load_json(self, path: Path):
+        try:
+            with open(path, encoding="utf-8") as f:
+                return json.load(f)
+        except (json.JSONDecodeError, OSError) as e:
+            self.error(f"{path.name}: JSON parse error: {e}")
             return None
 
     def _validate_registers(self, data: dict):
@@ -284,17 +296,100 @@ class SpecValidator:
         temp = data.get("temperature", {})
         if not isinstance(temp, dict):
             self.error("constants.yaml: 'temperature' must be a dictionary")
+        else:
+            if temp.get("TEMP2_DATA_MASK") != 0x0F:
+                self.error("constants.yaml: temperature.TEMP2_DATA_MASK should be 0x0F")
+            if temp.get("coherent_read_attempts") != 3:
+                self.error("constants.yaml: temperature.coherent_read_attempts should be 3")
+            self._validate_float_constant(
+                temp, "intercept_lsb", 1885.0, "temperature.intercept_lsb"
+            )
+            self._validate_float_constant(
+                temp, "intercept_c", 25.0, "temperature.intercept_c"
+            )
+            self._validate_float_constant(
+                temp, "slope_lsb_per_c", -9.05, "temperature.slope_lsb_per_c"
+            )
+
+    def _validate_float_constant(
+        self, values: dict, key: str, expected: float, label: str
+    ) -> None:
+        value = values.get(key)
+        if not isinstance(value, (int, float)) or isinstance(value, bool):
+            self.error(f"constants.yaml: {label} must be numeric")
+            return
+        if not math.isclose(float(value), expected, rel_tol=0.0, abs_tol=1e-12):
+            self.error(f"constants.yaml: {label} should be {expected}")
+
+    def _validate_temperature_vector(self, vector: object, index: int) -> tuple[int | None, bool]:
+        prefix = f"test_vectors.json: temperature vector[{index}]"
+        if not isinstance(vector, dict):
+            self.error(f"{prefix}: must be an object")
+            return None, False
+
+        required = {"name", "temp2", "temp1", "expected_raw", "expected_c"}
+        missing = required - set(vector)
+        if missing:
+            self.error(f"{prefix}: missing fields {missing}")
+            return None, False
+
+        temp2 = vector["temp2"]
+        temp1 = vector["temp1"]
+        if not self._validate_temperature_byte(temp2, "temp2", prefix):
+            return None, False
+        if not self._validate_temperature_byte(temp1, "temp1", prefix):
+            return None, False
+
+        raw = ((temp2 & 0x0F) << 8) | temp1
+        if vector["expected_raw"] != raw:
+            self.error(f"{prefix}: expected_raw should be {raw}")
+        self._validate_temperature_celsius(vector["expected_c"], raw, prefix)
+        return raw, (temp2 & 0xF0) != 0
+
+    def _validate_temperature_byte(self, value: object, name: str, prefix: str) -> bool:
+        if isinstance(value, int) and not isinstance(value, bool) and 0 <= value <= 0xFF:
+            return True
+        self.error(f"{prefix}: {name} must be a byte")
+        return False
+
+    def _validate_temperature_celsius(self, value: object, raw: int, prefix: str) -> None:
+        expected = 25.0 + (raw - 1885.0) / -9.05
+        if not isinstance(value, (int, float)) or isinstance(value, bool):
+            self.error(f"{prefix}: expected_c must be numeric")
+            return
+        if not math.isclose(float(value), expected, rel_tol=0.0, abs_tol=1e-9):
+            self.error(f"{prefix}: expected_c does not match nominal formula")
+
+    def _validate_test_vectors(self, data: dict):
+        temperature = data.get("temperature_conversion")
+        if not isinstance(temperature, dict):
+            self.error("test_vectors.json: missing temperature_conversion object")
+            return
+
+        tolerance = temperature.get("tolerance_c")
+        if not isinstance(tolerance, (int, float)) or isinstance(tolerance, bool) or tolerance <= 0:
+            self.error("test_vectors.json: temperature tolerance_c must be positive")
+
+        vectors = temperature.get("vectors")
+        if not isinstance(vectors, list) or not vectors:
+            self.error("test_vectors.json: temperature vectors must be a non-empty list")
+            return
+
+        validated = [self._validate_temperature_vector(vector, index) for index, vector in enumerate(vectors)]
+        raw_values = {raw for raw, _ in validated if raw is not None}
+        if not {0, 4095}.issubset(raw_values):
+            self.error("test_vectors.json: temperature vectors must include raw boundaries 0 and 4095")
+        if not any(has_reserved_nibble for _, has_reserved_nibble in validated):
+            self.error("test_vectors.json: temperature vectors must include a nonzero reserved TEMP2 nibble")
 
     def _validate_cross_references(self, registers: dict, constants: dict):
         """Check references between the two spec files."""
         regs = {r["name"]: r for r in registers.get("registers", []) if isinstance(r, dict) and "name" in r}
 
         # Verify register names referenced in constants exist
-        filter_info = constants.get("filter_register", {})
         if "FILTER" not in regs:
             self.warn("constants.yaml references FILTER register but it's not in registers.yaml")
 
-        status_info = constants.get("status_register", {})
         if "STATUS" not in regs:
             self.warn("constants.yaml references STATUS register but it's not in registers.yaml")
 
@@ -311,7 +406,7 @@ class SpecValidator:
                 print(f"  {e}")
         else:
             print(f"\n{'=' * 60}")
-            print(f"VALIDATION PASSED — 0 errors")
+            print("VALIDATION PASSED — 0 errors")
             print(f"{'=' * 60}")
 
         if self.warnings:

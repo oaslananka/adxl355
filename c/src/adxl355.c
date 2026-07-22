@@ -2,6 +2,15 @@
 
 #include <string.h>
 
+enum {
+    ADXL355_TEMP2_DATA_MASK = 0x0F,
+    ADXL355_TEMP_READ_ATTEMPTS = 3,
+};
+
+static const float ADXL355_TEMP_INTERCEPT_LSB = 1885.0f;
+static const float ADXL355_TEMP_INTERCEPT_C = 25.0f;
+static const float ADXL355_TEMP_SLOPE_LSB_PER_C = -9.05f;
+
 /* ---------------------------------------------------------------------------
  * Internal helpers
  * --------------------------------------------------------------------------- */
@@ -254,12 +263,25 @@ adxl355_status_t adxl355_read_temperature_raw(adxl355_t *dev, int16_t *out)
     if (dev == NULL || out == NULL) {
         return ADXL355_ERR_NULL;
     }
-    uint8_t buf[2];
-    if (dev->bus.read(dev->bus.ctx, ADXL355_REG_TEMP2, buf, 2) != 0) {
-        return ADXL355_ERR_BUS;
+    for (uint8_t attempt = 0U; attempt < ADXL355_TEMP_READ_ATTEMPTS; attempt++) {
+        uint8_t sample[2];
+        uint8_t confirm_temp2;
+        if (dev->bus.read(dev->bus.ctx, ADXL355_REG_TEMP2, sample, 2U) != 0) {
+            return ADXL355_ERR_BUS;
+        }
+        if (dev->bus.read(dev->bus.ctx, ADXL355_REG_TEMP2, &confirm_temp2, 1U) != 0) {
+            return ADXL355_ERR_BUS;
+        }
+
+        uint8_t sample_temp2 = (uint8_t)(sample[0] & ADXL355_TEMP2_DATA_MASK);
+        confirm_temp2 &= ADXL355_TEMP2_DATA_MASK;
+        if (sample_temp2 == confirm_temp2) {
+            int16_t raw = (int16_t)(((uint16_t)sample_temp2 << 8) | (uint16_t)sample[1]);
+            *out = raw;
+            return ADXL355_OK;
+        }
     }
-    *out = (int16_t)(((uint16_t)buf[0] << 8) | (uint16_t)buf[1]);
-    return ADXL355_OK;
+    return ADXL355_ERR_NOT_READY;
 }
 
 adxl355_status_t adxl355_read_temperature_c(adxl355_t *dev, float *out)
@@ -274,7 +296,8 @@ adxl355_status_t adxl355_read_temperature_c(adxl355_t *dev, float *out)
     }
     /* Datasheet Rev.D temperature sensor: 12-bit unsigned, nominal intercept 1885 LSB at 25°C,
      * slope -9.05 LSB/°C. Formula: T(°C) = 25.0 + (raw - 1885.0) / -9.05 */
-    *out = 25.0f + ((float)raw - 1885.0f) / -9.05f;
+    *out = ADXL355_TEMP_INTERCEPT_C +
+           ((float)raw - ADXL355_TEMP_INTERCEPT_LSB) / ADXL355_TEMP_SLOPE_LSB_PER_C;
     return ADXL355_OK;
 }
 

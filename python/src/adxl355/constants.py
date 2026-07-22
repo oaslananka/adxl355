@@ -27,3 +27,11 @@ RESET_CODE: int = 0x52
 # ASEL pin = GND: 0x1D, ASEL pin = VDDIO: 0x53
 ADXL355_I2C_ADDRESS_DEFAULT: int = 0x1D
 ADXL355_I2C_ADDRESS_ALTERNATE: int = 0x53
+
+
+# Temperature sensor constants (datasheet Rev.D, Table 29 and sensor section)
+TEMP2_DATA_MASK: int = 0x0F
+TEMP_READ_ATTEMPTS: int = 3
+TEMP_INTERCEPT_LSB: float = 1885.0
+TEMP_INTERCEPT_C: float = 25.0
+TEMP_SLOPE_LSB_PER_C: float = -9.05

@@ -382,6 +382,125 @@ static void test_reset(void)
  * Additional tests (Stage 3 coverage expansion)
  * --------------------------------------------------------------------------- */
 
+typedef struct {
+    uint8_t responses[8][2];
+    size_t lengths[8];
+    size_t response_count;
+    size_t response_index;
+} temperature_script_bus_t;
+
+static int temperature_script_read(void *ctx, uint8_t reg, uint8_t *data, size_t len)
+{
+    temperature_script_bus_t *script = (temperature_script_bus_t *)ctx;
+    if (reg != ADXL355_REG_TEMP2 || script->response_index >= script->response_count) {
+        return -1;
+    }
+    size_t response_length = script->lengths[script->response_index];
+    size_t copy_length = response_length < len ? response_length : len;
+    memcpy(data, script->responses[script->response_index], copy_length);
+    script->response_index++;
+    return response_length == len ? 0 : -1;
+}
+
+static int temperature_script_write(void *ctx, uint8_t reg, const uint8_t *data, size_t len)
+{
+    (void)ctx;
+    (void)reg;
+    (void)data;
+    (void)len;
+    return 0;
+}
+
+static adxl355_t temperature_script_device(temperature_script_bus_t *script)
+{
+    adxl355_bus_t bus = {
+        .read = temperature_script_read,
+        .write = temperature_script_write,
+        .delay_ms = NULL,
+        .ctx = script,
+    };
+    adxl355_t dev;
+    (void)adxl355_init(&dev, &bus);
+    return dev;
+}
+
+static void test_temperature_reserved_nibble_ignored(void)
+{
+    TEST_START("temperature_reserved_nibble_ignored");
+    adxl355_mock_bus_t mock;
+    adxl355_mock_bus_init(&mock);
+    mock.regs[ADXL355_REG_TEMP2] = 0xF7;
+    mock.regs[ADXL355_REG_TEMP1] = 0x5D;
+    adxl355_bus_t bus = adxl355_mock_bus_get_interface(&mock);
+    adxl355_t dev;
+    adxl355_init(&dev, &bus);
+
+    int16_t raw;
+    TEST_ASSERT(adxl355_read_temperature_raw(&dev, &raw) == ADXL355_OK,
+                "temperature read should succeed");
+    TEST_ASSERT(raw == 1885, "reserved TEMP2 high bits should be ignored");
+    TEST_END();
+}
+
+static void test_temperature_short_read_returns_bus_error(void)
+{
+    TEST_START("temperature_short_read_returns_bus_error");
+    temperature_script_bus_t script = {0};
+    script.responses[0][0] = 0x07;
+    script.lengths[0] = 1U;
+    script.response_count = 1U;
+    adxl355_t dev = temperature_script_device(&script);
+    int16_t raw = 1234;
+
+    TEST_ASSERT(adxl355_read_temperature_raw(&dev, &raw) == ADXL355_ERR_BUS,
+                "short temperature read should return bus error");
+    TEST_ASSERT(raw == 1234, "short read should not modify output");
+    TEST_END();
+}
+
+static void test_temperature_retries_on_high_byte_rollover(void)
+{
+    TEST_START("temperature_retries_on_high_byte_rollover");
+    temperature_script_bus_t script = {0};
+    const uint8_t responses[][2] = {
+        {0x07, 0xFF}, {0x08, 0x00},
+        {0x08, 0x00}, {0x08, 0x00},
+    };
+    const size_t lengths[] = {2U, 1U, 2U, 1U};
+    memcpy(script.responses, responses, sizeof(responses));
+    memcpy(script.lengths, lengths, sizeof(lengths));
+    script.response_count = 4U;
+    adxl355_t dev = temperature_script_device(&script);
+    int16_t raw = 0;
+
+    TEST_ASSERT(adxl355_read_temperature_raw(&dev, &raw) == ADXL355_OK,
+                "rollover should be retried");
+    TEST_ASSERT(raw == 2048, "retry should return coherent second sample");
+    TEST_END();
+}
+
+static void test_temperature_unstable_sample_returns_not_ready(void)
+{
+    TEST_START("temperature_unstable_sample_returns_not_ready");
+    temperature_script_bus_t script = {0};
+    const uint8_t responses[][2] = {
+        {0x07, 0xFF}, {0x08, 0x00},
+        {0x08, 0xFF}, {0x09, 0x00},
+        {0x09, 0xFF}, {0x0A, 0x00},
+    };
+    const size_t lengths[] = {2U, 1U, 2U, 1U, 2U, 1U};
+    memcpy(script.responses, responses, sizeof(responses));
+    memcpy(script.lengths, lengths, sizeof(lengths));
+    script.response_count = 6U;
+    adxl355_t dev = temperature_script_device(&script);
+    int16_t raw = 321;
+
+    TEST_ASSERT(adxl355_read_temperature_raw(&dev, &raw) == ADXL355_ERR_NOT_READY,
+                "unstable temperature should return not ready");
+    TEST_ASSERT(raw == 321, "unstable read should not modify output");
+    TEST_END();
+}
+
 static void test_temperature_raw(void)
 {
     TEST_START("temperature_raw");
@@ -401,6 +520,33 @@ static void test_temperature_raw(void)
     adxl355_status_t status = adxl355_read_temperature_raw(&dev, &raw);
     TEST_ASSERT(status == ADXL355_OK, "read temperature raw should succeed");
     TEST_ASSERT(raw == 0x0190, "raw temperature should be 0x0190");
+    TEST_END();
+}
+
+static void test_temperature_boundaries(void)
+{
+    TEST_START("temperature_boundaries");
+    adxl355_mock_bus_t mock;
+    adxl355_mock_bus_init(&mock);
+    adxl355_bus_t bus = adxl355_mock_bus_get_interface(&mock);
+    adxl355_t dev;
+    adxl355_init(&dev, &bus);
+    int16_t raw;
+    float temp;
+
+    mock.regs[ADXL355_REG_TEMP2] = 0x00;
+    mock.regs[ADXL355_REG_TEMP1] = 0x00;
+    TEST_ASSERT(adxl355_read_temperature_raw(&dev, &raw) == ADXL355_OK && raw == 0,
+                "minimum temperature raw value should be 0");
+
+    mock.regs[ADXL355_REG_TEMP2] = 0x0F;
+    mock.regs[ADXL355_REG_TEMP1] = 0xFF;
+    TEST_ASSERT(adxl355_read_temperature_raw(&dev, &raw) == ADXL355_OK && raw == 4095,
+                "maximum temperature raw value should be 4095");
+    TEST_ASSERT(adxl355_read_temperature_c(&dev, &temp) == ADXL355_OK,
+                "maximum temperature conversion should succeed");
+    TEST_ASSERT(approx_eq(temp, -219.1989f, 0.01f),
+                "maximum raw temperature should match shared vector");
     TEST_END();
 }
 
@@ -657,7 +803,12 @@ int main(void)
     test_status_string();
     test_set_power_mode();
     test_reset();
+    test_temperature_reserved_nibble_ignored();
+    test_temperature_short_read_returns_bus_error();
+    test_temperature_retries_on_high_byte_rollover();
+    test_temperature_unstable_sample_returns_not_ready();
     test_temperature_raw();
+    test_temperature_boundaries();
     test_temperature_celsius();
     test_temperature_celsius_zero();
     test_read_status();

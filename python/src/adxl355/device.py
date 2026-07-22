@@ -9,8 +9,15 @@ from adxl355.constants import (
     SCALE_4G_G_PER_LSB,
     SCALE_8G_G_PER_LSB,
     STANDARD_GRAVITY_M_S2,
+    TEMP2_DATA_MASK,
+    TEMP_INTERCEPT_C,
+    TEMP_INTERCEPT_LSB,
+    TEMP_READ_ATTEMPTS,
+    TEMP_SLOPE_LSB_PER_C,
 )
 from adxl355.errors import (
+    BusError,
+    DataNotReadyError,
     DeviceNotFoundError,
     InvalidConfigurationError,
 )
@@ -176,9 +183,27 @@ class ADXL355:
         )
 
     def read_temperature_raw(self) -> int:
-        """Read raw temperature value (16-bit)."""
-        data = self._transport.read_register(Register.TEMP2, 2)
-        return (data[0] << 8) | data[1]
+        """Read a coherent 12-bit unsigned temperature sample.
+
+        TEMP2/TEMP1 are not double-buffered. Read both bytes in one burst,
+        then re-read TEMP2 and retry if its data nibble changed. Reserved
+        TEMP2 bits 7:4 are ignored.
+        """
+        for _ in range(TEMP_READ_ATTEMPTS):
+            data = self._transport.read_register(Register.TEMP2, 2)
+            if len(data) != 2:
+                raise BusError(f"Short temperature read: expected 2 bytes, got {len(data)}")
+            confirm = self._transport.read_register(Register.TEMP2, 1)
+            if len(confirm) != 1:
+                raise BusError(
+                    f"Short TEMP2 confirmation read: expected 1 byte, got {len(confirm)}"
+                )
+
+            temp2 = data[0] & TEMP2_DATA_MASK
+            if temp2 == (confirm[0] & TEMP2_DATA_MASK):
+                return (temp2 << 8) | data[1]
+
+        raise DataNotReadyError("Temperature sample changed during all read attempts")
 
     def read_temperature_c(self) -> float:
         """
@@ -188,7 +213,7 @@ class ADXL355:
         slope -9.05 LSB/°C. Formula: T(°C) = 25.0 + (raw - 1885.0) / -9.05
         """
         raw = self.read_temperature_raw()
-        return 25.0 + (raw - 1885.0) / -9.05
+        return TEMP_INTERCEPT_C + (raw - TEMP_INTERCEPT_LSB) / TEMP_SLOPE_LSB_PER_C
 
     def read_status(self) -> int:
         """Read the status register."""

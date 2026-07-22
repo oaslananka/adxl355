@@ -64,6 +64,66 @@ fn test_reset() {
     assert!(dev.reset().is_ok());
 }
 
+struct TemperatureSequenceBus {
+    responses: Vec<Vec<u8>>,
+}
+
+impl adxl355::device::Transport for TemperatureSequenceBus {
+    fn read_register(&mut self, _reg: u8, _len: u8) -> Result<Vec<u8>, Error> {
+        if self.responses.is_empty() {
+            return Err(Error::Bus);
+        }
+        Ok(self.responses.remove(0))
+    }
+
+    fn write_register(&mut self, _reg: u8, _data: &[u8]) -> Result<(), Error> {
+        Ok(())
+    }
+
+    fn delay_ms(&mut self, _ms: u32) {}
+}
+
+#[test]
+fn test_temperature_reserved_nibble_ignored() {
+    let mut bus = MockBus::new();
+    bus.regs[registers::reg::TEMP2 as usize] = 0xF7;
+    bus.regs[registers::reg::TEMP1 as usize] = 0x5D;
+    let mut dev = Adxl355::new(bus);
+    assert_eq!(dev.read_temperature_raw().unwrap(), 1885);
+    assert!((dev.read_temperature_c().unwrap() - 25.0).abs() < 0.01);
+}
+
+#[test]
+fn test_temperature_short_read_returns_bus_error() {
+    let mut dev = Adxl355::new(TemperatureSequenceBus {
+        responses: vec![vec![0x07]],
+    });
+    assert_eq!(dev.read_temperature_raw(), Err(Error::Bus));
+}
+
+#[test]
+fn test_temperature_rollover_is_retried() {
+    let mut dev = Adxl355::new(TemperatureSequenceBus {
+        responses: vec![vec![0x07, 0xFF], vec![0x08], vec![0x08, 0x00], vec![0x08]],
+    });
+    assert_eq!(dev.read_temperature_raw().unwrap(), 2048);
+}
+
+#[test]
+fn test_temperature_unstable_returns_not_ready() {
+    let mut dev = Adxl355::new(TemperatureSequenceBus {
+        responses: vec![
+            vec![0x07, 0xFF],
+            vec![0x08],
+            vec![0x08, 0xFF],
+            vec![0x09],
+            vec![0x09, 0xFF],
+            vec![0x0A],
+        ],
+    });
+    assert_eq!(dev.read_temperature_raw(), Err(Error::NotReady));
+}
+
 #[test]
 fn test_temperature_raw() {
     let mut bus = MockBus::new();
@@ -73,6 +133,21 @@ fn test_temperature_raw() {
     let mut dev = Adxl355::new(bus);
     let raw = dev.read_temperature_raw().unwrap();
     assert_eq!(raw, 1885);
+}
+
+#[test]
+fn test_temperature_boundaries() {
+    let mut bus = MockBus::new();
+    let mut dev = Adxl355::new(bus);
+    assert_eq!(dev.read_temperature_raw().unwrap(), 0);
+
+    bus = dev.into_inner();
+    bus.regs[registers::reg::TEMP2 as usize] = 0x0F;
+    bus.regs[registers::reg::TEMP1 as usize] = 0xFF;
+    let mut dev = Adxl355::new(bus);
+    assert_eq!(dev.read_temperature_raw().unwrap(), 4095);
+    let temp = dev.read_temperature_c().unwrap();
+    assert!((temp - -219.1989).abs() < 0.01);
 }
 
 #[test]

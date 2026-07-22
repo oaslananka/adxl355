@@ -153,13 +153,27 @@ impl<T: Transport> Adxl355<T> {
         })
     }
 
-    /// Read raw temperature (16-bit, left-aligned).
+    /// Read a coherent 12-bit unsigned temperature sample.
+    ///
+    /// TEMP2/TEMP1 are not double-buffered. Both bytes are read together,
+    /// then TEMP2 is re-read; the operation retries if its data nibble changed.
     pub fn read_temperature_raw(&mut self) -> Result<i16, Error> {
-        let data = self.transport.read_register(registers::reg::TEMP2, 2)?;
-        if data.len() < 2 {
-            return Err(Error::Bus);
+        for _ in 0..registers::temperature::READ_ATTEMPTS {
+            let data = self.transport.read_register(registers::reg::TEMP2, 2)?;
+            if data.len() != 2 {
+                return Err(Error::Bus);
+            }
+            let confirm = self.transport.read_register(registers::reg::TEMP2, 1)?;
+            if confirm.len() != 1 {
+                return Err(Error::Bus);
+            }
+
+            let temp2 = data[0] & registers::temperature::TEMP2_DATA_MASK;
+            if temp2 == (confirm[0] & registers::temperature::TEMP2_DATA_MASK) {
+                return Ok(((temp2 as i16) << 8) | data[1] as i16);
+            }
         }
-        Ok(((data[0] as i16) << 8) | (data[1] as i16))
+        Err(Error::NotReady)
     }
 
     /// Read temperature in degrees Celsius.
@@ -168,7 +182,9 @@ impl<T: Transport> Adxl355<T> {
     /// slope -9.05 LSB/°C. Formula: T(°C) = 25.0 + (raw - 1885.0) / -9.05
     pub fn read_temperature_c(&mut self) -> Result<f32, Error> {
         let raw = self.read_temperature_raw()?;
-        Ok(25.0 + (raw as f32 - 1885.0) / -9.05)
+        Ok(registers::temperature::INTERCEPT_C
+            + (raw as f32 - registers::temperature::INTERCEPT_LSB)
+                / registers::temperature::SLOPE_LSB_PER_C)
     }
 
     /// Read the status register.

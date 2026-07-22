@@ -11,11 +11,21 @@ import {
   SCALE_8G_G_PER_LSB,
   STANDARD_GRAVITY_M_S2,
   RANGE_SEL_MASK,
+  TEMP2_DATA_MASK,
+  TEMP_INTERCEPT_C,
+  TEMP_INTERCEPT_LSB,
+  TEMP_READ_ATTEMPTS,
+  TEMP_SLOPE_LSB_PER_C,
   Range as RangeEnum,
 } from "./registers.js";
 import { Transport } from "./transport.js";
 import { RawXYZ, AccelXYZ } from "./types.js";
-import { DeviceNotFoundError, InvalidConfigurationError } from "./errors.js";
+import {
+  BusError,
+  DataNotReadyError,
+  DeviceNotFoundError,
+  InvalidConfigurationError,
+} from "./errors.js";
 
 /**
  * ADXL355 accelerometer driver.
@@ -152,10 +162,24 @@ export class ADXL355 {
     };
   }
 
-  /** Read raw temperature (16-bit). */
+  /** Read a coherent 12-bit unsigned temperature sample. */
   async readTemperatureRaw(): Promise<number> {
-    const data = await this.transport.readRegister(Reg.TEMP2, 2);
-    return (data[0] << 8) | data[1];
+    for (let attempt = 0; attempt < TEMP_READ_ATTEMPTS; attempt++) {
+      const data = await this.transport.readRegister(Reg.TEMP2, 2);
+      if (data.length !== 2) {
+        throw new BusError(`Short temperature read: expected 2 bytes, got ${data.length}`);
+      }
+      const confirm = await this.transport.readRegister(Reg.TEMP2, 1);
+      if (confirm.length !== 1) {
+        throw new BusError(`Short TEMP2 confirmation read: expected 1 byte, got ${confirm.length}`);
+      }
+
+      const temp2 = data[0] & TEMP2_DATA_MASK;
+      if (temp2 === (confirm[0] & TEMP2_DATA_MASK)) {
+        return (temp2 << 8) | data[1];
+      }
+    }
+    throw new DataNotReadyError("Temperature sample changed during all read attempts");
   }
 
   /**
@@ -164,7 +188,7 @@ export class ADXL355 {
    */
   async readTemperatureC(): Promise<number> {
     const raw = await this.readTemperatureRaw();
-    return 25.0 + (raw - 1885.0) / -9.05;
+    return TEMP_INTERCEPT_C + (raw - TEMP_INTERCEPT_LSB) / TEMP_SLOPE_LSB_PER_C;
   }
 
   /** Read status register. */

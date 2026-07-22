@@ -83,7 +83,8 @@ typedef struct {
 /**
  * Transport abstraction – function-pointer bus interface.
  *
- * All bus operations must return 0 on success and non-zero on failure.
+ * All bus operations must return 0 only after transferring the complete
+ * requested length, and non-zero on partial transfer or bus failure.
  * The driver does NOT own the context pointer; the caller must ensure it
  * remains valid for the lifetime of the adxl355_t object.
  */
@@ -252,19 +253,24 @@ adxl355_status_t adxl355_read_g(adxl355_t *dev, adxl355_float_xyz_t *out);
 adxl355_status_t adxl355_read_mps2(adxl355_t *dev, adxl355_float_xyz_t *out);
 
 /**
- * Read raw temperature value (16-bit, left-aligned).
+ * Read the coherent 12-bit unsigned temperature value.
+ *
+ * The driver performs a two-byte TEMP2/TEMP1 burst, re-reads TEMP2, masks
+ * reserved TEMP2 bits 7:4, and retries up to three times if the high data
+ * nibble changed across the sample. The output is modified only on success.
  *
  * @param dev Initialised device handle.
- * @param[out] out Raw temperature.
- * @return ADXL355_OK or error code.
+ * @param[out] out Raw temperature in the range 0..4095.
+ * @return ADXL355_OK, ADXL355_ERR_BUS on partial/bus reads, or
+ *         ADXL355_ERR_NOT_READY if no coherent sample is obtained.
  */
 adxl355_status_t adxl355_read_temperature_raw(adxl355_t *dev, int16_t *out);
 
 /**
  * Read temperature in degrees Celsius.
  *
- * Conversion formula (preliminary – verify against datasheet):
- *   T(°C) = raw_temp / 100.0 + 25.0
+ * Datasheet Rev.D nominal conversion:
+ *   T(°C) = 25.0 + (raw_temp - 1885.0) / -9.05
  *
  * @param dev Initialised device handle.
  * @param[out] out Temperature in °C.

@@ -51,11 +51,20 @@ const (
 // Reset code (datasheet Rev.D, Table 45).
 const RESET_CODE = 0x52
 
+// Temperature sensor constants (datasheet Rev.D, Table 29 and sensor section).
+const (
+	Temp2DataMask    = 0x0F
+	TempReadAttempts = 3
+	TempInterceptLSB = 1885.0
+	TempInterceptC   = 25.0
+	TempSlopeLSBPerC = -9.05
+)
+
 // STATUS register bit positions (datasheet Rev.D, Table 27).
 const (
-	StatusNVM_BUSY = 4
-	StatusACTIVITY = 3
-	StatusFIFO_OVR = 2
+	StatusNVM_BUSY  = 4
+	StatusACTIVITY  = 3
+	StatusFIFO_OVR  = 2
 	StatusFIFO_FULL = 1
 	StatusDATA_RDY  = 0
 )
@@ -77,7 +86,7 @@ func SPIWriteCmd(reg uint8) uint8 { return reg << 1 }
 
 // I2C addresses (datasheet Rev.D, Table 8).
 const (
-	I2CDefaultAddr  = 0x1D
+	I2CDefaultAddr   = 0x1D
 	I2CAlternateAddr = 0x53
 )
 
@@ -112,15 +121,15 @@ const (
 type ODR int
 
 const (
-	ODR4000Hz  ODR = 0
-	ODR2000Hz  ODR = 1
-	ODR1000Hz  ODR = 2
-	ODR500Hz   ODR = 3
-	ODR250Hz   ODR = 4
-	ODR125Hz   ODR = 5
-	ODR62_5Hz  ODR = 6
-	ODR31_25Hz ODR = 7
+	ODR4000Hz   ODR = 0
+	ODR2000Hz   ODR = 1
+	ODR1000Hz   ODR = 2
+	ODR500Hz    ODR = 3
+	ODR250Hz    ODR = 4
+	ODR125Hz    ODR = 5
+	ODR62_5Hz   ODR = 6
+	ODR31_25Hz  ODR = 7
 	ODR15_625Hz ODR = 8
-	ODR7_813Hz ODR = 9
-	ODR3_906Hz ODR = 10
+	ODR7_813Hz  ODR = 9
+	ODR3_906Hz  ODR = 10
 )
