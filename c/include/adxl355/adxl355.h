@@ -179,9 +179,13 @@ adxl355_status_t adxl355_reset(adxl355_t *dev);
 /**
  * Set the acceleration range.
  *
+ * The driver reads the current RANGE register and replaces only RANGE_SEL,
+ * preserving I2C_HS, INT_POL, and reserved bits. The cached range is updated
+ * only after the register write succeeds.
+ *
  * @param dev   Initialised device handle.
  * @param range Desired range.
- * @return ADXL355_OK or error code.
+ * @return ADXL355_OK, ADXL355_ERR_BUS on read/write failure, or an argument error.
  */
 adxl355_status_t adxl355_set_range(adxl355_t *dev, adxl355_range_t range);
 

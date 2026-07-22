@@ -131,7 +131,13 @@ adxl355_status_t adxl355_set_range(adxl355_t *dev, adxl355_range_t range)
     if (range < ADXL355_RANGE_2G || range > ADXL355_RANGE_8G) {
         return ADXL355_ERR_INVALID_ARG;
     }
-    if (write_reg(dev, ADXL355_REG_RANGE, (uint8_t)(range & ADXL355_RANGE_SEL_MASK)) != 0) {
+    uint8_t reg;
+    if (read_reg(dev, ADXL355_REG_RANGE, &reg) != 0) {
+        return ADXL355_ERR_BUS;
+    }
+    reg = (uint8_t)((reg & (uint8_t)(~ADXL355_RANGE_SEL_MASK)) |
+                    ((uint8_t)range & ADXL355_RANGE_SEL_MASK));
+    if (write_reg(dev, ADXL355_REG_RANGE, reg) != 0) {
         return ADXL355_ERR_BUS;
     }
     dev->range = range;
