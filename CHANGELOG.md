@@ -57,7 +57,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Go: +10 tests (21 total) — temperature raw/celsius nominal+50°C, status register, filter default, reset code verification, half-scale decode
 
 #### Stage 4: CI release gates
-- `.github/workflows/release.yml` — release gate workflow with package dry-run checks (Python sdist+wheel, Rust crate, npm pack, Go vet+build) — triggered on `v*` tags or manually
+- `.github/workflows/release.yml` — enforceable release gate that reuses required CI, validates tag/commit/version consistency, builds Python/Rust/npm/Go/C/C++ dry-run artifacts from one SHA, and uploads per-package plus aggregate SHA-256 checksums
 
 #### Stage 5: Hardware adapters
 - `python/src/adxl355/adapters/smbus2.py` — Linux I2C transport (smbus2)

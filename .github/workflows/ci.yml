@@ -9,9 +9,10 @@ on:
   pull_request:
     branches: [main, master]
   workflow_dispatch:
+  workflow_call:
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ci-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 env:
@@ -168,3 +169,5 @@ jobs:
         run: python spec/validate_spec.py
       - name: Check cross-language consistency
         run: python spec/check_language_consistency.py
+      - name: Test release automation
+        run: python -m unittest discover -s scripts/tests -p "test_*.py" -v

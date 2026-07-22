@@ -3,6 +3,17 @@
 > ⚠️ **Do not publish until the 1.0.0 release.**
 > All register values must be verified against the ADXL355 datasheet first.
 
+## Automated release verification
+
+Pushing a root `v*` tag starts `.github/workflows/release.yml`. The workflow
+re-runs the required CI workflow, verifies that the tag points to the packaged
+commit, validates every maintained version declaration, builds all package
+formats without publishing, and uploads checksummed artifacts for inspection.
+
+The workflow has read-only repository permissions and intentionally has no
+registry credentials or provenance identity permissions. See
+[`docs/releasing.md`](releasing.md) for the enforced checks and local fixture.
+
 ## Python (PyPI)
 
 ```bash
