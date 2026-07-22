@@ -6,91 +6,337 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Version to release (e.g. v0.1.0-alpha.1)"
+        description: "Existing release tag to verify (for example v0.1.0-alpha.2)"
         required: true
+        type: string
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: release-${{ github.ref }}
   cancel-in-progress: true
 
 env:
   CARGO_TERM_COLOR: always
+  RELEASE_TAG: ${{ github.event_name == 'push' && github.ref_name || inputs.version }}
 
 jobs:
-  # ── Pre-flight: all CI tests must pass ──────────────────────────
-  ci-passed:
-    name: CI Green?
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-      - name: Check CI status for this commit
-        run: |
-          echo "In a real workflow, this would query the commit status API."
-          echo "For now the release gate assumes CI was green on the target commit."
+  ci:
+    name: Required CI
+    uses: ./.github/workflows/ci.yml
+    permissions:
+      contents: read
 
-  # ── Python package dry-run ──────────────────────────────────────
-  python-package:
-    name: Python (sdist + wheel)
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: python
+  preflight:
+    name: Tag, commit, and version preflight
+    permissions:
+      contents: read
+    runs-on: ubuntu-24.04
+    outputs:
+      tag: ${{ steps.preflight.outputs.tag }}
+      version: ${{ steps.preflight.outputs.version }}
+      core_version: ${{ steps.preflight.outputs.core_version }}
+      release_sha: ${{ steps.preflight.outputs.release_sha }}
+      short_sha: ${{ steps.preflight.outputs.short_sha }}
     steps:
       - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+          persist-credentials: false
       - uses: actions/setup-python@v6
         with:
           python-version: "3.11"
-      - name: Install build
-        run: pip install build
-      - name: Build sdist + wheel
-        run: python -m build --outdir dist
+      - name: Test release preflight fixture
+        run: python -m unittest discover -s scripts/tests -p "test_release_preflight.py" -v
+      - name: Verify tag, commit, clean tree, and package versions
+        id: preflight
+        env:
+          RELEASE_SHA: ${{ github.sha }}
+        run: |
+          report="$RUNNER_TEMP/release-preflight.json"
+          python scripts/release_preflight.py \
+            --tag "$RELEASE_TAG" \
+            --sha "$RELEASE_SHA" > "$report"
+          jq -r '
+            {tag, version, core_version, release_sha, short_sha}
+            | to_entries[]
+            | "\(.key)=\(.value)"
+          ' "$report" >> "$GITHUB_OUTPUT"
+          cat "$report"
 
-  # ── Rust crate dry-run ──────────────────────────────────────────
+  python-package:
+    name: Python package dry run
+    permissions:
+      contents: read
+    needs: [ci, preflight]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.preflight.outputs.release_sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+      - name: Verify exact clean checkout
+        env:
+          RELEASE_SHA: ${{ needs.preflight.outputs.release_sha }}
+        run: |
+          test "$(git rev-parse HEAD)" = "$RELEASE_SHA"
+          test -z "$(git status --porcelain --untracked-files=all)"
+      - name: Build wheel and source distribution
+        env:
+          OUT: ${{ runner.temp }}/release/python
+        run: |
+          mkdir -p "$OUT"
+          python -m pip install --disable-pip-version-check "build==1.5.0"
+          python -m build python --outdir "$OUT"
+          (
+            cd "$OUT"
+            for artifact in ./*.whl ./*.tar.gz; do
+              printf '## %s\n' "$artifact"
+              case "$artifact" in
+                *.whl) python -m zipfile -l "$artifact" ;;
+                *.tar.gz) tar -tzf "$artifact" ;;
+              esac
+            done
+          ) > "$OUT/CONTENTS.txt"
+          (cd "$OUT" && sha256sum -- ./*.whl ./*.tar.gz > SHA256SUMS)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: package-python-${{ needs.preflight.outputs.version }}-${{ needs.preflight.outputs.short_sha }}
+          path: ${{ runner.temp }}/release/python/*
+          if-no-files-found: error
+          retention-days: 14
+
   rust-package:
-    name: Rust (crate)
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: rust
+    name: Rust crate dry run
+    permissions:
+      contents: read
+    needs: [ci, preflight]
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.preflight.outputs.release_sha }}
+          persist-credentials: false
       - uses: dtolnay/rust-toolchain@stable
-      - name: cargo package (dry-run)
-        run: cargo package --allow-dirty
+      - name: Verify exact clean checkout
+        env:
+          RELEASE_SHA: ${{ needs.preflight.outputs.release_sha }}
+        run: |
+          test "$(git rev-parse HEAD)" = "$RELEASE_SHA"
+          test -z "$(git status --porcelain --untracked-files=all)"
+      - name: Build crate without publishing
+        env:
+          OUT: ${{ runner.temp }}/release/rust
+          VERSION: ${{ needs.preflight.outputs.version }}
+        working-directory: rust
+        run: |
+          mkdir -p "$OUT"
+          cargo package --locked
+          cargo package --list > "$OUT/CONTENTS.txt"
+          cp "target/package/adxl355-${VERSION}.crate" "$OUT/"
+          (cd "$OUT" && sha256sum -- ./*.crate > SHA256SUMS)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: package-rust-${{ needs.preflight.outputs.version }}-${{ needs.preflight.outputs.short_sha }}
+          path: ${{ runner.temp }}/release/rust/*
+          if-no-files-found: error
+          retention-days: 14
 
-  # ── Node package dry-run ────────────────────────────────────────
   node-package:
-    name: Node.js (tarball)
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: node
+    name: Node.js tarball dry run
+    permissions:
+      contents: read
+    needs: [ci, preflight]
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.preflight.outputs.release_sha }}
+          persist-credentials: false
       - uses: actions/setup-node@v6
         with:
           node-version: "20"
-      - name: Install
-        run: npm ci
-      - name: Build
-        run: npm run build
-      - name: Pack (dry-run)
-        run: npm pack --dry-run
+          cache: npm
+          cache-dependency-path: node/package-lock.json
+      - name: Verify exact clean checkout
+        env:
+          RELEASE_SHA: ${{ needs.preflight.outputs.release_sha }}
+        run: |
+          test "$(git rev-parse HEAD)" = "$RELEASE_SHA"
+          test -z "$(git status --porcelain --untracked-files=all)"
+      - name: Build and pack without publishing
+        env:
+          OUT: ${{ runner.temp }}/release/node
+        working-directory: node
+        run: |
+          mkdir -p "$OUT"
+          npm ci --ignore-scripts
+          npm run build
+          npm pack --dry-run --json > "$OUT/PACK_CONTENTS.json"
+          npm pack --pack-destination "$OUT"
+          (cd "$OUT" && sha256sum -- ./*.tgz > SHA256SUMS)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: package-node-${{ needs.preflight.outputs.version }}-${{ needs.preflight.outputs.short_sha }}
+          path: ${{ runner.temp }}/release/node/*
+          if-no-files-found: error
+          retention-days: 14
 
-  # ── Go module check ─────────────────────────────────────────────
   go-package:
-    name: Go (module)
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: go
+    name: Go module dry run
+    permissions:
+      contents: read
+    needs: [ci, preflight]
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.preflight.outputs.release_sha }}
+          fetch-depth: 0
+          persist-credentials: false
       - uses: actions/setup-go@v6
         with:
           go-version: "1.21"
           cache: false
-      - name: go vet
-        run: go vet ./...
-      - name: go build
-        run: go build ./...
+      - name: Verify exact clean checkout
+        env:
+          RELEASE_SHA: ${{ needs.preflight.outputs.release_sha }}
+        run: |
+          test "$(git rev-parse HEAD)" = "$RELEASE_SHA"
+          test -z "$(git status --porcelain --untracked-files=all)"
+      - name: Verify and archive module without publishing
+        env:
+          OUT: ${{ runner.temp }}/release/go
+          VERSION: ${{ needs.preflight.outputs.version }}
+          RELEASE_SHA: ${{ needs.preflight.outputs.release_sha }}
+        run: |
+          mkdir -p "$OUT"
+          (cd go && go mod verify && go test ./... && go vet ./... && go build ./...)
+          git archive \
+            --format=tar.gz \
+            --prefix="adxl355-go-${VERSION}/" \
+            --output="$OUT/adxl355-go-${VERSION}.tar.gz" \
+            "${RELEASE_SHA}:go"
+          git show -s --format='commit=%H%ncommitted_at=%cI' "$RELEASE_SHA" > "$OUT/BUILD_INFO.txt"
+          (cd "$OUT" && sha256sum -- ./*.tar.gz > SHA256SUMS)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: package-go-${{ needs.preflight.outputs.version }}-${{ needs.preflight.outputs.short_sha }}
+          path: ${{ runner.temp }}/release/go/*
+          if-no-files-found: error
+          retention-days: 14
+
+  c-cpp-package:
+    name: C and C++ artifacts dry run
+    permissions:
+      contents: read
+    needs: [ci, preflight]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.preflight.outputs.release_sha }}
+          persist-credentials: false
+      - name: Install C/C++ build tools
+        run: sudo apt-get update && sudo apt-get install -y cmake gcc g++
+      - name: Verify exact clean checkout
+        env:
+          RELEASE_SHA: ${{ needs.preflight.outputs.release_sha }}
+        run: |
+          test "$(git rev-parse HEAD)" = "$RELEASE_SHA"
+          test -z "$(git status --porcelain --untracked-files=all)"
+      - name: Build and stage C/C++ artifacts
+        env:
+          OUT: ${{ runner.temp }}/release/c-cpp
+          VERSION: ${{ needs.preflight.outputs.version }}
+          RELEASE_SHA: ${{ needs.preflight.outputs.release_sha }}
+        run: |
+          cmake -S c -B c/build \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DADXL355_BUILD_TESTS=ON \
+            -DADXL355_BUILD_EXAMPLES=ON \
+            -DADXL355_WARNINGS_AS_ERRORS=ON
+          cmake --build c/build --parallel 2
+          ctest --test-dir c/build --output-on-failure
+
+          cmake -S cpp -B cpp/build \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DADXL355_BUILD_TESTS=ON \
+            -DADXL355_BUILD_EXAMPLES=ON \
+            -DCMAKE_CXX_FLAGS='-Wall -Wextra -Wpedantic -Werror'
+          cmake --build cpp/build --parallel 2
+          ctest --test-dir cpp/build --output-on-failure
+
+          STAGE="$RUNNER_TEMP/release/c-cpp-stage"
+          mkdir -p "$OUT" "$STAGE/include" "$STAGE/bin" "$STAGE/lib"
+          cmake --install c/build --prefix "$STAGE"
+          cp -R cpp/include/adxl355 "$STAGE/include/adxl355-cpp"
+          cp c/build/libadxl355.a "$STAGE/lib/"
+          cp c/build/examples/basic_read "$STAGE/bin/adxl355-c-basic-read"
+          cp cpp/build/examples/basic_read "$STAGE/bin/adxl355-cpp-basic-read"
+          printf 'version=%s\ncommit=%s\n' "$VERSION" "$RELEASE_SHA" > "$STAGE/BUILD_INFO.txt"
+          tar -C "$STAGE" -czf "$OUT/adxl355-c-cpp-${VERSION}.tar.gz" .
+          find "$STAGE" -type f -printf '%P\n' | sort > "$OUT/CONTENTS.txt"
+          (cd "$OUT" && sha256sum -- ./*.tar.gz > SHA256SUMS)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: package-c-cpp-${{ needs.preflight.outputs.version }}-${{ needs.preflight.outputs.short_sha }}
+          path: ${{ runner.temp }}/release/c-cpp/*
+          if-no-files-found: error
+          retention-days: 14
+
+  release-bundle:
+    name: Aggregate release artifacts and checksums
+    permissions: {}
+    needs:
+      - preflight
+      - python-package
+      - rust-package
+      - node-package
+      - go-package
+      - c-cpp-package
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: package-*-${{ needs.preflight.outputs.short_sha }}
+          path: ${{ runner.temp }}/release-artifacts
+      - name: Create aggregate metadata and checksums
+        env:
+          RELEASE_TAG: ${{ needs.preflight.outputs.tag }}
+          VERSION: ${{ needs.preflight.outputs.version }}
+          RELEASE_SHA: ${{ needs.preflight.outputs.release_sha }}
+          SHORT_SHA: ${{ needs.preflight.outputs.short_sha }}
+          ROOT: ${{ runner.temp }}
+        run: |
+          cd "$ROOT"
+          find release-artifacts -type f -print0 | sort -z | xargs -0 sha256sum > RELEASE_SHA256SUMS
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          metadata = {
+              "tag": os.environ["RELEASE_TAG"],
+              "version": os.environ["VERSION"],
+              "release_sha": os.environ["RELEASE_SHA"],
+              "short_sha": os.environ["SHORT_SHA"],
+              "run_id": os.environ["GITHUB_RUN_ID"],
+              "repository": os.environ["GITHUB_REPOSITORY"],
+              "publishing_enabled": False,
+          }
+          Path(os.environ["ROOT"], "release-metadata.json").write_text(
+              json.dumps(metadata, indent=2) + "\n"
+          )
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-bundle-${{ needs.preflight.outputs.version }}-${{ needs.preflight.outputs.short_sha }}
+          path: |
+            ${{ runner.temp }}/release-artifacts
+            ${{ runner.temp }}/RELEASE_SHA256SUMS
+            ${{ runner.temp }}/release-metadata.json
+          if-no-files-found: error
+          retention-days: 14
