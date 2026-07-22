@@ -198,6 +198,80 @@ func TestReadRaw(t *testing.T) {
 	}
 }
 
+type temperatureSequenceTransport struct {
+	*mockTransport
+	responses [][]byte
+}
+
+func (m *temperatureSequenceTransport) ReadRegister(reg byte, length int) ([]byte, error) {
+	if reg == RegTEMP2 && len(m.responses) > 0 {
+		response := m.responses[0]
+		m.responses = m.responses[1:]
+		return response, nil
+	}
+	return m.mockTransport.ReadRegister(reg, length)
+}
+
+func TestTemperatureReservedNibbleIgnored(t *testing.T) {
+	mock := newMockTransport()
+	mock.regs[RegTEMP2] = 0xF7
+	mock.regs[RegTEMP1] = 0x5D
+	raw, err := New(mock).ReadTemperatureRaw()
+	if err != nil || raw != 1885 {
+		t.Fatalf("ReadTemperatureRaw = (%d, %v), want (1885, nil)", raw, err)
+	}
+}
+
+func TestTemperatureShortReadReturnsBusError(t *testing.T) {
+	transport := &temperatureSequenceTransport{mockTransport: newMockTransport(), responses: [][]byte{{0x07}}}
+	_, err := New(transport).ReadTemperatureRaw()
+	if err != ErrBus {
+		t.Fatalf("short read error = %v, want ErrBus", err)
+	}
+}
+
+func TestTemperatureRolloverRetry(t *testing.T) {
+	transport := &temperatureSequenceTransport{
+		mockTransport: newMockTransport(),
+		responses:     [][]byte{{0x07, 0xFF}, {0x08}, {0x08, 0x00}, {0x08}},
+	}
+	raw, err := New(transport).ReadTemperatureRaw()
+	if err != nil || raw != 2048 {
+		t.Fatalf("rollover read = (%d, %v), want (2048, nil)", raw, err)
+	}
+}
+
+func TestTemperatureUnstableReturnsNotReady(t *testing.T) {
+	transport := &temperatureSequenceTransport{
+		mockTransport: newMockTransport(),
+		responses:     [][]byte{{0x07, 0xFF}, {0x08}, {0x08, 0xFF}, {0x09}, {0x09, 0xFF}, {0x0A}},
+	}
+	_, err := New(transport).ReadTemperatureRaw()
+	if err != ErrNotReady {
+		t.Fatalf("unstable read error = %v, want ErrNotReady", err)
+	}
+}
+
+func TestTemperatureBoundaries(t *testing.T) {
+	mock := newMockTransport()
+	dev := New(mock)
+	raw, err := dev.ReadTemperatureRaw()
+	if err != nil || raw != 0 {
+		t.Fatalf("minimum raw = (%d, %v), want (0, nil)", raw, err)
+	}
+
+	mock.regs[RegTEMP2] = 0x0F
+	mock.regs[RegTEMP1] = 0xFF
+	raw, err = dev.ReadTemperatureRaw()
+	if err != nil || raw != 4095 {
+		t.Fatalf("maximum raw = (%d, %v), want (4095, nil)", raw, err)
+	}
+	temp, err := dev.ReadTemperatureC()
+	if err != nil || temp < -219.21 || temp > -219.19 {
+		t.Fatalf("maximum temperature = (%f, %v), want ~-219.1989", temp, err)
+	}
+}
+
 func TestTemperatureRaw(t *testing.T) {
 	mock := newMockTransport()
 	mock.regs[RegTEMP2] = 0x07

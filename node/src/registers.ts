@@ -51,6 +51,13 @@ export const PARTID_VALUE = 0xed;
 /** Software reset code (datasheet Rev.D, Table 45) */
 export const RESET_CODE = 0x52;
 
+/** Temperature sensor constants (datasheet Rev.D, Table 29 and sensor section) */
+export const TEMP2_DATA_MASK = 0x0f;
+export const TEMP_READ_ATTEMPTS = 3;
+export const TEMP_INTERCEPT_LSB = 1885.0;
+export const TEMP_INTERCEPT_C = 25.0;
+export const TEMP_SLOPE_LSB_PER_C = -9.05;
+
 /** STATUS register bit positions (datasheet Rev.D, Table 27) */
 export const STATUS_NVM_BUSY = 4;
 export const STATUS_ACTIVITY = 3;

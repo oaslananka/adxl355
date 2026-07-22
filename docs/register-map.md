@@ -12,8 +12,8 @@
 | 0x03 | REVID | R | — | Revision ID |
 | 0x04 | STATUS | R | — | Status register (see below) |
 | 0x05 | FIFO_ENTRIES | R | — | FIFO entry count |
-| 0x06 | TEMP2 | R | — | Temperature high byte |
-| 0x07 | TEMP1 | R | — | Temperature low byte |
+| 0x06 | TEMP2 | R | — | Temperature bits 11:8 in bits 3:0; bits 7:4 reserved |
+| 0x07 | TEMP1 | R | — | Temperature bits 7:0 |
 | 0x08 | XDATA3 | R | — | X-axis acceleration MSB |
 | 0x09 | XDATA2 | R | — | X-axis acceleration mid |
 | 0x0A | XDATA1 | R | — | X-axis acceleration LSB |
@@ -99,6 +99,19 @@ starts with `0x11`, while writing `POWER_CTL` (`0x2D`) starts with `0x5A`.
 | 9 | 7.813 Hz |
 | 10 | 3.906 Hz |
 
+## Temperature Registers (0x06–0x07)
+
+`TEMP2[3:0]` contains raw temperature bits 11:8 and `TEMP1[7:0]`
+contains bits 7:0. `TEMP2[7:4]` is reserved and must be masked out.
+Because the temperature registers are not double-buffered, drivers read
+`TEMP2`/`TEMP1` as one two-byte burst, re-read `TEMP2`, and retry up to three
+times if the high data nibble changed. Short reads are bus errors; persistent
+rollover returns a not-ready error.
+
+Nominal conversion:
+
+`T(°C) = 25.0 + (raw - 1885.0) / -9.05`
+
 ## Power Control Register (0x2D)
 
 | Bit | Value | Description |
@@ -117,7 +130,7 @@ The following fields have **not** been verified against the official ADXL355 dat
 - [ ] Reset command value (0x52)
 - [x] Range register default (`RANGE[1:0] = 0b01` = ±2g)
 - [ ] Scale factors (3.9, 7.8, 15.6 µg/LSB)
-- [ ] Temperature conversion formula
+- [x] Temperature bit layout, coherent-read strategy, and nominal conversion formula
 - [x] SPI Mode 0 and read/write command format
 - [ ] I2C address options
 - [ ] Status register bit definitions

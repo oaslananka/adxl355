@@ -83,5 +83,39 @@
         "expected_mps2": 80.2073860934
       }
     ]
+  },
+  "temperature_conversion": {
+    "description": "TEMP2/TEMP1 decoding and nominal Celsius conversion",
+    "tolerance_c": 0.01,
+    "vectors": [
+      {
+        "name": "zero_raw",
+        "temp2": 0,
+        "temp1": 0,
+        "expected_raw": 0,
+        "expected_c": 233.28729281767954
+      },
+      {
+        "name": "nominal_25c",
+        "temp2": 7,
+        "temp1": 93,
+        "expected_raw": 1885,
+        "expected_c": 25.0
+      },
+      {
+        "name": "reserved_nibble_ignored",
+        "temp2": 247,
+        "temp1": 93,
+        "expected_raw": 1885,
+        "expected_c": 25.0
+      },
+      {
+        "name": "maximum_raw",
+        "temp2": 15,
+        "temp1": 255,
+        "expected_raw": 4095,
+        "expected_c": -219.1988950276243
+      }
+    ]
   }
 }

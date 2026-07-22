@@ -169,13 +169,31 @@ func (d *Device) ReadMps2() (*AccelXYZ, error) {
 	}, nil
 }
 
-// ReadTemperatureRaw reads raw temperature (16-bit).
+// ReadTemperatureRaw reads a coherent 12-bit unsigned temperature sample.
+// TEMP2/TEMP1 are read together, then TEMP2 is re-read to detect high-byte rollover.
 func (d *Device) ReadTemperatureRaw() (int16, error) {
-	data, err := d.transport.ReadRegister(RegTEMP2, 2)
-	if err != nil {
-		return 0, err
+	for attempt := 0; attempt < TempReadAttempts; attempt++ {
+		data, err := d.transport.ReadRegister(RegTEMP2, 2)
+		if err != nil {
+			return 0, err
+		}
+		if len(data) != 2 {
+			return 0, ErrBus
+		}
+		confirm, err := d.transport.ReadRegister(RegTEMP2, 1)
+		if err != nil {
+			return 0, err
+		}
+		if len(confirm) != 1 {
+			return 0, ErrBus
+		}
+
+		temp2 := data[0] & Temp2DataMask
+		if temp2 == confirm[0]&Temp2DataMask {
+			return int16(temp2)<<8 | int16(data[1]), nil
+		}
 	}
-	return int16(data[0])<<8 | int16(data[1]), nil
+	return 0, ErrNotReady
 }
 
 // ReadTemperatureC reads temperature in degrees Celsius.
@@ -185,7 +203,7 @@ func (d *Device) ReadTemperatureC() (float32, error) {
 	if err != nil {
 		return 0, err
 	}
-	return 25.0 + (float32(raw)-1885.0)/-9.05, nil
+	return TempInterceptC + (float32(raw)-TempInterceptLSB)/TempSlopeLSBPerC, nil
 }
 
 // ReadStatus reads the status register.

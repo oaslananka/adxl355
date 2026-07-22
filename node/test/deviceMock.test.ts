@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { ADXL355 } from "../src/device.js";
 import { Range, PowerMode, Reg, RESET_CODE } from "../src/registers.js";
 import { Transport } from "../src/transport.js";
-import { InvalidConfigurationError } from "../src/errors.js";
+import { BusError, DataNotReadyError, InvalidConfigurationError } from "../src/errors.js";
 
 class MockTransport implements Transport {
   private regs: Uint8Array;
@@ -49,6 +49,23 @@ class MockTransport implements Transport {
     // no-op
   }
 }
+
+class TemperatureSequenceTransport extends MockTransport {
+  private readonly responses: Uint8Array[];
+
+  constructor(responses: number[][]) {
+    super();
+    this.responses = responses.map((response) => Uint8Array.from(response));
+  }
+
+  override async readRegister(reg: number, length: number): Promise<Uint8Array> {
+    if (reg === Reg.TEMP2 && this.responses.length > 0) {
+      return this.responses.shift()!;
+    }
+    return super.readRegister(reg, length);
+  }
+}
+
 
 describe("ADXL355", () => {
   it("should default cached range to 2g", () => {
@@ -140,6 +157,49 @@ describe("ADXL355", () => {
     expect(accel.x).toBeGreaterThan(0);
     expect(accel.y).toBe(0);
     expect(accel.z).toBeLessThan(0);
+  });
+
+  it("should ignore reserved TEMP2 high bits", async () => {
+    const transport = new MockTransport();
+    transport["regs"][Reg.TEMP2] = 0xf7;
+    transport["regs"][Reg.TEMP1] = 0x5d;
+    const dev = new ADXL355(transport);
+    await expect(dev.readTemperatureRaw()).resolves.toBe(1885);
+    await expect(dev.readTemperatureC()).resolves.toBeCloseTo(25.0, 2);
+  });
+
+  it("should reject short temperature reads", async () => {
+    const dev = new ADXL355(new TemperatureSequenceTransport([[0x07]]));
+    await expect(dev.readTemperatureRaw()).rejects.toBeInstanceOf(BusError);
+  });
+
+  it("should retry a temperature high-byte rollover", async () => {
+    const dev = new ADXL355(
+      new TemperatureSequenceTransport([[0x07, 0xff], [0x08], [0x08, 0x00], [0x08]]),
+    );
+    await expect(dev.readTemperatureRaw()).resolves.toBe(2048);
+  });
+
+  it("should reject persistently unstable temperature samples", async () => {
+    const dev = new ADXL355(
+      new TemperatureSequenceTransport([
+        [0x07, 0xff], [0x08],
+        [0x08, 0xff], [0x09],
+        [0x09, 0xff], [0x0a],
+      ]),
+    );
+    await expect(dev.readTemperatureRaw()).rejects.toBeInstanceOf(DataNotReadyError);
+  });
+
+  it("should decode temperature boundary vectors", async () => {
+    const transport = new MockTransport();
+    const dev = new ADXL355(transport);
+    await expect(dev.readTemperatureRaw()).resolves.toBe(0);
+
+    transport["regs"][Reg.TEMP2] = 0x0f;
+    transport["regs"][Reg.TEMP1] = 0xff;
+    await expect(dev.readTemperatureRaw()).resolves.toBe(4095);
+    await expect(dev.readTemperatureC()).resolves.toBeCloseTo(-219.198895, 2);
   });
 
   it("should read temperature raw nominal", async () => {

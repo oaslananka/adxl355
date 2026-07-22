@@ -84,10 +84,12 @@ Register addresses, bit fields, and expected ID values are defined in `spec/adxl
 
 - 20-bit raw data decoding (5 vectors: zero, positive one, positive max, negative min, negative one)
 - Acceleration conversion (raw to g, raw to m/s²)
+- Temperature decoding and conversion, including reserved TEMP2 bits and raw boundaries
 
 Every language must pass the same test vectors. Floating-point tolerance:
 - g conversion: ±1e-6
 - m/s² conversion: ±1e-5
+- temperature conversion: ±0.01°C
 
 ## Testing Strategy
 
@@ -99,7 +101,7 @@ Every language must pass the same test vectors. Floating-point tolerance:
 - Sign extension correctness
 - Config register write verification
 - Status register readback
-- Temperature conversion (preliminary)
+- Coherent 12-bit temperature read and nominal conversion
 
 ### Hardware tests (optional, separated)
 

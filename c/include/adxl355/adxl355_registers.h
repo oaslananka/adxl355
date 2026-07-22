@@ -16,6 +16,13 @@ extern "C" {
 #define ADXL355_REG_FIFO_ENTRIES  0x05U
 #define ADXL355_REG_TEMP2         0x06U
 #define ADXL355_REG_TEMP1         0x07U
+
+/* Temperature data (datasheet Rev.D, Table 29) */
+#define ADXL355_TEMP2_DATA_MASK        0x0FU
+#define ADXL355_TEMP_READ_ATTEMPTS     3U
+#define ADXL355_TEMP_INTERCEPT_LSB     1885.0f
+#define ADXL355_TEMP_INTERCEPT_C       25.0f
+#define ADXL355_TEMP_SLOPE_LSB_PER_C   -9.05f
 #define ADXL355_REG_XDATA3        0x08U
 #define ADXL355_REG_XDATA2        0x09U
 #define ADXL355_REG_XDATA1        0x0AU

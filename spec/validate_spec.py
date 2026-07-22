@@ -68,6 +68,7 @@ class SpecValidator:
         self.spec_dir = spec_dir
         self.registers_path = spec_dir / "adxl355.registers.yaml"
         self.constants_path = spec_dir / "adxl355.constants.yaml"
+        self.vectors_path = spec_dir / "test_vectors.json"
         self.errors: list[str] = []
         self.warnings: list[str] = []
 
@@ -85,17 +86,19 @@ class SpecValidator:
 
         registers = self._load_yaml(self.registers_path)
         constants = self._load_yaml(self.constants_path)
-        if registers is None or constants is None:
+        vectors = self._load_json(self.vectors_path)
+        if registers is None or constants is None or vectors is None:
             return False
 
         self._validate_registers(registers)
         self._validate_constants(constants)
         self._validate_cross_references(registers, constants)
+        self._validate_test_vectors(vectors)
 
         return len(self.errors) == 0
 
     def _check_files_exist(self):
-        for p in [self.registers_path, self.constants_path]:
+        for p in [self.registers_path, self.constants_path, self.vectors_path]:
             if not p.exists():
                 self.error(f"File not found: {p}")
 
@@ -109,6 +112,14 @@ class SpecValidator:
             return data
         except yaml.YAMLError as e:
             self.error(f"{path.name}: YAML parse error: {e}")
+            return None
+
+    def _load_json(self, path: Path):
+        try:
+            with open(path, encoding="utf-8") as f:
+                return json.load(f)
+        except (json.JSONDecodeError, OSError) as e:
+            self.error(f"{path.name}: JSON parse error: {e}")
             return None
 
     def _validate_registers(self, data: dict):
@@ -284,17 +295,71 @@ class SpecValidator:
         temp = data.get("temperature", {})
         if not isinstance(temp, dict):
             self.error("constants.yaml: 'temperature' must be a dictionary")
+        else:
+            if temp.get("TEMP2_DATA_MASK") != 0x0F:
+                self.error("constants.yaml: temperature.TEMP2_DATA_MASK should be 0x0F")
+            if temp.get("coherent_read_attempts") != 3:
+                self.error("constants.yaml: temperature.coherent_read_attempts should be 3")
+            if temp.get("intercept_lsb") != 1885.0 or temp.get("intercept_c") != 25.0:
+                self.error("constants.yaml: temperature intercept constants are incorrect")
+            if temp.get("slope_lsb_per_c") != -9.05:
+                self.error("constants.yaml: temperature.slope_lsb_per_c should be -9.05")
+
+    def _validate_test_vectors(self, data: dict):
+        temperature = data.get("temperature_conversion")
+        if not isinstance(temperature, dict):
+            self.error("test_vectors.json: missing temperature_conversion object")
+            return
+        tolerance = temperature.get("tolerance_c")
+        vectors = temperature.get("vectors")
+        if not isinstance(tolerance, (int, float)) or tolerance <= 0:
+            self.error("test_vectors.json: temperature tolerance_c must be positive")
+        if not isinstance(vectors, list) or not vectors:
+            self.error("test_vectors.json: temperature vectors must be a non-empty list")
+            return
+
+        raw_values = set()
+        has_reserved_nibble = False
+        for index, vector in enumerate(vectors):
+            prefix = f"test_vectors.json: temperature vector[{index}]"
+            if not isinstance(vector, dict):
+                self.error(f"{prefix}: must be an object")
+                continue
+            required = {"name", "temp2", "temp1", "expected_raw", "expected_c"}
+            missing = required - set(vector)
+            if missing:
+                self.error(f"{prefix}: missing fields {missing}")
+                continue
+            temp2 = vector["temp2"]
+            temp1 = vector["temp1"]
+            if not isinstance(temp2, int) or not 0 <= temp2 <= 0xFF:
+                self.error(f"{prefix}: temp2 must be a byte")
+                continue
+            if not isinstance(temp1, int) or not 0 <= temp1 <= 0xFF:
+                self.error(f"{prefix}: temp1 must be a byte")
+                continue
+            expected_raw = ((temp2 & 0x0F) << 8) | temp1
+            if vector["expected_raw"] != expected_raw:
+                self.error(f"{prefix}: expected_raw should be {expected_raw}")
+            expected_c = 25.0 + (expected_raw - 1885.0) / -9.05
+            if not isinstance(vector["expected_c"], (int, float)) or abs(vector["expected_c"] - expected_c) > 1e-9:
+                self.error(f"{prefix}: expected_c does not match nominal formula")
+            raw_values.add(expected_raw)
+            has_reserved_nibble = has_reserved_nibble or (temp2 & 0xF0) != 0
+
+        if not {0, 4095}.issubset(raw_values):
+            self.error("test_vectors.json: temperature vectors must include raw boundaries 0 and 4095")
+        if not has_reserved_nibble:
+            self.error("test_vectors.json: temperature vectors must include a nonzero reserved TEMP2 nibble")
 
     def _validate_cross_references(self, registers: dict, constants: dict):
         """Check references between the two spec files."""
         regs = {r["name"]: r for r in registers.get("registers", []) if isinstance(r, dict) and "name" in r}
 
         # Verify register names referenced in constants exist
-        filter_info = constants.get("filter_register", {})
         if "FILTER" not in regs:
             self.warn("constants.yaml references FILTER register but it's not in registers.yaml")
 
-        status_info = constants.get("status_register", {})
         if "STATUS" not in regs:
             self.warn("constants.yaml references STATUS register but it's not in registers.yaml")
 
@@ -311,7 +376,7 @@ class SpecValidator:
                 print(f"  {e}")
         else:
             print(f"\n{'=' * 60}")
-            print(f"VALIDATION PASSED — 0 errors")
+            print("VALIDATION PASSED — 0 errors")
             print(f"{'=' * 60}")
 
         if self.warnings:

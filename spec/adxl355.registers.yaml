@@ -83,14 +83,21 @@ registers:
     address: 0x06
     type: read-only
     default: null
-    description: Temperature high byte (12-bit, left-aligned)
+    description: Temperature bits 11:8 in bits 3:0; bits 7:4 are reserved
     datasheet_ref: "Table 29, page 33"
+    fields:
+      - bit: 7..4
+        name: RESERVED
+        description: Reserved; ignore when decoding temperature
+      - bit: 3..0
+        name: TEMP_DATA_H
+        description: Temperature data bits 11:8
 
   - name: TEMP1
     address: 0x07
     type: read-only
     default: null
-    description: Temperature low byte (12-bit, left-aligned)
+    description: Temperature data bits 7:0
     datasheet_ref: "Table 29, page 33"
 
   - name: XDATA3

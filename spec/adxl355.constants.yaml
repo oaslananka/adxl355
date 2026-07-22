@@ -87,6 +87,11 @@ gravity:
   description: "Standard gravity constant for g to m/s² conversion"
 
 temperature:
+  TEMP2_DATA_MASK: 0x0F
+  coherent_read_attempts: 3
+  intercept_lsb: 1885.0
+  intercept_c: 25.0
+  slope_lsb_per_c: -9.05
   formula: "T(°C) = 25.0 + (raw - 1885.0) / -9.05"
   note: |
     Nominal conversion based on datasheet:
@@ -94,7 +99,9 @@ temperature:
     - 25°C corresponds to approximately 1885 LSB (nominal intercept)
     - Slope: -9.05 LSB/°C (temperature decreases as raw increases)
     - Actual devices may need calibration for accurate readings
-    Raw value 0x00 = 12-bit left-aligned in TEMP2/TEMP1 registers
+    TEMP2 bits 3:0 contain raw bits 11:8; TEMP2 bits 7:4 are reserved
+    TEMP1 contains raw bits 7:0
+    Coherent reads use a two-byte burst plus TEMP2 confirmation and up to three attempts
     See datasheet Temperature Sensor section.
 
 acceleration:
