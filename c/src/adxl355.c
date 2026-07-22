@@ -16,6 +16,23 @@ static inline int write_reg(adxl355_t *dev, uint8_t reg, uint8_t byte)
     return dev->bus.write(dev->bus.ctx, reg, &byte, 1);
 }
 
+static bool range_from_register(uint8_t reg, adxl355_range_t *range)
+{
+    switch (reg & ADXL355_RANGE_SEL_MASK) {
+        case ADXL355_RANGE_2G:
+            *range = ADXL355_RANGE_2G;
+            return true;
+        case ADXL355_RANGE_4G:
+            *range = ADXL355_RANGE_4G;
+            return true;
+        case ADXL355_RANGE_8G:
+            *range = ADXL355_RANGE_8G;
+            return true;
+        default:
+            return false;
+    }
+}
+
 /* ---------------------------------------------------------------------------
  * Scale factor lookup
  * --------------------------------------------------------------------------- */
@@ -40,7 +57,7 @@ adxl355_status_t adxl355_init(adxl355_t *dev, const adxl355_bus_t *bus)
     }
     memset(dev, 0, sizeof(*dev));
     dev->bus = *bus;
-    dev->range = ADXL355_RANGE_4G; /* default after reset */
+    dev->range = ADXL355_RANGE_2G; /* datasheet reset default */
     dev->initialized = false;
     return ADXL355_OK;
 }
@@ -72,11 +89,21 @@ adxl355_status_t adxl355_probe(adxl355_t *dev)
         return ADXL355_ERR_BAD_DEVICE;
     }
 
-    /* Put device into standby mode after probe */
+    uint8_t range_reg;
+    adxl355_range_t detected_range;
+    if (read_reg(dev, ADXL355_REG_RANGE, &range_reg) != 0) {
+        return ADXL355_ERR_BUS;
+    }
+    if (!range_from_register(range_reg, &detected_range)) {
+        return ADXL355_ERR_INVALID_ARG;
+    }
+
+    /* Put device into standby mode after probe. */
     if (write_reg(dev, ADXL355_REG_POWER_CTL, ADXL355_POWER_STANDBY) != 0) {
         return ADXL355_ERR_BUS;
     }
 
+    dev->range = detected_range;
     dev->initialized = true;
     return ADXL355_OK;
 }
@@ -92,7 +119,7 @@ adxl355_status_t adxl355_reset(adxl355_t *dev)
     if (dev->bus.delay_ms != NULL) {
         dev->bus.delay_ms(dev->bus.ctx, 10);
     }
-    dev->range = ADXL355_RANGE_4G;
+    dev->range = ADXL355_RANGE_2G;
     return ADXL355_OK;
 }
 
@@ -101,7 +128,7 @@ adxl355_status_t adxl355_set_range(adxl355_t *dev, adxl355_range_t range)
     if (dev == NULL) {
         return ADXL355_ERR_NULL;
     }
-    if (range > ADXL355_RANGE_8G) {
+    if (range < ADXL355_RANGE_2G || range > ADXL355_RANGE_8G) {
         return ADXL355_ERR_INVALID_ARG;
     }
     if (write_reg(dev, ADXL355_REG_RANGE, (uint8_t)(range & ADXL355_RANGE_SEL_MASK)) != 0) {
@@ -120,7 +147,9 @@ adxl355_status_t adxl355_get_range(adxl355_t *dev, adxl355_range_t *range)
     if (read_reg(dev, ADXL355_REG_RANGE, &reg) != 0) {
         return ADXL355_ERR_BUS;
     }
-    *range = (adxl355_range_t)(reg & ADXL355_RANGE_SEL_MASK);
+    if (!range_from_register(reg, range)) {
+        return ADXL355_ERR_INVALID_ARG;
+    }
     return ADXL355_OK;
 }
 

@@ -46,6 +46,9 @@ static int mock_write(void *ctx, uint8_t reg, const uint8_t *data, size_t len)
     for (size_t i = 0; i < len && (reg + i) < ADXL355_MOCK_NUM_REGS; i++) {
         mock->regs[reg + i] = data[i];
     }
+    if (reg == ADXL355_REG_RESET && len > 0 && data[0] == ADXL355_RESET_CODE) {
+        mock->regs[ADXL355_REG_RANGE] = ADXL355_RANGE_2G;
+    }
     return 0;
 }
 
@@ -63,6 +66,7 @@ static void mock_delay(void *ctx, uint32_t ms)
 void adxl355_mock_bus_init(adxl355_mock_bus_t *mock)
 {
     memset(mock, 0, sizeof(*mock));
+    mock->regs[ADXL355_REG_RANGE] = ADXL355_RANGE_2G;
 }
 
 void adxl355_mock_bus_set_identity_ok(adxl355_mock_bus_t *mock)

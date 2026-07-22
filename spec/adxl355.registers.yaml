@@ -294,7 +294,7 @@ registers:
     address: 0x2C
     type: read-write
     default: 0x01
-    description: Acceleration range selection
+    description: Acceleration range selection (reset default ±2g)
     datasheet_ref: "Table 42, page 38"
     fields:
       - bit: 7

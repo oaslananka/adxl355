@@ -3,7 +3,7 @@
 use alloc::vec::Vec;
 
 use crate::error::Error;
-use crate::registers::{self, Range, PowerMode};
+use crate::registers::{self, PowerMode, Range};
 use crate::types::{AccelXyz, RawXyz};
 
 /// Transport abstraction for ADXL355 communication.
@@ -29,7 +29,7 @@ impl<T: Transport> Adxl355<T> {
     pub fn new(transport: T) -> Self {
         Adxl355 {
             transport,
-            range: Range::G4,
+            range: Range::G2,
             initialized: false,
         }
     }
@@ -56,7 +56,7 @@ impl<T: Transport> Adxl355<T> {
     // Core API
     // ------------------------------------------------------------------
 
-    /// Probe for the ADXL355 by reading identity registers.
+    /// Probe for the ADXL355 and synchronize the cached hardware range.
     pub fn probe(&mut self) -> Result<bool, Error> {
         let id_ad = self.read_u8(registers::reg::DEVID_AD)?;
         let id_mst = self.read_u8(registers::reg::DEVID_MST)?;
@@ -69,8 +69,12 @@ impl<T: Transport> Adxl355<T> {
             return Err(Error::BadDevice);
         }
 
-        // Enter standby mode after probe
+        let range_value = self.read_u8(registers::reg::RANGE)?;
+        let detected_range = Range::from_register(range_value).ok_or(Error::InvalidArgument)?;
+
+        // Enter standby mode after probe. Commit state only after all bus operations succeed.
         self.write_u8(registers::reg::POWER_CTL, PowerMode::Standby as u8)?;
+        self.range = detected_range;
         self.initialized = true;
         Ok(true)
     }
@@ -79,14 +83,15 @@ impl<T: Transport> Adxl355<T> {
     pub fn reset(&mut self) -> Result<(), Error> {
         self.write_u8(registers::reg::RESET, registers::RESET_CODE)?;
         self.transport.delay_ms(10);
-        self.range = Range::G4;
+        self.range = Range::G2;
         Ok(())
     }
 
     /// Set the acceleration range.
     pub fn set_range(&mut self, range: Range) -> Result<(), Error> {
         let mut reg = self.read_u8(registers::reg::RANGE)?;
-        reg = (reg & !registers::range_reg::SEL_MASK) | (range.to_register() & registers::range_reg::SEL_MASK);
+        reg = (reg & !registers::range_reg::SEL_MASK)
+            | (range.to_register() & registers::range_reg::SEL_MASK);
         self.write_u8(registers::reg::RANGE, reg)?;
         self.range = range;
         Ok(())
@@ -209,7 +214,9 @@ mod tests {
 
     impl MockTransport {
         fn new() -> Self {
-            MockTransport { regs: [0; 128] }
+            let mut transport = MockTransport { regs: [0; 128] };
+            transport.regs[registers::reg::RANGE as usize] = Range::G2.to_register();
+            transport
         }
 
         fn set_identity_ok(&mut self) {
@@ -244,6 +251,10 @@ mod tests {
                 if reg + i < self.regs.len() {
                     self.regs[reg + i] = b;
                 }
+            }
+            if reg == registers::reg::RESET as usize && data.first() == Some(&registers::RESET_CODE)
+            {
+                self.regs[registers::reg::RANGE as usize] = Range::G2.to_register();
             }
             Ok(())
         }
@@ -296,6 +307,60 @@ mod tests {
         let v = raw_to_mps2(100000, Range::G2);
         let expected = 100000.0 * 0.0000039 * 9.80665;
         assert!((v - expected).abs() < 1e-5);
+    }
+
+    #[test]
+    fn test_new_defaults_to_2g() {
+        let dev = Adxl355::new(MockTransport::new());
+        assert_eq!(dev.range, Range::G2);
+    }
+
+    #[test]
+    fn test_probe_synchronizes_hardware_range() {
+        let mut mock = MockTransport::new();
+        mock.set_identity_ok();
+        mock.regs[registers::reg::RANGE as usize] = Range::G8.to_register();
+        let mut dev = Adxl355::new(mock);
+
+        assert_eq!(dev.probe(), Ok(true));
+        assert_eq!(dev.range, Range::G8);
+    }
+
+    #[test]
+    fn test_probe_rejects_reserved_range() {
+        let mut mock = MockTransport::new();
+        mock.set_identity_ok();
+        mock.regs[registers::reg::RANGE as usize] = 0;
+        let mut dev = Adxl355::new(mock);
+
+        assert_eq!(dev.probe(), Err(Error::InvalidArgument));
+        assert!(!dev.initialized);
+        assert_eq!(dev.range, Range::G2);
+    }
+
+    #[test]
+    fn test_reset_restores_2g_cache() {
+        let mut mock = MockTransport::new();
+        mock.set_identity_ok();
+        mock.regs[registers::reg::RANGE as usize] = Range::G8.to_register();
+        let mut dev = Adxl355::new(mock);
+        dev.probe().unwrap();
+
+        dev.reset().unwrap();
+        assert_eq!(dev.range, Range::G2);
+    }
+
+    #[test]
+    fn test_reset_range_converts_raw_value_to_one_g() {
+        let mut mock = MockTransport::new();
+        mock.set_identity_ok();
+        mock.regs[registers::reg::RANGE as usize] = Range::G2.to_register();
+        mock.set_xyz_raw(256410, 0, 0);
+        let mut dev = Adxl355::new(mock);
+
+        dev.probe().unwrap();
+        let accel = dev.read_g().unwrap();
+        assert!((accel.x - 1.0).abs() < 0.001);
     }
 
     #[test]

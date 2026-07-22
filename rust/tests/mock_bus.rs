@@ -1,7 +1,7 @@
 //! Integration tests for ADXL355 device with mock transport.
 
-use adxl355::{Adxl355, PowerMode, Error};
 use adxl355::registers;
+use adxl355::{Adxl355, Error, PowerMode};
 
 struct MockBus {
     regs: [u8; 128],
@@ -13,6 +13,7 @@ impl MockBus {
         bus.regs[registers::reg::DEVID_AD as usize] = registers::id::DEVID_AD;
         bus.regs[registers::reg::DEVID_MST as usize] = registers::id::DEVID_MST;
         bus.regs[registers::reg::PARTID as usize] = registers::id::PARTID;
+        bus.regs[registers::reg::RANGE as usize] = registers::Range::G2.to_register();
         bus
     }
 }
@@ -30,6 +31,9 @@ impl adxl355::device::Transport for MockBus {
             if start + i < self.regs.len() {
                 self.regs[start + i] = b;
             }
+        }
+        if reg == registers::reg::RESET && data.first() == Some(&registers::RESET_CODE) {
+            self.regs[registers::reg::RANGE as usize] = registers::Range::G2.to_register();
         }
         Ok(())
     }
@@ -125,8 +129,14 @@ fn test_filter_default_odr() {
     let bus = MockBus::new();
     let dev = Adxl355::new(bus);
     let inner = dev.into_inner();
-    assert_eq!(inner.regs[registers::reg::FILTER as usize] & registers::filter::ODR_MASK, 0x00);
-    assert_eq!(inner.regs[registers::reg::FILTER as usize] & registers::filter::HPF_MASK, 0x00);
+    assert_eq!(
+        inner.regs[registers::reg::FILTER as usize] & registers::filter::ODR_MASK,
+        0x00
+    );
+    assert_eq!(
+        inner.regs[registers::reg::FILTER as usize] & registers::filter::HPF_MASK,
+        0x00
+    );
 }
 
 #[test]
@@ -135,7 +145,10 @@ fn test_filter_hpf_preserved() {
     bus.regs[registers::reg::FILTER as usize] = 0x10;
     let dev = Adxl355::new(bus);
     let inner = dev.into_inner();
-    assert_eq!(inner.regs[registers::reg::FILTER as usize] & registers::filter::HPF_MASK, 0x10);
+    assert_eq!(
+        inner.regs[registers::reg::FILTER as usize] & registers::filter::HPF_MASK,
+        0x10
+    );
 }
 
 #[test]

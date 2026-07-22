@@ -11,7 +11,7 @@ type Device struct {
 func New(transport Transport) *Device {
 	return &Device{
 		transport:   transport,
-		rangeMode:   Range4G,
+		rangeMode:   Range2G,
 		initialized: false,
 	}
 }
@@ -36,7 +36,7 @@ func (d *Device) writeU8(reg byte, val byte) error {
 // Core API
 // ---------------------------------------------------------------------------
 
-// Probe verifies device identity by reading ID registers.
+// Probe verifies device identity and synchronizes the cached hardware range.
 func (d *Device) Probe() (bool, error) {
 	idAd, err := d.readU8(RegDEVID_AD)
 	if err != nil {
@@ -55,11 +55,21 @@ func (d *Device) Probe() (bool, error) {
 		return false, ErrBadDevice
 	}
 
-	// Enter standby mode after probe
+	rangeValue, err := d.readU8(RegRANGE)
+	if err != nil {
+		return false, err
+	}
+	detectedRange := Range(rangeValue & RangeSEL_MASK)
+	if detectedRange < Range2G || detectedRange > Range8G {
+		return false, ErrInvalidArg
+	}
+
+	// Enter standby mode after probe. Commit state only after all bus operations succeed.
 	if err := d.writeU8(RegPOWER_CTL, byte(PowerStandby)); err != nil {
 		return false, err
 	}
 
+	d.rangeMode = detectedRange
 	d.initialized = true
 	return true, nil
 }
@@ -70,7 +80,7 @@ func (d *Device) Reset() error {
 		return err
 	}
 	d.transport.DelayMs(10)
-	d.rangeMode = Range4G
+	d.rangeMode = Range2G
 	return nil
 }
 
@@ -97,7 +107,11 @@ func (d *Device) GetRange() (Range, error) {
 	if err != nil {
 		return 0, err
 	}
-	return Range(val & 0x03), nil
+	r := Range(val & RangeSEL_MASK)
+	if r < Range2G || r > Range8G {
+		return 0, ErrInvalidArg
+	}
+	return r, nil
 }
 
 // SetPowerMode sets the power mode (standby/measurement).

@@ -10,6 +10,7 @@ import {
   SCALE_4G_G_PER_LSB,
   SCALE_8G_G_PER_LSB,
   STANDARD_GRAVITY_M_S2,
+  RANGE_SEL_MASK,
   Range as RangeEnum,
 } from "./registers.js";
 import { Transport } from "./transport.js";
@@ -26,7 +27,7 @@ export class ADXL355 {
 
   constructor(transport: Transport) {
     this.transport = transport;
-    this.range = Range.G4;
+    this.range = Range.G2;
     this.initialized = false;
   }
 
@@ -47,7 +48,7 @@ export class ADXL355 {
   // Core API
   // ------------------------------------------------------------------
 
-  /** Probe for the ADXL355 by reading identity registers. */
+  /** Probe for the ADXL355 and synchronize the cached hardware range. */
   async probe(): Promise<boolean> {
     const idAd = await this.readU8(Reg.DEVID_AD);
     const idMst = await this.readU8(Reg.DEVID_MST);
@@ -60,8 +61,17 @@ export class ADXL355 {
       );
     }
 
-    // Enter standby mode after probe
+    const rangeBits = (await this.readU8(Reg.RANGE)) & RANGE_SEL_MASK;
+    if (![Range.G2, Range.G4, Range.G8].includes(rangeBits as Range)) {
+      throw new InvalidConfigurationError(
+        `Invalid RANGE register encoding: 0x${rangeBits.toString(16).padStart(2, "0")}`,
+      );
+    }
+    const detectedRange = rangeBits as Range;
+
+    // Enter standby mode after probe. Commit state only after all bus operations succeed.
     await this.writeU8(Reg.POWER_CTL, PowerMode.Standby);
+    this.range = detectedRange;
     this.initialized = true;
     return true;
   }
@@ -72,7 +82,7 @@ export class ADXL355 {
     if (this.transport.delayMs) {
       await this.transport.delayMs(10);
     }
-    this.range = Range.G4;
+    this.range = Range.G2;
   }
 
   /** Set the acceleration range, preserving unrelated bits. */
@@ -80,15 +90,20 @@ export class ADXL355 {
     if (![Range.G2, Range.G4, Range.G8].includes(range)) {
       throw new InvalidConfigurationError(`Invalid range: ${range}`);
     }
-    const reg = (await this.readU8(Reg.RANGE)) & ~0x03;
-    await this.writeU8(Reg.RANGE, reg | (range & 0x03));
+    const reg = (await this.readU8(Reg.RANGE)) & ~RANGE_SEL_MASK;
+    await this.writeU8(Reg.RANGE, reg | (range & RANGE_SEL_MASK));
     this.range = range;
   }
 
   /** Read the currently configured range. */
   async getRange(): Promise<Range> {
-    const val = await this.readU8(Reg.RANGE);
-    return (val & 0x03) as Range;
+    const rangeBits = (await this.readU8(Reg.RANGE)) & RANGE_SEL_MASK;
+    if (![Range.G2, Range.G4, Range.G8].includes(rangeBits as Range)) {
+      throw new InvalidConfigurationError(
+        `Invalid RANGE register encoding: 0x${rangeBits.toString(16).padStart(2, "0")}`,
+      );
+    }
+    return rangeBits as Range;
   }
 
   /** Set power mode. Datasheet Rev.D, Table 43: bit 0 = 1 => standby. */

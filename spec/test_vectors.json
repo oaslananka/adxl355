@@ -46,6 +46,14 @@
         "expected_mps2": 0.0
       },
       {
+        "name": "reset_default_one_g",
+        "raw": 256410,
+        "range": "G2",
+        "expected_g": 0.999999,
+        "expected_mps2": 9.80664019335,
+        "description": "Reset default RANGE[1:0]=0b01 (±2g): raw value representing approximately 1g"
+      },
+      {
         "name": "positive_max_2g",
         "raw": 524287,
         "range": "G2",

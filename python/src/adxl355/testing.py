@@ -14,8 +14,8 @@ from __future__ import annotations
 import time
 from typing import Optional
 
-from adxl355.registers import Register
-from adxl355.constants import DEVID_AD, DEVID_MST, PARTID
+from adxl355.constants import DEVID_AD, DEVID_MST, PARTID, RESET_CODE
+from adxl355.registers import Range, Register
 
 
 class MockTransport:
@@ -31,6 +31,7 @@ class MockTransport:
 
     def __init__(self) -> None:
         self._regs = [0] * self.NUM_REGS
+        self._regs[Register.RANGE] = int(Range.G2)
         self._force_error: Optional[Exception] = None
         self.call_count = 0
         self.calls: list[dict] = []
@@ -56,6 +57,8 @@ class MockTransport:
         for i, b in enumerate(data):
             if reg + i < self.NUM_REGS:
                 self._regs[reg + i] = b
+        if reg == Register.RESET and data and data[0] == RESET_CODE:
+            self._regs[Register.RANGE] = int(Range.G2)
 
     def delay_ms(self, ms: int) -> None:
         if self._force_error is not None:

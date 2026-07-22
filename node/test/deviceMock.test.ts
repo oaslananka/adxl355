@@ -1,7 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { ADXL355 } from "../src/device.js";
-import { Range, PowerMode, Reg } from "../src/registers.js";
+import { Range, PowerMode, Reg, RESET_CODE } from "../src/registers.js";
 import { Transport } from "../src/transport.js";
+import { InvalidConfigurationError } from "../src/errors.js";
 
 class MockTransport implements Transport {
   private regs: Uint8Array;
@@ -14,6 +15,7 @@ class MockTransport implements Transport {
     this.regs[Reg.DEVID_AD] = 0xad;
     this.regs[Reg.DEVID_MST] = 0x1d;
     this.regs[Reg.PARTID] = 0xed;
+    this.regs[Reg.RANGE] = Range.G2;
   }
 
   setRawXYZ(x: number, y: number, z: number) {
@@ -38,6 +40,9 @@ class MockTransport implements Transport {
     this.calls.push({ isWrite: true, reg });
     this.callCount++;
     this.regs.set(data, reg);
+    if (reg === Reg.RESET && data[0] === RESET_CODE) {
+      this.regs[Reg.RANGE] = Range.G2;
+    }
   }
 
   async delayMs(_ms: number): Promise<void> {
@@ -46,6 +51,51 @@ class MockTransport implements Transport {
 }
 
 describe("ADXL355", () => {
+  it("should default cached range to 2g", () => {
+    const dev = new ADXL355(new MockTransport());
+    expect((dev as unknown as { range: Range }).range).toBe(Range.G2);
+  });
+
+  it("should synchronize cached range during probe", async () => {
+    const transport = new MockTransport();
+    transport["regs"][Reg.RANGE] = Range.G8;
+    const dev = new ADXL355(transport);
+
+    await expect(dev.probe()).resolves.toBe(true);
+    expect((dev as unknown as { range: Range }).range).toBe(Range.G8);
+  });
+
+  it("should reject reserved range encoding during probe", async () => {
+    const transport = new MockTransport();
+    transport["regs"][Reg.RANGE] = 0x00;
+    const dev = new ADXL355(transport);
+
+    await expect(dev.probe()).rejects.toBeInstanceOf(InvalidConfigurationError);
+    expect((dev as unknown as { initialized: boolean }).initialized).toBe(false);
+    expect((dev as unknown as { range: Range }).range).toBe(Range.G2);
+  });
+
+  it("should restore cached range to 2g after reset", async () => {
+    const transport = new MockTransport();
+    transport["regs"][Reg.RANGE] = Range.G8;
+    const dev = new ADXL355(transport);
+    await dev.probe();
+
+    await dev.reset();
+    expect((dev as unknown as { range: Range }).range).toBe(Range.G2);
+  });
+
+  it("should convert reset-range raw data to approximately one g", async () => {
+    const transport = new MockTransport();
+    transport["regs"][Reg.RANGE] = Range.G2;
+    transport.setRawXYZ(256410, 0, 0);
+    const dev = new ADXL355(transport);
+
+    await dev.probe();
+    const accel = await dev.readAccelerationG();
+    expect(accel.x).toBeCloseTo(1.0, 3);
+  });
+
   it("should probe successfully", async () => {
     const transport = new MockTransport();
     const dev = new ADXL355(transport);
