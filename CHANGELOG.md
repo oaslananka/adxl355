@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Breaking (all languages)**: Corrected temperature conversion formula from `raw/100+25` to `25+(raw-1885)/-9.05` per datasheet Rev.D
 - **Breaking (Python/Rust SPI adapters)**: Corrected command framing to read `(reg << 1) | 0x01` and write `reg << 1`, kept command and payload in one chip-select transaction, and documented SPI Mode 0 (`CPOL=0`, `CPHA=0`)
 - Corrected `RANGE` register writes in every implementation, including the C reference driver, to preserve unrelated bits (`INT_POL`, `I2C_HS`) and update cached state only after successful writes
+- Corrected the Linux spidev example to perform sustained multi-byte reads in one command-plus-payload transaction and discard the command-phase receive byte
 - Updated all test assertions to match new enum values and temperature formula
 - Marked all datasheet-derived values with traceable datasheet section references
 

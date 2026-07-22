@@ -12,6 +12,7 @@
  */
 
 #include "adxl355/adxl355.h"
+#include "linux_spi_transfer.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -54,30 +55,26 @@ static int spi_open(spi_ctx_t *ctx, int bus, int cs, uint32_t speed_hz)
 static int spi_read(void *ctx, uint8_t reg, uint8_t *data, size_t len)
 {
     spi_ctx_t *spi = (spi_ctx_t *)ctx;
-    uint8_t    cmd = (reg << 1) | 0x01;  /* SPI read command */
-    uint8_t    buf[2] = {cmd, 0};
+    adxl355_linux_spi_read_transfer_t transfer;
 
-    struct spi_ioc_transfer tr[2] = {0};
-    tr[0].tx_buf        = (unsigned long)&cmd;
-    tr[0].len           = 1;
-    tr[0].speed_hz      = spi->speed_hz;
-    tr[0].bits_per_word = 8;
-
-    for (size_t i = 0; i < len; i++) {
-        tr[1].tx_buf        = (unsigned long)buf + 1;  /* dummy */
-        tr[1].rx_buf        = (unsigned long)(data + i);
-        tr[1].len           = 1;
-        tr[1].speed_hz      = spi->speed_hz;
-        tr[1].bits_per_word = 8;
-
-        if (ioctl(spi->fd, SPI_IOC_MESSAGE(2), tr) < 0) {
-            perror("spi_read ioctl");
-            return -1;
-        }
-        cmd = reg + 1 + i;  /* auto-increment address */
-        tr[0].tx_buf = (unsigned long)&cmd;
+    if (adxl355_linux_spi_prepare_read(reg, len, &transfer) != 0) {
+        fprintf(stderr, "spi_read: unsupported payload length %zu\n", len);
+        return -1;
     }
-    return 0;
+
+    struct spi_ioc_transfer tr = {0};
+    tr.tx_buf        = (unsigned long)(uintptr_t)transfer.tx;
+    tr.rx_buf        = (unsigned long)(uintptr_t)transfer.rx;
+    tr.len           = (uint32_t)transfer.length;
+    tr.speed_hz      = spi->speed_hz;
+    tr.bits_per_word = 8;
+
+    if (ioctl(spi->fd, SPI_IOC_MESSAGE(1), &tr) < 0) {
+        perror("spi_read ioctl");
+        return -1;
+    }
+
+    return adxl355_linux_spi_copy_read_payload(&transfer, data, len);
 }
 
 static int spi_write(void *ctx, uint8_t reg, const uint8_t *data, size_t len)
