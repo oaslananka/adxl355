@@ -2,6 +2,15 @@
 
 #include <string.h>
 
+enum {
+    ADXL355_TEMP2_DATA_MASK = 0x0F,
+    ADXL355_TEMP_READ_ATTEMPTS = 3,
+};
+
+static const float ADXL355_TEMP_INTERCEPT_LSB = 1885.0f;
+static const float ADXL355_TEMP_INTERCEPT_C = 25.0f;
+static const float ADXL355_TEMP_SLOPE_LSB_PER_C = -9.05f;
+
 /* ---------------------------------------------------------------------------
  * Internal helpers
  * --------------------------------------------------------------------------- */
