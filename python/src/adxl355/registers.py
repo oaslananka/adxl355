@@ -101,3 +101,14 @@ FILTER_HPF_SHIFT = 4
 
 # Range register mask (datasheet Rev.D, Table 42)
 RANGE_SEL_MASK = 0x03
+
+
+# SPI command byte helpers (datasheet Rev.D, SPI protocol)
+def spi_read_cmd(reg: int) -> int:
+    """Encode an ADXL355 SPI read command byte."""
+    return (reg << 1) | 0x01
+
+
+def spi_write_cmd(reg: int) -> int:
+    """Encode an ADXL355 SPI write command byte."""
+    return reg << 1

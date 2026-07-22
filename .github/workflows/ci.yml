@@ -97,11 +97,13 @@ jobs:
         with:
           components: clippy
       - name: Check
-        run: cargo check --all-targets
+        run: cargo check --all-targets --all-features
       - name: Lint
-        run: cargo clippy --all-targets -- -D warnings
-      - name: Test
-        run: cargo test
+        run: cargo clippy --all-targets --all-features -- -D warnings
+      - name: Test (all features)
+        run: cargo test --all-features
+      - name: Check (no_std + hal)
+        run: cargo check --no-default-features --features hal
       - name: Test (no_std)
         run: cargo test --no-default-features
 

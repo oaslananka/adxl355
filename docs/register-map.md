@@ -43,6 +43,19 @@
 | 0x2E | SELF_TEST | R/W | 0x00 | Self-test control |
 | 0x2F | RESET | W | — | Software reset (write 0x52) |
 
+## SPI Protocol
+
+The ADXL355 uses **SPI Mode 0** (`CPOL=0`, `CPHA=0`). The first byte of every
+transaction contains the seven-bit register address in bits 7:1 and the
+read/write flag in bit 0:
+
+- Read command: `(register << 1) | 0x01`
+- Write command: `register << 1`
+
+Command and payload bytes must be sent as one transaction with chip select
+asserted for the complete transfer. For example, reading `XDATA3` (`0x08`)
+starts with `0x11`, while writing `POWER_CTL` (`0x2D`) starts with `0x5A`.
+
 ## Status Register (0x04)
 
 | Bit | Name | Description |
@@ -105,7 +118,7 @@ The following fields have **not** been verified against the official ADXL355 dat
 - [x] Range register default (`RANGE[1:0] = 0b01` = ±2g)
 - [ ] Scale factors (3.9, 7.8, 15.6 µg/LSB)
 - [ ] Temperature conversion formula
-- [ ] SPI read/write command format
+- [x] SPI Mode 0 and read/write command format
 - [ ] I2C address options
 - [ ] Status register bit definitions
 - [ ] Filter register ODR/LPF field bit positions
