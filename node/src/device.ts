@@ -21,7 +21,7 @@ import { DeviceNotFoundError, InvalidConfigurationError } from "./errors.js";
  * ADXL355 accelerometer driver.
  */
 export class ADXL355 {
-  private transport: Transport;
+  private readonly transport: Transport;
   private range: RangeEnum;
   private initialized: boolean;
 

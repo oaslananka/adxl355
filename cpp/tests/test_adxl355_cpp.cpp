@@ -99,7 +99,7 @@ void test_probe_synchronizes_range() {
     try {
         dev.probe();
         TEST(dev.getRange() == adxl355::Range::G8, "probe synchronizes 8g range");
-    } catch (...) {
+    } catch (const adxl355::Error &) {
         TEST(false, "probe range synchronization failed");
     }
 }
@@ -113,7 +113,7 @@ void test_reset_restores_2g_range() {
         dev.setRange(adxl355::Range::G8);
         dev.reset();
         TEST(dev.getRange() == adxl355::Range::G2, "reset restores 2g range");
-    } catch (...) {
+    } catch (const adxl355::Error &) {
         TEST(false, "reset range verification failed");
     }
 }
