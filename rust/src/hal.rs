@@ -24,7 +24,7 @@ where
 {
     /// Create a new SPI transport.
     ///
-    /// `spi` must be configured for ADXL355 (CPOL=1, CPHA=1, mode 3).
+    /// `spi` must be configured for ADXL355 SPI Mode 0 (CPOL=0, CPHA=0).
     pub fn new(spi: SPI, delay: D) -> Self {
         SpiTransport { spi, delay, buf: [0u8; 12] }
     }
@@ -36,7 +36,7 @@ where
     D: embedded_hal::delay::DelayNs,
 {
     fn read_register(&mut self, reg: u8, len: u8) -> Result<Vec<u8>, Error> {
-        let addr = reg | 0x80;
+        let addr = crate::registers::spi::read_cmd(reg);
         let count = len as usize;
         if count > self.buf.len() {
             return Err(Error::Bus);
@@ -54,7 +54,7 @@ where
         if data.len() > self.buf.len() - 1 {
             return Err(Error::Bus);
         }
-        self.buf[0] = reg & 0x7F;
+        self.buf[0] = crate::registers::spi::write_cmd(reg);
         self.buf[1..=data.len()].copy_from_slice(data);
         let mut ops =
             [embedded_hal::spi::Operation::Write(&self.buf[..=data.len()])];
