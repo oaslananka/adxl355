@@ -10,9 +10,6 @@ on:
         required: true
         type: string
 
-permissions:
-  contents: read
-
 concurrency:
   group: release-${{ github.ref }}
   cancel-in-progress: true
@@ -30,6 +27,8 @@ jobs:
 
   preflight:
     name: Tag, commit, and version preflight
+    permissions:
+      contents: read
     runs-on: ubuntu-24.04
     outputs:
       tag: ${{ steps.preflight.outputs.tag }}
@@ -52,14 +51,22 @@ jobs:
         id: preflight
         env:
           RELEASE_SHA: ${{ github.sha }}
-        run: >-
-          python scripts/release_preflight.py
-          --tag "$RELEASE_TAG"
-          --sha "$RELEASE_SHA"
-          --github-output "$GITHUB_OUTPUT"
+        run: |
+          report="$RUNNER_TEMP/release-preflight.json"
+          python scripts/release_preflight.py \
+            --tag "$RELEASE_TAG" \
+            --sha "$RELEASE_SHA" > "$report"
+          jq -r '
+            {tag, version, core_version, release_sha, short_sha}
+            | to_entries[]
+            | "\(.key)=\(.value)"
+          ' "$report" >> "$GITHUB_OUTPUT"
+          cat "$report"
 
   python-package:
     name: Python package dry run
+    permissions:
+      contents: read
     needs: [ci, preflight]
     runs-on: ubuntu-24.04
     steps:
@@ -81,7 +88,7 @@ jobs:
           OUT: ${{ runner.temp }}/release/python
         run: |
           mkdir -p "$OUT"
-          python -m pip install --disable-pip-version-check build
+          python -m pip install --disable-pip-version-check "build==1.5.0"
           python -m build python --outdir "$OUT"
           (
             cd "$OUT"
@@ -103,6 +110,8 @@ jobs:
 
   rust-package:
     name: Rust crate dry run
+    permissions:
+      contents: read
     needs: [ci, preflight]
     runs-on: ubuntu-24.04
     steps:
@@ -137,6 +146,8 @@ jobs:
 
   node-package:
     name: Node.js tarball dry run
+    permissions:
+      contents: read
     needs: [ci, preflight]
     runs-on: ubuntu-24.04
     steps:
@@ -161,7 +172,7 @@ jobs:
         working-directory: node
         run: |
           mkdir -p "$OUT"
-          npm ci
+          npm ci --ignore-scripts
           npm run build
           npm pack --dry-run --json > "$OUT/PACK_CONTENTS.json"
           npm pack --pack-destination "$OUT"
@@ -175,6 +186,8 @@ jobs:
 
   go-package:
     name: Go module dry run
+    permissions:
+      contents: read
     needs: [ci, preflight]
     runs-on: ubuntu-24.04
     steps:
@@ -217,6 +230,8 @@ jobs:
 
   c-cpp-package:
     name: C and C++ artifacts dry run
+    permissions:
+      contents: read
     needs: [ci, preflight]
     runs-on: ubuntu-24.04
     steps:
@@ -274,6 +289,7 @@ jobs:
 
   release-bundle:
     name: Aggregate release artifacts and checksums
+    permissions: {}
     needs:
       - preflight
       - python-package

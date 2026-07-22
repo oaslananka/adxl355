@@ -208,18 +208,12 @@ def validate_git_state(root: Path, tag: str, expected_sha: str) -> str:
     return head_sha
 
 
-def write_github_outputs(path: Path, values: dict[str, str]) -> None:
-    with path.open("a", encoding="utf-8") as handle:
-        for key, value in values.items():
-            handle.write(f"{key}={value}\n")
-
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parents[1])
     parser.add_argument("--tag", required=True)
     parser.add_argument("--sha", required=True)
-    parser.add_argument("--github-output", type=Path)
     args = parser.parse_args(argv)
 
     try:
@@ -229,7 +223,7 @@ def main(argv: list[str] | None = None) -> int:
         if errors:
             raise ValueError("version consistency check failed:\n- " + "\n- ".join(errors))
         release_sha = validate_git_state(args.root, release.tag, args.sha)
-    except (KeyError, OSError, ValueError, tomllib.TOMLDecodeError) as error:
+    except (KeyError, OSError, ValueError) as error:
         print(f"release preflight failed: {error}", file=sys.stderr)
         return 1
 
@@ -240,9 +234,6 @@ def main(argv: list[str] | None = None) -> int:
         "release_sha": release_sha,
         "short_sha": release_sha[:12],
     }
-    if args.github_output is not None:
-        write_github_outputs(args.github_output, outputs)
-
     print(json.dumps({"status": "ok", **outputs, "sources": len(sources)}, indent=2))
     return 0
 

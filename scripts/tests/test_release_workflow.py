@@ -40,11 +40,21 @@ class ReleaseWorkflowTests(unittest.TestCase):
         for job_name in PACKAGE_JOBS:
             self.assertEqual(set(jobs[job_name]["needs"]), {"ci", "preflight"})
 
-    def test_release_has_least_privilege_and_bundle_artifact(self) -> None:
+    def test_release_has_job_scoped_least_privilege_and_bundle_artifact(self) -> None:
         release = self.load_release()
-        self.assertEqual(release["permissions"], {"contents": "read"})
-        self.assertIn("release-bundle", release["jobs"])
+        jobs = release["jobs"]
+        self.assertNotIn("permissions", release)
+        for job_name in {"ci", "preflight", *PACKAGE_JOBS}:
+            self.assertEqual(jobs[job_name]["permissions"], {"contents": "read"})
+        self.assertEqual(jobs["release-bundle"]["permissions"], {})
+        self.assertIn("release-bundle", jobs)
         self.assertIn("actions/upload-artifact", RELEASE_WORKFLOW.read_text())
+
+    def test_dependency_installation_is_pinned_and_script_safe(self) -> None:
+        text = RELEASE_WORKFLOW.read_text()
+        self.assertIn("build==1.5.0", text)
+        self.assertIn("npm ci --ignore-scripts", text)
+        self.assertNotIn("--github-output", text)
 
     def test_package_jobs_checkout_preflight_sha_and_upload_checksums(self) -> None:
         jobs = self.load_release()["jobs"]
