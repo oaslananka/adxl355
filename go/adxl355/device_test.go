@@ -14,6 +14,7 @@ func newMockTransport() *mockTransport {
 	m.regs[RegDEVID_AD] = DEVID_AD_VALUE
 	m.regs[RegDEVID_MST] = DEVID_MST_VALUE
 	m.regs[RegPARTID] = PARTID_VALUE
+	m.regs[RegRANGE] = byte(Range2G)
 	return m
 }
 
@@ -23,6 +24,9 @@ func (m *mockTransport) ReadRegister(reg byte, length int) ([]byte, error) {
 
 func (m *mockTransport) WriteRegister(reg byte, data []byte) error {
 	copy(m.regs[reg:], data)
+	if reg == RegRESET && len(data) > 0 && data[0] == RESET_CODE {
+		m.regs[RegRANGE] = byte(Range2G)
+	}
 	return nil
 }
 
@@ -86,6 +90,78 @@ func TestProbe(t *testing.T) {
 	}
 	if !ok {
 		t.Fatal("Probe returned false")
+	}
+}
+
+func TestNewDefaultsTo2G(t *testing.T) {
+	dev := New(newMockTransport())
+	if dev.rangeMode != Range2G {
+		t.Fatalf("rangeMode = %d, want %d", dev.rangeMode, Range2G)
+	}
+}
+
+func TestProbeSynchronizesHardwareRange(t *testing.T) {
+	mock := newMockTransport()
+	mock.regs[RegRANGE] = byte(Range8G)
+	dev := New(mock)
+
+	ok, err := dev.Probe()
+	if err != nil || !ok {
+		t.Fatalf("Probe failed: ok=%v err=%v", ok, err)
+	}
+	if dev.rangeMode != Range8G {
+		t.Fatalf("rangeMode = %d, want %d", dev.rangeMode, Range8G)
+	}
+}
+
+func TestProbeRejectsReservedRange(t *testing.T) {
+	mock := newMockTransport()
+	mock.regs[RegRANGE] = 0
+	dev := New(mock)
+
+	ok, err := dev.Probe()
+	if ok || err != ErrInvalidArg {
+		t.Fatalf("Probe = (%v, %v), want (false, ErrInvalidArg)", ok, err)
+	}
+	if dev.initialized {
+		t.Fatal("failed probe should remain uninitialized")
+	}
+	if dev.rangeMode != Range2G {
+		t.Fatalf("rangeMode = %d, want %d", dev.rangeMode, Range2G)
+	}
+}
+
+func TestResetRestores2GCache(t *testing.T) {
+	mock := newMockTransport()
+	mock.regs[RegRANGE] = byte(Range8G)
+	dev := New(mock)
+	if _, err := dev.Probe(); err != nil {
+		t.Fatalf("Probe failed: %v", err)
+	}
+
+	if err := dev.Reset(); err != nil {
+		t.Fatalf("Reset failed: %v", err)
+	}
+	if dev.rangeMode != Range2G {
+		t.Fatalf("rangeMode = %d, want %d", dev.rangeMode, Range2G)
+	}
+}
+
+func TestResetRangeConvertsRawValueToOneG(t *testing.T) {
+	mock := newMockTransport()
+	mock.regs[RegRANGE] = byte(Range2G)
+	mock.setRawXYZ(256410, 0, 0)
+	dev := New(mock)
+	if _, err := dev.Probe(); err != nil {
+		t.Fatalf("Probe failed: %v", err)
+	}
+
+	accel, err := dev.ReadG()
+	if err != nil {
+		t.Fatalf("ReadG failed: %v", err)
+	}
+	if accel.X < 0.999 || accel.X > 1.001 {
+		t.Fatalf("X = %f, want approximately 1g", accel.X)
 	}
 }
 

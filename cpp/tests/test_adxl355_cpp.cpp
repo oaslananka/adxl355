@@ -28,6 +28,7 @@ public:
         regs[ADXL355_REG_DEVID_AD]  = ADXL355_DEVID_AD;
         regs[ADXL355_REG_DEVID_MST] = ADXL355_DEVID_MST;
         regs[ADXL355_REG_PARTID]    = ADXL355_PARTID_VALUE;
+        regs[ADXL355_REG_RANGE]     = ADXL355_RANGE_2G;
     }
 
     int read(void *ctx, uint8_t reg, uint8_t *data, size_t len) override {
@@ -39,6 +40,9 @@ public:
     int write(void *ctx, uint8_t reg, const uint8_t *data, size_t len) override {
         (void)ctx;
         std::memcpy(&regs[reg], data, len);
+        if (reg == ADXL355_REG_RESET && len > 0 && data[0] == ADXL355_RESET_CODE) {
+            regs[ADXL355_REG_RANGE] = ADXL355_RANGE_2G;
+        }
         return 0;
     }
 
@@ -87,6 +91,33 @@ void test_probe() {
     }
 }
 
+void test_probe_synchronizes_range() {
+    auto bus = std::make_unique<MockBus>();
+    bus->regs[ADXL355_REG_RANGE] = ADXL355_RANGE_8G;
+    adxl355::Device dev(std::move(bus));
+
+    try {
+        dev.probe();
+        TEST(dev.getRange() == adxl355::Range::G8, "probe synchronizes 8g range");
+    } catch (const adxl355::Error &) {
+        TEST(false, "probe range synchronization failed");
+    }
+}
+
+void test_reset_restores_2g_range() {
+    auto bus = std::make_unique<MockBus>();
+    adxl355::Device dev(std::move(bus));
+
+    try {
+        dev.probe();
+        dev.setRange(adxl355::Range::G8);
+        dev.reset();
+        TEST(dev.getRange() == adxl355::Range::G2, "reset restores 2g range");
+    } catch (const adxl355::Error &) {
+        TEST(false, "reset range verification failed");
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
@@ -98,6 +129,8 @@ int main() {
     test_decode_raw20();
     test_raw_to_g();
     test_probe();
+    test_probe_synchronizes_range();
+    test_reset_restores_2g_range();
 
     std::printf("\nResults: %d/%d passed\n", tests_pass, tests_run);
     return (tests_pass == tests_run) ? 0 : 1;

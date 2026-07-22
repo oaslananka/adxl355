@@ -124,6 +124,72 @@ static void test_init_null_args(void)
     TEST_END();
 }
 
+static void test_init_defaults_to_2g(void)
+{
+    TEST_START("init_defaults_to_2g");
+    adxl355_mock_bus_t mock;
+    adxl355_mock_bus_init(&mock);
+    adxl355_bus_t bus = adxl355_mock_bus_get_interface(&mock);
+    adxl355_t dev;
+
+    TEST_ASSERT(adxl355_init(&dev, &bus) == ADXL355_OK, "init should succeed");
+    TEST_ASSERT(dev.range == ADXL355_RANGE_2G, "init range should be 2g");
+    TEST_END();
+}
+
+static void test_probe_synchronizes_range(void)
+{
+    TEST_START("probe_synchronizes_range");
+    adxl355_mock_bus_t mock;
+    adxl355_mock_bus_init(&mock);
+    adxl355_mock_bus_set_identity_ok(&mock);
+    mock.regs[ADXL355_REG_RANGE] = ADXL355_RANGE_8G;
+    adxl355_bus_t bus = adxl355_mock_bus_get_interface(&mock);
+    adxl355_t dev;
+    adxl355_init(&dev, &bus);
+
+    TEST_ASSERT(adxl355_probe(&dev) == ADXL355_OK, "probe should succeed");
+    TEST_ASSERT(dev.range == ADXL355_RANGE_8G, "probe should cache hardware 8g range");
+    TEST_END();
+}
+
+static void test_probe_rejects_reserved_range(void)
+{
+    TEST_START("probe_rejects_reserved_range");
+    adxl355_mock_bus_t mock;
+    adxl355_mock_bus_init(&mock);
+    adxl355_mock_bus_set_identity_ok(&mock);
+    mock.regs[ADXL355_REG_RANGE] = 0x00;
+    adxl355_bus_t bus = adxl355_mock_bus_get_interface(&mock);
+    adxl355_t dev;
+    adxl355_init(&dev, &bus);
+
+    TEST_ASSERT(adxl355_probe(&dev) == ADXL355_ERR_INVALID_ARG,
+                "probe should reject reserved range encoding");
+    TEST_ASSERT(dev.initialized == false, "failed probe should remain uninitialized");
+    TEST_ASSERT(dev.range == ADXL355_RANGE_2G, "failed probe should preserve cached range");
+    TEST_END();
+}
+
+static void test_probe_reset_range_converts_one_g(void)
+{
+    TEST_START("probe_reset_range_converts_one_g");
+    adxl355_mock_bus_t mock;
+    adxl355_mock_bus_init(&mock);
+    adxl355_mock_bus_set_identity_ok(&mock);
+    mock.regs[ADXL355_REG_RANGE] = ADXL355_RANGE_2G;
+    adxl355_mock_bus_set_xyz_raw(&mock, 256410, 0, 0);
+    adxl355_bus_t bus = adxl355_mock_bus_get_interface(&mock);
+    adxl355_t dev;
+    adxl355_init(&dev, &bus);
+
+    TEST_ASSERT(adxl355_probe(&dev) == ADXL355_OK, "probe should succeed");
+    adxl355_float_xyz_t accel;
+    TEST_ASSERT(adxl355_read_g(&dev, &accel) == ADXL355_OK, "read_g should succeed");
+    TEST_ASSERT(approx_eq(accel.x, 1.0f, 0.001f), "reset-range raw value should convert to 1g");
+    TEST_END();
+}
+
 static void test_probe_bad_device(void)
 {
     TEST_START("probe_bad_device");
@@ -246,6 +312,7 @@ static void test_reset(void)
         }
     }
     TEST_ASSERT(found == 1, "write to RESET register occurred");
+    TEST_ASSERT(dev.range == ADXL355_RANGE_2G, "reset range should be 2g");
     TEST_END();
 }
 
@@ -514,7 +581,11 @@ int main(void)
     test_raw_to_g_8g();
     test_raw_to_mps2();
     test_init_null_args();
+    test_init_defaults_to_2g();
     test_probe_bad_device();
+    test_probe_synchronizes_range();
+    test_probe_rejects_reserved_range();
+    test_probe_reset_range_converts_one_g();
     test_probe_ok();
     test_set_range_writes_expected_register();
     test_read_raw_reads_9_bytes();

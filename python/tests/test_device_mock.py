@@ -2,7 +2,7 @@
 
 import pytest
 
-from adxl355 import ADXL355, Range, PowerMode
+from adxl355 import ADXL355, PowerMode, Range
 from adxl355.errors import DeviceNotFoundError, InvalidConfigurationError
 from adxl355.registers import Register
 from adxl355.testing import MockTransport
@@ -16,6 +16,53 @@ def mock_device() -> ADXL355:
     dev = ADXL355(transport)
     dev.probe()
     return dev
+
+
+class TestDefaultRangeState:
+    def test_constructor_defaults_to_2g(self) -> None:
+        dev = ADXL355(MockTransport())
+        assert dev._range == Range.G2
+
+    def test_probe_synchronizes_hardware_range(self) -> None:
+        transport = MockTransport()
+        transport.set_identity_ok()
+        transport.set_register(Register.RANGE, int(Range.G8))
+        dev = ADXL355(transport)
+
+        assert dev.probe() is True
+        assert dev._range == Range.G8
+
+    def test_probe_rejects_reserved_range(self) -> None:
+        transport = MockTransport()
+        transport.set_identity_ok()
+        transport.set_register(Register.RANGE, 0x00)
+        dev = ADXL355(transport)
+
+        with pytest.raises(InvalidConfigurationError):
+            dev.probe()
+        assert dev._initialized is False
+        assert dev._range == Range.G2
+
+    def test_reset_restores_2g_cache(self) -> None:
+        transport = MockTransport()
+        transport.set_identity_ok()
+        transport.set_register(Register.RANGE, int(Range.G8))
+        dev = ADXL355(transport)
+        dev.probe()
+
+        dev.reset()
+        assert dev._range == Range.G2
+
+    def test_reset_range_converts_raw_value_to_one_g(self) -> None:
+        transport = MockTransport()
+        transport.set_identity_ok()
+        transport.set_register(Register.RANGE, int(Range.G2))
+        transport.set_xyz_raw(x=256410, y=0, z=0)
+        dev = ADXL355(transport)
+
+        dev.probe()
+        accel = dev.read_acceleration_g()
+        assert accel.x == pytest.approx(1.0, abs=0.001)
 
 
 class TestProbe:
@@ -230,7 +277,6 @@ class TestResetVerification:
         assert len(writes) >= 1, "reset should write to RESET register"
 
     def test_reset_code(self, mock_device: ADXL355) -> None:
-        from adxl355.constants import RESET_CODE
         mock_device.reset()
 
     def test_reset_clears_call_log(self, mock_device: ADXL355) -> None:

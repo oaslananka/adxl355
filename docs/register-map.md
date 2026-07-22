@@ -58,10 +58,10 @@
 
 | Bits | Value | Description |
 |------|-------|-------------|
-| 1:0 | 00 | ±2g |
-| 1:0 | 01 | ±4g (default) |
-| 1:0 | 10 | ±8g |
-| 1:0 | 11 | Reserved |
+| 1:0 | 00 | Reserved |
+| 1:0 | 01 | ±2g (reset default) |
+| 1:0 | 10 | ±4g |
+| 1:0 | 11 | ±8g |
 
 ## Filter Register (0x28)
 
@@ -102,7 +102,7 @@ The following fields have **not** been verified against the official ADXL355 dat
 - [ ] Expected DEVID_MST value (0x1D)
 - [ ] Expected PARTID value (0xED)
 - [ ] Reset command value (0x52)
-- [ ] Range register default (0x01 = ±4g)
+- [x] Range register default (`RANGE[1:0] = 0b01` = ±2g)
 - [ ] Scale factors (3.9, 7.8, 15.6 µg/LSB)
 - [ ] Temperature conversion formula
 - [ ] SPI read/write command format

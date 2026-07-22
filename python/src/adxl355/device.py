@@ -5,28 +5,27 @@ from adxl355.constants import (
     DEVID_MST,
     PARTID,
     RESET_CODE,
-    STANDARD_GRAVITY_M_S2,
     SCALE_2G_G_PER_LSB,
     SCALE_4G_G_PER_LSB,
     SCALE_8G_G_PER_LSB,
+    STANDARD_GRAVITY_M_S2,
 )
 from adxl355.errors import (
-    BusError,
     DeviceNotFoundError,
     InvalidConfigurationError,
 )
 from adxl355.registers import (
-    Register,
-    Range,
-    PowerMode,
-    ODR,
-    RANGE_SEL_MASK,
+    FILTER_HPF_MASK,
     FILTER_ODR_MASK,
     FILTER_ODR_SHIFT,
-    FILTER_HPF_MASK,
+    ODR,
+    RANGE_SEL_MASK,
+    PowerMode,
+    Range,
+    Register,
 )
 from adxl355.transport import Transport
-from adxl355.types import RawXYZ, AccelXYZ
+from adxl355.types import AccelXYZ, RawXYZ
 
 
 class ADXL355:
@@ -38,7 +37,7 @@ class ADXL355:
 
     def __init__(self, transport: Transport) -> None:
         self._transport = transport
-        self._range = Range.G4
+        self._range = Range.G2
         self._initialized = False
 
     # ------------------------------------------------------------------
@@ -65,7 +64,8 @@ class ADXL355:
         Verify device identity by reading ID registers.
 
         Returns True if all three ID registers match expected values.
-        After successful probe, the device is left in standby mode.
+        After successful probe, the cached range matches the hardware RANGE register
+        and the device is left in standby mode.
         """
         id_ad = self._read_reg(Register.DEVID_AD)
         id_mst = self._read_reg(Register.DEVID_MST)
@@ -77,8 +77,17 @@ class ADXL355:
                 f"DEVID_MST=0x{id_mst:02X}, PARTID=0x{part_id:02X}"
             )
 
-        # Enter standby mode after probe
+        range_bits = self._read_reg(Register.RANGE) & RANGE_SEL_MASK
+        try:
+            detected_range = Range(range_bits)
+        except ValueError as exc:
+            raise InvalidConfigurationError(
+                f"Invalid RANGE register encoding: 0x{range_bits:02X}"
+            ) from exc
+
+        # Enter standby mode after probe. Commit state only after all bus operations succeed.
         self._write_reg(Register.POWER_CTL, PowerMode.STANDBY)
+        self._range = detected_range
         self._initialized = True
         return True
 
@@ -86,7 +95,7 @@ class ADXL355:
         """Perform a software reset."""
         self._write_reg(Register.RESET, RESET_CODE)
         self._transport.delay_ms(10)
-        self._range = Range.G4
+        self._range = Range.G2
 
     def set_range(self, range_val: Range) -> None:
         """Set the acceleration range.
@@ -104,7 +113,13 @@ class ADXL355:
     def get_range(self) -> Range:
         """Read the currently configured range from hardware."""
         reg = self._read_reg(Register.RANGE)
-        return Range(reg & RANGE_SEL_MASK)
+        range_bits = reg & RANGE_SEL_MASK
+        try:
+            return Range(range_bits)
+        except ValueError as exc:
+            raise InvalidConfigurationError(
+                f"Invalid RANGE register encoding: 0x{range_bits:02X}"
+            ) from exc
 
     def set_power_mode(self, mode: PowerMode) -> None:
         """Set power mode (standby or measurement).

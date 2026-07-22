@@ -153,12 +153,13 @@ adxl355_status_t adxl355_init(adxl355_t *dev, const adxl355_bus_t *bus);
 /**
  * Probe for the ADXL355 by reading the identity registers.
  *
- * On success the device is placed into standby mode and `dev->initialized`
- * is set to true.
+ * On success the device range cache is synchronized from the RANGE register,
+ * the device is placed into standby mode, and `dev->initialized` is set to true.
  *
  * @param dev  Initialised device handle.
  * @return ADXL355_OK if all three ID registers match,
  *         ADXL355_ERR_BAD_DEVICE if they don't,
+ *         ADXL355_ERR_INVALID_ARG for reserved RANGE encoding,
  *         ADXL355_ERR_BUS on bus error.
  */
 adxl355_status_t adxl355_probe(adxl355_t *dev);
@@ -166,7 +167,7 @@ adxl355_status_t adxl355_probe(adxl355_t *dev);
 /**
  * Perform a software reset.
  *
- * After reset the device defaults to standby mode with ±4g range.
+ * After reset the device defaults to standby mode with ±2g range.
  * The caller should wait at least 1 ms after reset before further
  * communication.
  *
