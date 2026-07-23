@@ -18,6 +18,15 @@ because CMake's `project(VERSION ...)` field does not represent prerelease
 metadata. Package manifests and `ADXL355_VERSION_STRING` must match the complete
 version, including any prerelease suffix.
 
+## External hardware evidence prerequisite
+
+The packaging workflow cannot safely schedule a physical lab fixture. Before a
+production-ready release claim, maintainers must attach successful manual HIL
+evidence for both SPI and I2C to the release record. Each artifact must reference
+the release-candidate commit, include the device revision, and be no more than 30
+days old. See [`hardware-testing.md`](hardware-testing.md) for fixture and address
+coverage requirements.
+
 ## Enforced gates
 
 The workflow calls the repository CI workflow on the release commit. Package

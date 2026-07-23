@@ -25,11 +25,20 @@ Transport-agnostic, testable, production-ready driver family with shared registe
 - Raw 20-bit acceleration decoding with golden test vectors
 - Required clean-checkout cross-language vector gate with zero permitted CI skips
 - CI quality gates for sanitizers, static analysis, package smoke tests, dependency audit, race detection, and coverage reporting
+- Manual Linux SPI/I2C hardware-in-the-loop runner with sanitized revision and diagnostics evidence
 - Range-based g and m/s² conversion
 - Temperature sensor readout
 - FIFO basic support
 - Self-test and offset calibration API
 - Register map specification and documentation
+
+## Hardware Validation Status
+
+The opt-in HIL runner and self-hosted workflow are implemented, but this
+repository does not claim a physical pass until a public workflow artifact from a
+connected ADXL355 is available. Wiring, runner setup, supported SPI/I2C settings,
+and release evidence requirements are documented in
+[`docs/hardware-testing.md`](docs/hardware-testing.md).
 
 ## Device Lifecycle Contract
 

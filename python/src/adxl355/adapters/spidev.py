@@ -61,6 +61,16 @@ class SpiDevTransport(Transport):
             self._spi = spi
         return self._spi
 
+    @property
+    def mode(self) -> int:
+        """Return the mode applied to the open Linux SPI device."""
+        return int(self._ensure_open().mode)
+
+    @property
+    def speed_hz(self) -> int:
+        """Return the clock applied to the open Linux SPI device."""
+        return int(self._ensure_open().max_speed_hz)
+
     def read_register(self, reg: int, length: int = 1) -> bytes:
         spi = self._ensure_open()
         # ADXL355 command byte: address in bits 7:1, read flag in bit 0.

@@ -1,0 +1,165 @@
+name: Hardware-in-the-Loop
+
+on:
+  workflow_dispatch:
+    inputs:
+      transport:
+        description: Physical bus connected to the ADXL355
+        required: true
+        type: choice
+        options:
+          - spi
+          - i2c
+      spi_bus:
+        description: Linux spidev bus number
+        required: true
+        default: "0"
+        type: string
+      spi_device:
+        description: Linux spidev chip-select number
+        required: true
+        default: "0"
+        type: string
+      spi_speed_hz:
+        description: SPI clock in Hz (100000 through 10000000)
+        required: true
+        default: "1000000"
+        type: string
+      i2c_bus:
+        description: Linux i2c-dev bus number
+        required: true
+        default: "1"
+        type: string
+      i2c_address:
+        description: Address selected by the MISO/ASEL strap
+        required: true
+        default: "0x1D"
+        type: choice
+        options:
+          - "0x1D"
+          - "0x53"
+      i2c_bus_hz:
+        description: Runner-configured I2C clock in Hz
+        required: true
+        default: "400000"
+        type: choice
+        options:
+          - "100000"
+          - "400000"
+          - "1000000"
+          - "3400000"
+      samples:
+        description: Continuous samples to capture (4 through 1000)
+        required: true
+        default: "32"
+        type: string
+      sample_timeout_ms:
+        description: Per-sample DATA_READY timeout in milliseconds
+        required: true
+        default: "500"
+        type: string
+      runner_id:
+        description: Public lab/fixture identifier; do not enter secrets
+        required: true
+        default: "adxl355-lab"
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: adxl355-hil
+  cancel-in-progress: false
+
+jobs:
+  hil:
+    name: ADXL355 HIL (${{ inputs.transport }})
+    if: ${{ github.ref == 'refs/heads/main' }}
+    runs-on: [self-hosted, linux, adxl355-hil]
+    timeout-minutes: 15
+    steps:
+      - name: Check out tested revision
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: "3.12"
+
+      - name: Record bounded runner context
+        env:
+          SELECTED_TRANSPORT: ${{ inputs.transport }}
+        run: |
+          mkdir -p artifacts
+          {
+            printf 'transport=%s\n' "$SELECTED_TRANSPORT"
+            printf 'kernel='; uname -sr
+            printf 'architecture='; uname -m
+            printf 'python='; python --version
+          } > artifacts/runner-context.txt
+
+      - name: Install local driver
+        run: python -m pip install --disable-pip-version-check --no-deps -e ./python
+
+      - name: Install SPI adapter
+        if: inputs.transport == 'spi'
+        run: python -m pip install --disable-pip-version-check spidev==3.8
+
+      - name: Install I2C adapter
+        if: inputs.transport == 'i2c'
+        run: python -m pip install --disable-pip-version-check smbus2==0.6.1
+
+      - name: Run SPI HIL sequence
+        if: inputs.transport == 'spi'
+        env:
+          HIL_SPI_BUS: ${{ inputs.spi_bus }}
+          HIL_SPI_DEVICE: ${{ inputs.spi_device }}
+          HIL_SPI_SPEED_HZ: ${{ inputs.spi_speed_hz }}
+          HIL_SAMPLES: ${{ inputs.samples }}
+          HIL_SAMPLE_TIMEOUT_MS: ${{ inputs.sample_timeout_ms }}
+          HIL_RUNNER_ID: ${{ inputs.runner_id }}
+          HIL_GIT_SHA: ${{ github.sha }}
+        run: |
+          python scripts/hil_runner.py \
+            --transport spi \
+            --spi-bus "$HIL_SPI_BUS" \
+            --spi-device "$HIL_SPI_DEVICE" \
+            --spi-speed-hz "$HIL_SPI_SPEED_HZ" \
+            --samples "$HIL_SAMPLES" \
+            --sample-timeout-ms "$HIL_SAMPLE_TIMEOUT_MS" \
+            --runner-id "$HIL_RUNNER_ID" \
+            --git-sha "$HIL_GIT_SHA" \
+            --report artifacts/hil-report.json
+
+      - name: Run I2C HIL sequence
+        if: inputs.transport == 'i2c'
+        env:
+          HIL_I2C_BUS: ${{ inputs.i2c_bus }}
+          HIL_I2C_ADDRESS: ${{ inputs.i2c_address }}
+          HIL_I2C_BUS_HZ: ${{ inputs.i2c_bus_hz }}
+          HIL_SAMPLES: ${{ inputs.samples }}
+          HIL_SAMPLE_TIMEOUT_MS: ${{ inputs.sample_timeout_ms }}
+          HIL_RUNNER_ID: ${{ inputs.runner_id }}
+          HIL_GIT_SHA: ${{ github.sha }}
+        run: |
+          python scripts/hil_runner.py \
+            --transport i2c \
+            --i2c-bus "$HIL_I2C_BUS" \
+            --i2c-address "$HIL_I2C_ADDRESS" \
+            --i2c-bus-hz "$HIL_I2C_BUS_HZ" \
+            --samples "$HIL_SAMPLES" \
+            --sample-timeout-ms "$HIL_SAMPLE_TIMEOUT_MS" \
+            --runner-id "$HIL_RUNNER_ID" \
+            --git-sha "$HIL_GIT_SHA" \
+            --report artifacts/hil-report.json
+
+      - name: Upload HIL evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: adxl355-hil-${{ inputs.transport }}-${{ github.run_id }}
+          path: artifacts/
+          if-no-files-found: error
+          retention-days: 30

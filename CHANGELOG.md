@@ -64,6 +64,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 #### Stage 4: CI release gates
 - `.github/workflows/release.yml` — enforceable release gate that reuses required CI, validates tag/commit/version consistency, builds Python/Rust/npm/Go/C/C++ dry-run artifacts from one SHA, and uploads per-package plus aggregate SHA-256 checksums
 
+#### Stage 6: Hardware-in-the-loop validation
+- Manual-only Linux self-hosted HIL workflow for explicit SPI or I2C fixtures
+- Public HIL CLI covering bus configuration, identity/device revision, reset, range/ODR, temperature, raw XYZ, continuous reads, and standby restoration
+- Sanitized JSON evidence, bounded diagnostic hints, wiring/voltage/runner documentation, and a 30-day release-evidence policy
+
 #### Stage 5: Hardware adapters
 - `python/src/adxl355/adapters/smbus2.py` — Linux I2C transport (smbus2)
 - `c/examples/linux_spi.c` — Linux SPI hardware example using spidev ioctl

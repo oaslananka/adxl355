@@ -197,22 +197,24 @@ Run the native package smoke locally with:
 
 ## Hardware-in-the-Loop Tests
 
-**Not yet implemented.** Hardware tests will be located in:
+Physical validation is implemented as the explicit CLI
+`scripts/hil_runner.py` and the manual-only `.github/workflows/hil.yml`
+workflow. Neither is part of default unit-test discovery or pull-request CI.
+The runner supports Linux SPI and I2C fixtures, validates identity, device
+revision, reset, range/ODR configuration, temperature, raw XYZ, and a bounded
+continuous-read sequence, then writes a sanitized JSON evidence report.
 
-```
-c/tests/hardware/
-python/tests/hardware/
-```
+The runner framework and failure paths are covered by ordinary unit tests, but a
+real HIL result is valid only when the workflow runs on a connected ADXL355. See
+[`docs/hardware-testing.md`](hardware-testing.md) for voltage limits, wiring,
+self-hosted runner setup, commands, report contents, and troubleshooting.
 
-Hardware tests require:
-- Real ADXL355 breakout board
-- SPI (e.g., via spidev on Raspberry Pi)
-- Or I2C (e.g., via smbus2)
-- Proper wiring as described in `docs/wiring.md`
-
-Hardware tests are excluded from the default test suite. Run them explicitly:
 ```bash
-pytest python/tests/hardware/
+# Explicit local SPI example; requires a physical /dev/spidev0.0 fixture
+python scripts/hil_runner.py --transport spi --spi-bus 0 --spi-device 0
+
+# Explicit local I2C example; requires a physical /dev/i2c-1 fixture
+python scripts/hil_runner.py --transport i2c --i2c-bus 1 --i2c-address 0x1D
 ```
 
 ## Cross-Language Test Vector Verification

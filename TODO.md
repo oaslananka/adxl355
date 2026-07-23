@@ -29,7 +29,7 @@
 - [x] smbus2 adapter implementation
 - [ ] Calibration helper utilities
 - [ ] FIFO read support
-- [ ] Hardware-in-the-loop test examples
+- [x] Hardware-in-the-loop runner and failure-path tests
 - [x] Verify Ruff and strict mypy compliance
 - [x] Add more device-level integration tests (75 tests passing)
 - [x] Core MVP (full Device class, 75 tests passing)
@@ -60,9 +60,9 @@
 - [x] Full RAII device class with all C API methods (3 tests passing)
 
 ### Documentation
-- [ ] Hardware wiring diagrams
-- [ ] Raspberry Pi setup guide
-- [ ] Hardware test plan with steps
+- [x] Hardware wiring tables and voltage/bus assumptions
+- [x] Linux self-hosted SPI/I2C runner setup guide
+- [x] Hardware test plan with identity/reset/configuration/data steps
 - [ ] Interrupt and FIFO detailed documentation
 - [ ] API reference docs for each language
 - [ ] Video/images for hardware setup
@@ -74,5 +74,6 @@
 
 ### Testing
 - [x] Required clean-checkout vector gate (`scripts/verify_vectors.py --ci`) for C, C++, Python, Rust, Node.js, and Go with zero permitted skips
-- [ ] Hardware-in-the-loop test procedure
-- [ ] Continuous integration with hardware test runner
+- [x] Hardware-in-the-loop test procedure
+- [x] Manual-only self-hosted HIL workflow
+- [ ] Publish a successful physical SPI and I2C HIL artifact for the release candidate
