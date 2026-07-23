@@ -38,8 +38,25 @@ prevents artifact generation.
 Each package job checks out the preflight SHA explicitly, performs a clean-tree
 check, builds without publishing, inspects archive contents, installs or consumes
 the built artifact in a clean temporary environment, generates SHA-256 checksums,
-and uploads an inspectable artifact. A final job downloads all package artifacts and creates an
-aggregate checksum file and metadata document.
+and uploads an inspectable artifact.
+
+The final job downloads every verified package artifact, creates aggregate
+checksums and metadata, generates an SPDX JSON SBOM, and scans that SBOM with
+Grype. A high severity or critical vulnerability blocks bundle creation even when
+no upstream fix is available. It then creates a final compressed release bundle,
+records its SHA-256 digest, and uses GitHub OIDC to persist SLSA provenance and an
+SBOM attestation. Only that final job receives `id-token`, `attestations`, and
+`artifact-metadata` write permissions.
+
+Verify a downloaded final bundle with:
+
+```bash
+gh attestation verify adxl355-release-*.tar.gz --repo oaslananka/adxl355
+sha256sum --check RELEASE_BUNDLE_SHA256SUMS
+```
+
+See [`security/supply-chain.md`](security/supply-chain.md) for scanner ownership,
+exception rules, immutable action updates, and trusted publishing policy.
 
 ## Version-mismatch fixture
 

@@ -1,0 +1,82 @@
+version: 2
+
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Europe/Istanbul
+    open-pull-requests-limit: 2
+    rebase-strategy: auto
+    labels: [dependencies, area/ci]
+    commit-message:
+      prefix: "deps(actions)"
+    groups:
+      github-actions:
+        patterns: ["*"]
+
+  - package-ecosystem: pip
+    directory: /python
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:15"
+      timezone: Europe/Istanbul
+    open-pull-requests-limit: 2
+    rebase-strategy: auto
+    labels: [dependencies, area/python]
+    commit-message:
+      prefix: "deps(python)"
+    groups:
+      python-dependencies:
+        patterns: ["*"]
+
+  - package-ecosystem: cargo
+    directory: /rust
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:30"
+      timezone: Europe/Istanbul
+    open-pull-requests-limit: 2
+    rebase-strategy: auto
+    labels: [dependencies, area/rust]
+    commit-message:
+      prefix: "deps(rust)"
+    groups:
+      rust-dependencies:
+        patterns: ["*"]
+
+  - package-ecosystem: npm
+    directory: /node
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:45"
+      timezone: Europe/Istanbul
+    open-pull-requests-limit: 2
+    rebase-strategy: auto
+    labels: [dependencies, area/node]
+    commit-message:
+      prefix: "deps(node)"
+    groups:
+      node-dependencies:
+        patterns: ["*"]
+
+  - package-ecosystem: gomod
+    directory: /go
+    schedule:
+      interval: weekly
+      day: monday
+      time: "07:00"
+      timezone: Europe/Istanbul
+    open-pull-requests-limit: 2
+    rebase-strategy: auto
+    labels: [dependencies, area/go]
+    commit-message:
+      prefix: "deps(go)"
+    groups:
+      go-dependencies:
+        patterns: ["*"]

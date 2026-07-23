@@ -12,6 +12,11 @@
 - [x] Add enforceable release gate (canonical version mapping, artifact inspection/smoke, checksums)
 - [x] Canonical multi-ecosystem version and package-name strategy
 - [x] Add required language quality gates (lint/type, sanitizers, package smoke, audit, race, coverage)
+- [x] Group and rate-limit dependency updates across all maintained ecosystems
+- [x] Add primary CodeQL SAST for supported repository languages
+- [x] Pin external GitHub Actions to immutable commit SHAs
+- [x] Add release SBOM, high-severity vulnerability gate, checksums, and OIDC attestations
+- [x] Enable vulnerability alerts, Dependabot security updates, push protection, and private reporting
 - [x] Fix copyright holder name in LICENSE
 
 ### C
