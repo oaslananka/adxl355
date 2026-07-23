@@ -1,5 +1,7 @@
 """Main ADXL355 device driver."""
 
+from __future__ import annotations
+
 from adxl355.constants import (
     DEVID_AD,
     DEVID_MST,
