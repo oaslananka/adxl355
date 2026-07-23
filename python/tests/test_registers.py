@@ -1,14 +1,14 @@
 """Tests for register definitions and enums."""
 
-from adxl355.registers import Register, Range, PowerMode
 from adxl355.constants import (
-    ADXL355_I2C_ADDRESS_DEFAULT,
     ADXL355_I2C_ADDRESS_ALTERNATE,
+    ADXL355_I2C_ADDRESS_DEFAULT,
     DEVID_AD,
     DEVID_MST,
     PARTID,
     RESET_CODE,
 )
+from adxl355.registers import PowerMode, Range, Register
 
 
 class TestRegisterValues:

@@ -24,6 +24,7 @@ Transport-agnostic, testable, production-ready driver family with shared registe
 - Mock transport testing (no hardware required)
 - Raw 20-bit acceleration decoding with golden test vectors
 - Required clean-checkout cross-language vector gate with zero permitted CI skips
+- CI quality gates for sanitizers, static analysis, package smoke tests, dependency audit, race detection, and coverage reporting
 - Range-based g and m/s² conversion
 - Temperature sensor readout
 - FIFO basic support

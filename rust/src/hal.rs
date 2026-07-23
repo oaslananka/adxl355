@@ -26,7 +26,11 @@ where
     ///
     /// `spi` must be configured for ADXL355 SPI Mode 0 (CPOL=0, CPHA=0).
     pub fn new(spi: SPI, delay: D) -> Self {
-        SpiTransport { spi, delay, buf: [0u8; 12] }
+        SpiTransport {
+            spi,
+            delay,
+            buf: [0u8; 12],
+        }
     }
 }
 
@@ -56,8 +60,9 @@ where
         }
         self.buf[0] = crate::registers::spi::write_cmd(reg);
         self.buf[1..=data.len()].copy_from_slice(data);
-        let mut ops =
-            [embedded_hal::spi::Operation::Write(&self.buf[..=data.len()])];
+        let mut ops = [embedded_hal::spi::Operation::Write(
+            &self.buf[..=data.len()],
+        )];
         self.spi.transaction(&mut ops).map_err(|_| Error::Bus)?;
         Ok(())
     }
@@ -91,7 +96,9 @@ where
 {
     fn read_register(&mut self, reg: u8, len: u8) -> Result<Vec<u8>, Error> {
         let mut buf = vec![0u8; len as usize];
-        self.i2c.write_read(self.addr, &[reg], &mut buf).map_err(|_| Error::Bus)?;
+        self.i2c
+            .write_read(self.addr, &[reg], &mut buf)
+            .map_err(|_| Error::Bus)?;
         Ok(buf)
     }
 

@@ -1,9 +1,9 @@
+use adxl355::registers::id;
+use adxl355::registers::reg;
 /// Basic ADXL355 readout example using mock transport.
 ///
 /// Run: cargo run --example basic
-use adxl355::{Adxl355, Range, PowerMode, Error};
-use adxl355::registers::reg;
-use adxl355::registers::id;
+use adxl355::{Adxl355, Error, PowerMode, Range};
 
 struct MockBus {
     regs: [u8; 128],
@@ -25,13 +25,11 @@ impl adxl355::Transport for MockBus {
 }
 
 fn main() -> Result<(), Error> {
-    let mut bus = MockBus {
-        regs: [0u8; 128],
-    };
+    let mut bus = MockBus { regs: [0u8; 128] };
     // Set expected ID values for probe to pass
-    bus.regs[reg::DEVID_AD as usize]  = id::DEVID_AD;
+    bus.regs[reg::DEVID_AD as usize] = id::DEVID_AD;
     bus.regs[reg::DEVID_MST as usize] = id::DEVID_MST;
-    bus.regs[reg::PARTID as usize]    = id::PARTID;
+    bus.regs[reg::PARTID as usize] = id::PARTID;
 
     let mut dev = Adxl355::new(bus);
 
@@ -48,7 +46,10 @@ fn main() -> Result<(), Error> {
     let temp = dev.read_temperature_c()?;
 
     println!("Raw:   x={:7}  y={:7}  z={:7}", raw.x, raw.y, raw.z);
-    println!("Accel: x={:10.6}  y={:10.6}  z={:10.6} g", accel.x, accel.y, accel.z);
+    println!(
+        "Accel: x={:10.6}  y={:10.6}  z={:10.6} g",
+        accel.x, accel.y, accel.z
+    );
     println!("Temp:  {:.2} °C", temp);
 
     Ok(())

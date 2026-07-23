@@ -1,19 +1,53 @@
 {
   "name": "adxl355",
   "version": "0.1.0",
-  "description": "Cross-platform ADXL355 accelerometer driver for Node.js",
+  "description": "Typed, transport-agnostic ADXL355 accelerometer driver for Node.js",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "license": "MIT",
-  "keywords": ["adxl355", "accelerometer", "sensor", "spi", "i2c", "embedded", "raspberry-pi"],
+  "keywords": [
+    "adxl355",
+    "accelerometer",
+    "sensor",
+    "spi",
+    "i2c",
+    "embedded",
+    "raspberry-pi"
+  ],
   "scripts": {
     "build": "tsc",
     "test": "vitest run",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "typecheck": "tsc --noEmit",
+    "pack:check": "npm run build && npm pack --dry-run --json > .npm-pack.json && node scripts/check-package.mjs",
+    "audit:ci": "npm audit --audit-level=moderate"
   },
   "devDependencies": {
-    "typescript": "^5.4.0",
-    "vitest": "^2.0.0"
+    "typescript": "5.9.3",
+    "vitest": "4.1.10"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": "^22.0.0 || >=24.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/oaslananka/adxl355.git",
+    "directory": "node"
+  },
+  "homepage": "https://github.com/oaslananka/adxl355#readme",
+  "bugs": {
+    "url": "https://github.com/oaslananka/adxl355/issues"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
   }
 }

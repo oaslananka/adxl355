@@ -1,0 +1,7 @@
+cmake_minimum_required(VERSION 3.14)
+project(adxl355-cpp-consumer LANGUAGES CXX)
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+find_package(adxl355-cpp 0.1 CONFIG REQUIRED)
+add_executable(adxl355_cpp_consumer main.cpp)
+target_link_libraries(adxl355_cpp_consumer PRIVATE adxl355::cpp)

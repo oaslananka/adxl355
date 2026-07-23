@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=64"]
+requires = ["setuptools==80.9.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -8,7 +8,8 @@ version = "0.1.0"
 description = "Cross-platform ADXL355 accelerometer driver"
 readme = "README.md"
 requires-python = ">=3.9"
-license = { text = "MIT" }
+license = "MIT"
+license-files = ["LICENSE"]
 authors = [
     { name = "Oğuzhan Aslan" },
 ]
@@ -17,11 +18,15 @@ classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
     "Intended Audience :: Science/Research",
-    "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
     "Topic :: Scientific/Engineering",
     "Topic :: System :: Hardware",
 ]
+
+[project.urls]
+Homepage = "https://github.com/oaslananka/adxl355"
+Repository = "https://github.com/oaslananka/adxl355"
+Issues = "https://github.com/oaslananka/adxl355/issues"
 
 [project.optional-dependencies]
 spi = ["spidev"]
@@ -44,3 +49,6 @@ select = ["E", "F", "W", "N", "I"]
 [tool.mypy]
 strict = true
 python_version = "3.9"
+
+[tool.setuptools.package-data]
+adxl355 = ["py.typed"]
