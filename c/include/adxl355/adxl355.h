@@ -23,7 +23,8 @@ typedef enum {
     ADXL355_ERR_INVALID_ARG = -4,
     ADXL355_ERR_BAD_DEVICE = -5,
     ADXL355_ERR_NOT_READY  = -6,
-    ADXL355_ERR_UNSUPPORTED = -7
+    ADXL355_ERR_UNSUPPORTED = -7,
+    ADXL355_ERR_STATE       = -8
 } adxl355_status_t;
 
 /* ---------------------------------------------------------------------------
@@ -155,7 +156,9 @@ adxl355_status_t adxl355_init(adxl355_t *dev, const adxl355_bus_t *bus);
  * Probe for the ADXL355 by reading the identity registers.
  *
  * On success the device range cache is synchronized from the RANGE register,
- * the device is placed into standby mode, and `dev->initialized` is set to true.
+ * the device is placed into standby mode without changing unrelated POWER_CTL
+ * bits, and `dev->initialized` is set to true. A failed probe leaves the device
+ * handle uninitialized.
  *
  * @param dev  Initialised device handle.
  * @return ADXL355_OK if all three ID registers match,
@@ -173,20 +176,23 @@ adxl355_status_t adxl355_probe(adxl355_t *dev);
  * communication.
  *
  * @param dev  Initialised device handle.
- * @return ADXL355_OK or error code.
+ * @return ADXL355_OK, ADXL355_ERR_STATE before a successful probe, or another error code.
  */
 adxl355_status_t adxl355_reset(adxl355_t *dev);
 
 /**
  * Set the acceleration range.
  *
- * The driver reads the current RANGE register and replaces only RANGE_SEL,
- * preserving I2C_HS, INT_POL, and reserved bits. The cached range is updated
- * only after the register write succeeds.
+ * The driver requires a successful probe. If the device is measuring, it
+ * temporarily enters standby, updates only RANGE_SEL while preserving I2C_HS,
+ * INT_POL, and reserved bits, then restores the original POWER_CTL value. The
+ * cached range is updated immediately after a successful RANGE write so it
+ * remains consistent even if restoring measurement mode fails.
  *
  * @param dev   Initialised device handle.
  * @param range Desired range.
- * @return ADXL355_OK, ADXL355_ERR_BUS on read/write failure, or an argument error.
+ * @return ADXL355_OK, ADXL355_ERR_STATE before probe, ADXL355_ERR_BUS on
+ *         transition/configuration/restore failure, or an argument error.
  */
 adxl355_status_t adxl355_set_range(adxl355_t *dev, adxl355_range_t range);
 
@@ -213,7 +219,10 @@ adxl355_status_t adxl355_set_power_mode(adxl355_t *dev, adxl355_power_mode_t mod
 /**
  * Set the output data rate / filter corner.
  *
- * @param dev Initialised device handle.
+ * If measurement mode is active, the driver temporarily enters standby and
+ * restores the exact original POWER_CTL value after updating FILTER.
+ *
+ * @param dev Initialised and probed device handle.
  * @param odr Desired ODR value.
  * @return ADXL355_OK or error code.
  */

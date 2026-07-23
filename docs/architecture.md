@@ -72,6 +72,52 @@ export interface Transport {
 }
 ```
 
+## Device Lifecycle and Configuration State
+
+Every implementation exposes the same two-state lifecycle:
+
+```text
+constructed / unprobed -- successful probe --> probed + standby
+          ^                    |
+          |---- failed probe --|
+```
+
+Construction or C `adxl355_init()` only stores the transport and initializes local
+cache defaults. `probe()` validates all identity registers, synchronizes the cached
+range, and enters standby with a read-modify-write of `POWER_CTL` so unrelated bits
+are preserved. A failed or repeated unsuccessful probe leaves the handle
+uninitialized.
+
+After a successful probe, all methods that access hardware are enabled. Before
+probe, they fail without touching the transport. Stateless decode and unit
+conversion helpers are intentionally exempt. The language-specific state errors
+are:
+
+| C | C++ | Python | Rust | Node.js | Go |
+|---|---|---|---|---|---|
+| `ADXL355_ERR_STATE` | `InvalidStateError` | `DeviceStateError` | `Error::InvalidState` | `DeviceStateError` | `ErrInvalidState` |
+
+### Standby Configuration Guard
+
+Datasheet configuration guidance requires range and ODR/filter changes in standby.
+Each supported configuration method uses the same guard:
+
+1. Read and retain the complete original `POWER_CTL` value.
+2. If measurement mode is active, set only the standby bit.
+3. Apply the target register update.
+4. Restore the exact original `POWER_CTL` value when a transition was made.
+
+If the device is already in standby, steps 2 and 4 perform no bus writes. If the
+target operation fails, restoration is still attempted and the associated cache is
+not changed. If the target write succeeds but restoration fails, the method reports
+a bus error, hardware remains in standby, and the cache retains the successfully
+written target value so software and hardware remain consistent.
+
+The guard applies to `set_range` in every implementation and to the public
+ODR/filter configuration APIs currently provided by C and Python. Explicit
+power-mode changes are not wrapped by the guard because changing that mode is the
+operation requested by the caller.
+
 ## Register Specification as Single Source of Truth
 
 Register addresses, bit fields, and expected ID values are defined in `spec/adxl355.registers.yaml`. This YAML file is the authoritative reference. Every language package duplicates these values in its native format (header files, enums, constants), but they must all match the YAML.

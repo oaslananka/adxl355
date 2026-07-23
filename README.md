@@ -29,6 +29,29 @@ Transport-agnostic, testable, production-ready driver family with shared registe
 - Self-test and offset calibration API
 - Register map specification and documentation
 
+## Device Lifecycle Contract
+
+Creating a driver object only stores the transport; it does not verify hardware.
+Call `probe()` successfully before any stateful hardware operation such as reset,
+range or filter configuration, status/data reads, or power-mode changes. Stateless
+conversion helpers remain usable without a device.
+
+| Language | Required startup | Pre-probe error |
+|---|---|---|
+| C | `adxl355_init()` → `adxl355_probe()` | `ADXL355_ERR_STATE` |
+| C++ | construct `Device` → `probe()` | `InvalidStateError` |
+| Python | construct `ADXL355` → `probe()` | `DeviceStateError` |
+| Rust | `Adxl355::new()` → `probe()` | `Error::InvalidState` |
+| Node.js | construct `ADXL355` → `await probe()` | `DeviceStateError` |
+| Go | `New()` → `Probe()` | `ErrInvalidState` |
+
+The datasheet requires range and filter changes in standby. If measurement mode is
+active, the drivers automatically preserve the complete `POWER_CTL` byte, enter
+standby, perform the configuration write, and restore the previous mode. No power
+write is performed when the device is already in standby. A successful target
+write updates cached state before restoration, so the cache continues to match the
+hardware even if restoring measurement mode fails.
+
 ## Quick Start
 
 ### Python

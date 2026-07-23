@@ -35,6 +35,10 @@ typedef struct {
     int      force_error;                        /**< If non-zero, every bus call fails. */
     int      force_read_error;                   /**< If non-zero, reads fail. */
     int      force_write_error;                  /**< If non-zero, writes fail. */
+    int      fail_read_reg;                      /**< Register-specific read failure; -1 disables. */
+    int      fail_write_reg;                     /**< Register-specific write failure; -1 disables. */
+    size_t   fail_write_occurrence;              /**< 1-based matching write to fail; 0 fails all. */
+    size_t   fail_write_matches;                 /**< Matching write attempts observed. */
     size_t   call_count;                         /**< Number of recorded successful bus calls. */
     adxl355_mock_call_t calls[ADXL355_MOCK_MAX_CALLS]; /**< Call history. */
     void    *delay_ctx;                          /**< Context for delay callback (unused). */

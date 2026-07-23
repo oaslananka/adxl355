@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Breaking (all languages)**: Corrected `STATUS` register bit positions per datasheet Rev.D Table 27 (DATA_RDY=0, FIFO_FULL=1, FIFO_OVR=2, ACTIVITY=3, NVM_BUSY=4)
 - **Breaking (all languages)**: Corrected `FILTER` register — ODR in bits 3:0, HPF in bits 6:4 per datasheet Rev.D Table 38 (ODR mask was 0xF0, now 0x0F)
 - **Breaking (all languages)**: Corrected temperature conversion formula from `raw/100+25` to `25+(raw-1885)/-9.05` per datasheet Rev.D
+- **Breaking (all languages)**: Required a successful probe before stateful hardware operations and added explicit state errors; range and supported ODR/filter writes now use a bounded standby/configure/restore transaction that preserves the complete `POWER_CTL` value and cache consistency on failures
 - Masked reserved `TEMP2[7:4]` bits, added exact-length validation, and implemented coherent temperature sampling with bounded high-byte rollover retries across C, Python, Rust, Node.js, and Go
 - **Breaking (Python/Rust SPI adapters)**: Corrected command framing to read `(reg << 1) | 0x01` and write `reg << 1`, kept command and payload in one chip-select transaction, and documented SPI Mode 0 (`CPOL=0`, `CPHA=0`)
 - Corrected `RANGE` register writes in every implementation, including the C reference driver, to preserve unrelated bits (`INT_POL`, `I2C_HS`) and update cached state only after successful writes

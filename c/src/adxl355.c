@@ -25,6 +25,46 @@ static inline int write_reg(adxl355_t *dev, uint8_t reg, uint8_t byte)
     return dev->bus.write(dev->bus.ctx, reg, &byte, 1);
 }
 
+typedef struct {
+    uint8_t original_power_ctl;
+    bool restore_measurement;
+} adxl355_config_guard_t;
+
+static adxl355_status_t require_initialized(const adxl355_t *dev)
+{
+    return dev->initialized ? ADXL355_OK : ADXL355_ERR_STATE;
+}
+
+static adxl355_status_t enter_configuration_standby(
+    adxl355_t *dev, adxl355_config_guard_t *guard)
+{
+    if (read_reg(dev, ADXL355_REG_POWER_CTL, &guard->original_power_ctl) != 0) {
+        return ADXL355_ERR_BUS;
+    }
+    guard->restore_measurement =
+        (guard->original_power_ctl & (uint8_t)(1U << ADXL355_POWER_MODE_BIT)) == 0U;
+    if (guard->restore_measurement) {
+        uint8_t standby = (uint8_t)(guard->original_power_ctl |
+                                    (uint8_t)(1U << ADXL355_POWER_MODE_BIT));
+        if (write_reg(dev, ADXL355_REG_POWER_CTL, standby) != 0) {
+            return ADXL355_ERR_BUS;
+        }
+    }
+    return ADXL355_OK;
+}
+
+static adxl355_status_t finish_configuration(
+    adxl355_t *dev,
+    const adxl355_config_guard_t *guard,
+    adxl355_status_t operation_status)
+{
+    if (guard->restore_measurement &&
+        write_reg(dev, ADXL355_REG_POWER_CTL, guard->original_power_ctl) != 0) {
+        return ADXL355_ERR_BUS;
+    }
+    return operation_status;
+}
+
 static bool range_from_register(uint8_t reg, adxl355_range_t *range)
 {
     switch (reg & ADXL355_RANGE_SEL_MASK) {
@@ -76,6 +116,7 @@ adxl355_status_t adxl355_probe(adxl355_t *dev)
     if (dev == NULL) {
         return ADXL355_ERR_NULL;
     }
+    dev->initialized = false;
     if (dev->bus.read == NULL || dev->bus.write == NULL) {
         return ADXL355_ERR_NULL;
     }
@@ -107,9 +148,15 @@ adxl355_status_t adxl355_probe(adxl355_t *dev)
         return ADXL355_ERR_INVALID_ARG;
     }
 
-    /* Put device into standby mode after probe. */
-    if (write_reg(dev, ADXL355_REG_POWER_CTL, ADXL355_POWER_STANDBY) != 0) {
+    uint8_t power_ctl;
+    if (read_reg(dev, ADXL355_REG_POWER_CTL, &power_ctl) != 0) {
         return ADXL355_ERR_BUS;
+    }
+    if ((power_ctl & (uint8_t)(1U << ADXL355_POWER_MODE_BIT)) == 0U) {
+        power_ctl |= (uint8_t)(1U << ADXL355_POWER_MODE_BIT);
+        if (write_reg(dev, ADXL355_REG_POWER_CTL, power_ctl) != 0) {
+            return ADXL355_ERR_BUS;
+        }
     }
 
     dev->range = detected_range;
@@ -121,6 +168,10 @@ adxl355_status_t adxl355_reset(adxl355_t *dev)
 {
     if (dev == NULL) {
         return ADXL355_ERR_NULL;
+    }
+    adxl355_status_t state = require_initialized(dev);
+    if (state != ADXL355_OK) {
+        return state;
     }
     if (write_reg(dev, ADXL355_REG_RESET, ADXL355_RESET_CODE) != 0) {
         return ADXL355_ERR_BUS;
@@ -137,26 +188,43 @@ adxl355_status_t adxl355_set_range(adxl355_t *dev, adxl355_range_t range)
     if (dev == NULL) {
         return ADXL355_ERR_NULL;
     }
+    adxl355_status_t state = require_initialized(dev);
+    if (state != ADXL355_OK) {
+        return state;
+    }
     if (range < ADXL355_RANGE_2G || range > ADXL355_RANGE_8G) {
         return ADXL355_ERR_INVALID_ARG;
     }
+
+    adxl355_config_guard_t guard;
+    adxl355_status_t status = enter_configuration_standby(dev, &guard);
+    if (status != ADXL355_OK) {
+        return status;
+    }
+
     uint8_t reg;
     if (read_reg(dev, ADXL355_REG_RANGE, &reg) != 0) {
-        return ADXL355_ERR_BUS;
+        status = ADXL355_ERR_BUS;
+    } else {
+        reg = (uint8_t)((reg & (uint8_t)(~ADXL355_RANGE_SEL_MASK)) |
+                        ((uint8_t)range & ADXL355_RANGE_SEL_MASK));
+        if (write_reg(dev, ADXL355_REG_RANGE, reg) != 0) {
+            status = ADXL355_ERR_BUS;
+        } else {
+            dev->range = range;
+        }
     }
-    reg = (uint8_t)((reg & (uint8_t)(~ADXL355_RANGE_SEL_MASK)) |
-                    ((uint8_t)range & ADXL355_RANGE_SEL_MASK));
-    if (write_reg(dev, ADXL355_REG_RANGE, reg) != 0) {
-        return ADXL355_ERR_BUS;
-    }
-    dev->range = range;
-    return ADXL355_OK;
+    return finish_configuration(dev, &guard, status);
 }
 
 adxl355_status_t adxl355_get_range(adxl355_t *dev, adxl355_range_t *range)
 {
     if (dev == NULL || range == NULL) {
         return ADXL355_ERR_NULL;
+    }
+    adxl355_status_t state = require_initialized(dev);
+    if (state != ADXL355_OK) {
+        return state;
     }
     uint8_t reg;
     if (read_reg(dev, ADXL355_REG_RANGE, &reg) != 0) {
@@ -173,11 +241,18 @@ adxl355_status_t adxl355_set_power_mode(adxl355_t *dev, adxl355_power_mode_t mod
     if (dev == NULL) {
         return ADXL355_ERR_NULL;
     }
+    adxl355_status_t state = require_initialized(dev);
+    if (state != ADXL355_OK) {
+        return state;
+    }
+    if (mode != ADXL355_POWER_STANDBY && mode != ADXL355_POWER_MEASUREMENT) {
+        return ADXL355_ERR_INVALID_ARG;
+    }
+
     uint8_t reg;
     if (read_reg(dev, ADXL355_REG_POWER_CTL, &reg) != 0) {
         return ADXL355_ERR_BUS;
     }
-    /* Datasheet Rev.D, Table 43: bit 0 = 1 => standby, bit 0 = 0 => measurement */
     if (mode == ADXL355_POWER_STANDBY) {
         reg |= (uint8_t)(1U << ADXL355_POWER_MODE_BIT);
     } else {
@@ -194,25 +269,41 @@ adxl355_status_t adxl355_set_odr(adxl355_t *dev, adxl355_odr_t odr)
     if (dev == NULL) {
         return ADXL355_ERR_NULL;
     }
+    adxl355_status_t state = require_initialized(dev);
+    if (state != ADXL355_OK) {
+        return state;
+    }
     if (odr > ADXL355_ODR_3_906_HZ) {
         return ADXL355_ERR_INVALID_ARG;
     }
+
+    adxl355_config_guard_t guard;
+    adxl355_status_t status = enter_configuration_standby(dev, &guard);
+    if (status != ADXL355_OK) {
+        return status;
+    }
+
     uint8_t reg;
     if (read_reg(dev, ADXL355_REG_FILTER, &reg) != 0) {
-        return ADXL355_ERR_BUS;
+        status = ADXL355_ERR_BUS;
+    } else {
+        reg = (uint8_t)((reg & ADXL355_FILTER_HPF_MASK) |
+                        ((uint8_t)odr & ADXL355_FILTER_ODR_MASK));
+        if (write_reg(dev, ADXL355_REG_FILTER, reg) != 0) {
+            status = ADXL355_ERR_BUS;
+        }
     }
-    /* Datasheet Rev.D, Table 38: ODR_LPF in bits 3:0, HPF_CORNER in bits 6:4 */
-    reg = (uint8_t)((reg & ADXL355_FILTER_HPF_MASK) | ((uint8_t)odr & ADXL355_FILTER_ODR_MASK));
-    if (write_reg(dev, ADXL355_REG_FILTER, reg) != 0) {
-        return ADXL355_ERR_BUS;
-    }
-    return ADXL355_OK;
+    return finish_configuration(dev, &guard, status);
 }
 
 adxl355_status_t adxl355_read_raw(adxl355_t *dev, adxl355_raw_xyz_t *out)
 {
     if (dev == NULL || out == NULL) {
         return ADXL355_ERR_NULL;
+    }
+    adxl355_status_t state = require_initialized(dev);
+    if (state != ADXL355_OK) {
+        return state;
     }
 
     uint8_t buf[9];
@@ -263,6 +354,10 @@ adxl355_status_t adxl355_read_temperature_raw(adxl355_t *dev, int16_t *out)
     if (dev == NULL || out == NULL) {
         return ADXL355_ERR_NULL;
     }
+    adxl355_status_t state = require_initialized(dev);
+    if (state != ADXL355_OK) {
+        return state;
+    }
     for (uint8_t attempt = 0U; attempt < ADXL355_TEMP_READ_ATTEMPTS; attempt++) {
         uint8_t sample[2];
         uint8_t confirm_temp2;
@@ -306,6 +401,10 @@ adxl355_status_t adxl355_read_status(adxl355_t *dev, uint8_t *status)
     if (dev == NULL || status == NULL) {
         return ADXL355_ERR_NULL;
     }
+    adxl355_status_t state = require_initialized(dev);
+    if (state != ADXL355_OK) {
+        return state;
+    }
     return (read_reg(dev, ADXL355_REG_STATUS, status) == 0)
            ? ADXL355_OK
            : ADXL355_ERR_BUS;
@@ -346,6 +445,7 @@ const char *adxl355_status_string(adxl355_status_t status)
         case ADXL355_ERR_BAD_DEVICE: return "ADXL355_ERR_BAD_DEVICE";
         case ADXL355_ERR_NOT_READY:  return "ADXL355_ERR_NOT_READY";
         case ADXL355_ERR_UNSUPPORTED: return "ADXL355_ERR_UNSUPPORTED";
+        case ADXL355_ERR_STATE:       return "ADXL355_ERR_STATE";
         default:                     return "ADXL355_UNKNOWN";
     }
 }

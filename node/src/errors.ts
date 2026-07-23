@@ -22,6 +22,14 @@ export class DeviceNotFoundError extends ADXL355Error {
   }
 }
 
+/** Operation requires a successful probe or a different device state. */
+export class DeviceStateError extends ADXL355Error {
+  constructor(message = "Invalid device state") {
+    super(message);
+    this.name = "DeviceStateError";
+  }
+}
+
 /** Invalid configuration argument. */
 export class InvalidConfigurationError extends ADXL355Error {
   constructor(message = "Invalid configuration") {

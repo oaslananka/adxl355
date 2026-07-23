@@ -217,6 +217,156 @@ static void test_probe_ok(void)
     TEST_END();
 }
 
+static size_t count_mock_writes(const adxl355_mock_bus_t *mock, uint8_t reg)
+{
+    size_t count = 0U;
+    for (size_t i = 0U; i < mock->call_count && i < ADXL355_MOCK_MAX_CALLS; i++) {
+        if (mock->calls[i].is_write && mock->calls[i].reg == reg) {
+            count++;
+        }
+    }
+    return count;
+}
+
+static void test_pre_probe_operations_return_state_error(void)
+{
+    TEST_START("pre_probe_operations_return_state_error");
+    adxl355_mock_bus_t mock;
+    adxl355_mock_bus_init(&mock);
+    adxl355_bus_t bus = adxl355_mock_bus_get_interface(&mock);
+    adxl355_t dev;
+    adxl355_init(&dev, &bus);
+    uint8_t status = 0xAAU;
+
+    TEST_ASSERT(adxl355_set_range(&dev, ADXL355_RANGE_4G) == ADXL355_ERR_STATE,
+                "set_range before probe should return state error");
+    TEST_ASSERT(adxl355_read_status(&dev, &status) == ADXL355_ERR_STATE,
+                "read_status before probe should return state error");
+    TEST_ASSERT(adxl355_reset(&dev) == ADXL355_ERR_STATE,
+                "reset before probe should return state error");
+    TEST_ASSERT(mock.call_count == 0U, "pre-probe operations should not access the bus");
+    TEST_ASSERT(status == 0xAAU, "pre-probe read should not modify output");
+    TEST_END();
+}
+
+static void test_set_range_temporarily_enters_standby(void)
+{
+    TEST_START("set_range_temporarily_enters_standby");
+    adxl355_mock_bus_t mock;
+    adxl355_mock_bus_init(&mock);
+    adxl355_mock_bus_set_identity_ok(&mock);
+    adxl355_bus_t bus = adxl355_mock_bus_get_interface(&mock);
+    adxl355_t dev;
+    adxl355_init(&dev, &bus);
+    TEST_ASSERT(adxl355_probe(&dev) == ADXL355_OK, "probe should succeed");
+
+    mock.regs[ADXL355_REG_POWER_CTL] = ADXL355_POWER_MEASUREMENT;
+    mock.call_count = 0U;
+    TEST_ASSERT(adxl355_set_range(&dev, ADXL355_RANGE_4G) == ADXL355_OK,
+                "range change in measurement should succeed");
+    TEST_ASSERT(mock.regs[ADXL355_REG_POWER_CTL] == ADXL355_POWER_MEASUREMENT,
+                "measurement mode should be restored");
+    TEST_ASSERT(mock.regs[ADXL355_REG_RANGE] == ADXL355_RANGE_4G,
+                "range register should be updated");
+    TEST_ASSERT(dev.range == ADXL355_RANGE_4G, "range cache should be updated");
+    TEST_ASSERT(count_mock_writes(&mock, ADXL355_REG_POWER_CTL) == 2U,
+                "measurement configuration should write standby then restore");
+    TEST_END();
+}
+
+static void test_set_range_in_standby_avoids_power_writes(void)
+{
+    TEST_START("set_range_in_standby_avoids_power_writes");
+    adxl355_mock_bus_t mock;
+    adxl355_mock_bus_init(&mock);
+    adxl355_mock_bus_set_identity_ok(&mock);
+    adxl355_bus_t bus = adxl355_mock_bus_get_interface(&mock);
+    adxl355_t dev;
+    adxl355_init(&dev, &bus);
+    TEST_ASSERT(adxl355_probe(&dev) == ADXL355_OK, "probe should succeed");
+
+    mock.call_count = 0U;
+    TEST_ASSERT(adxl355_set_range(&dev, ADXL355_RANGE_8G) == ADXL355_OK,
+                "standby range change should succeed");
+    TEST_ASSERT(count_mock_writes(&mock, ADXL355_REG_POWER_CTL) == 0U,
+                "already-standby configuration should not rewrite power mode");
+    TEST_END();
+}
+
+static void test_set_range_failure_restores_measurement(void)
+{
+    TEST_START("set_range_failure_restores_measurement");
+    adxl355_mock_bus_t mock;
+    adxl355_mock_bus_init(&mock);
+    adxl355_mock_bus_set_identity_ok(&mock);
+    adxl355_bus_t bus = adxl355_mock_bus_get_interface(&mock);
+    adxl355_t dev;
+    adxl355_init(&dev, &bus);
+    TEST_ASSERT(adxl355_probe(&dev) == ADXL355_OK, "probe should succeed");
+
+    mock.regs[ADXL355_REG_POWER_CTL] = ADXL355_POWER_MEASUREMENT;
+    mock.fail_write_reg = ADXL355_REG_RANGE;
+    TEST_ASSERT(adxl355_set_range(&dev, ADXL355_RANGE_4G) == ADXL355_ERR_BUS,
+                "target write failure should return bus error");
+    TEST_ASSERT(mock.regs[ADXL355_REG_POWER_CTL] == ADXL355_POWER_MEASUREMENT,
+                "measurement mode should be restored after target failure");
+    TEST_ASSERT(mock.regs[ADXL355_REG_RANGE] == ADXL355_RANGE_2G,
+                "failed target write should leave hardware range unchanged");
+    TEST_ASSERT(dev.range == ADXL355_RANGE_2G,
+                "failed target write should leave cache unchanged");
+    TEST_END();
+}
+
+static void test_set_range_restore_failure_keeps_range_cache_consistent(void)
+{
+    TEST_START("set_range_restore_failure_keeps_range_cache_consistent");
+    adxl355_mock_bus_t mock;
+    adxl355_mock_bus_init(&mock);
+    adxl355_mock_bus_set_identity_ok(&mock);
+    adxl355_bus_t bus = adxl355_mock_bus_get_interface(&mock);
+    adxl355_t dev;
+    adxl355_init(&dev, &bus);
+    TEST_ASSERT(adxl355_probe(&dev) == ADXL355_OK, "probe should succeed");
+
+    mock.regs[ADXL355_REG_POWER_CTL] = ADXL355_POWER_MEASUREMENT;
+    mock.fail_write_reg = ADXL355_REG_POWER_CTL;
+    mock.fail_write_occurrence = 2U;
+    TEST_ASSERT(adxl355_set_range(&dev, ADXL355_RANGE_4G) == ADXL355_ERR_BUS,
+                "restore failure should return bus error");
+    TEST_ASSERT(mock.regs[ADXL355_REG_POWER_CTL] == ADXL355_POWER_STANDBY,
+                "failed restore should leave hardware in standby");
+    TEST_ASSERT(mock.regs[ADXL355_REG_RANGE] == ADXL355_RANGE_4G,
+                "successful target write should update hardware range");
+    TEST_ASSERT(dev.range == ADXL355_RANGE_4G,
+                "cache should match successful hardware range write");
+    TEST_END();
+}
+
+static void test_set_odr_temporarily_enters_standby(void)
+{
+    TEST_START("set_odr_temporarily_enters_standby");
+    adxl355_mock_bus_t mock;
+    adxl355_mock_bus_init(&mock);
+    adxl355_mock_bus_set_identity_ok(&mock);
+    adxl355_bus_t bus = adxl355_mock_bus_get_interface(&mock);
+    adxl355_t dev;
+    adxl355_init(&dev, &bus);
+    TEST_ASSERT(adxl355_probe(&dev) == ADXL355_OK, "probe should succeed");
+
+    mock.regs[ADXL355_REG_POWER_CTL] = ADXL355_POWER_MEASUREMENT;
+    mock.regs[ADXL355_REG_FILTER] = 0x50U;
+    mock.call_count = 0U;
+    TEST_ASSERT(adxl355_set_odr(&dev, ADXL355_ODR_125_HZ) == ADXL355_OK,
+                "ODR change in measurement should succeed");
+    TEST_ASSERT(mock.regs[ADXL355_REG_POWER_CTL] == ADXL355_POWER_MEASUREMENT,
+                "measurement mode should be restored after ODR change");
+    TEST_ASSERT(mock.regs[ADXL355_REG_FILTER] == 0x55U,
+                "ODR update should preserve HPF bits");
+    TEST_ASSERT(count_mock_writes(&mock, ADXL355_REG_POWER_CTL) == 2U,
+                "ODR configuration should write standby then restore");
+    TEST_END();
+}
+
 static void test_set_range_writes_expected_register(void)
 {
     TEST_START("set_range_writes_expected_register");
@@ -361,6 +511,7 @@ static void test_reset(void)
     adxl355_bus_t bus = adxl355_mock_bus_get_interface(&mock);
     adxl355_t dev;
     adxl355_init(&dev, &bus);
+    TEST_ASSERT(adxl355_probe(&dev) == ADXL355_OK, "probe should succeed");
 
     TEST_ASSERT(adxl355_reset(&dev) == ADXL355_OK, "reset should succeed");
 
@@ -421,6 +572,8 @@ static adxl355_t temperature_script_device(temperature_script_bus_t *script)
     };
     adxl355_t dev;
     (void)adxl355_init(&dev, &bus);
+    /* This focused transport only scripts TEMP2 reads; model a successful probe. */
+    dev.initialized = true;
     return dev;
 }
 
@@ -429,11 +582,13 @@ static void test_temperature_reserved_nibble_ignored(void)
     TEST_START("temperature_reserved_nibble_ignored");
     adxl355_mock_bus_t mock;
     adxl355_mock_bus_init(&mock);
+    adxl355_mock_bus_set_identity_ok(&mock);
     mock.regs[ADXL355_REG_TEMP2] = 0xF7;
     mock.regs[ADXL355_REG_TEMP1] = 0x5D;
     adxl355_bus_t bus = adxl355_mock_bus_get_interface(&mock);
     adxl355_t dev;
     adxl355_init(&dev, &bus);
+    TEST_ASSERT(adxl355_probe(&dev) == ADXL355_OK, "probe should succeed");
 
     int16_t raw;
     TEST_ASSERT(adxl355_read_temperature_raw(&dev, &raw) == ADXL355_OK,
@@ -528,9 +683,11 @@ static void test_temperature_boundaries(void)
     TEST_START("temperature_boundaries");
     adxl355_mock_bus_t mock;
     adxl355_mock_bus_init(&mock);
+    adxl355_mock_bus_set_identity_ok(&mock);
     adxl355_bus_t bus = adxl355_mock_bus_get_interface(&mock);
     adxl355_t dev;
     adxl355_init(&dev, &bus);
+    TEST_ASSERT(adxl355_probe(&dev) == ADXL355_OK, "probe should succeed");
     int16_t raw;
     float temp;
 
@@ -795,6 +952,12 @@ int main(void)
     test_probe_rejects_reserved_range();
     test_probe_reset_range_converts_one_g();
     test_probe_ok();
+    test_pre_probe_operations_return_state_error();
+    test_set_range_temporarily_enters_standby();
+    test_set_range_in_standby_avoids_power_writes();
+    test_set_range_failure_restores_measurement();
+    test_set_range_restore_failure_keeps_range_cache_consistent();
+    test_set_odr_temporarily_enters_standby();
     test_set_range_writes_expected_register();
     test_set_range_preserves_unrelated_bits();
     test_set_range_read_error_prevents_write();

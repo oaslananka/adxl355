@@ -143,6 +143,18 @@ go test ./...
 - Set/get range via mock
 - Read raw via mock
 
+## Cross-Language State Contract Tests
+
+All language suites verify the same device-state behavior:
+
+- pre-probe hardware operations fail without transport access;
+- successful probe synchronizes range and leaves the sensor in standby;
+- range and supported ODR/filter changes enter and restore measurement mode;
+- already-standby configuration avoids redundant power writes;
+- target-write failures restore the prior mode without changing cached state; and
+- restore failures leave cached configuration consistent with the successful
+  hardware write.
+
 ## Hardware-in-the-Loop Tests
 
 **Not yet implemented.** Hardware tests will be located in:

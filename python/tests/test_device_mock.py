@@ -184,28 +184,33 @@ class TestTemperature:
         assert abs(mock_device.read_temperature_c() - 25.0) < 0.01
 
     def test_short_temperature_read_raises_bus_error(self) -> None:
-        dev = ADXL355(TemperatureSequenceTransport([bytes([0x07])]))
+        transport = TemperatureSequenceTransport([bytes([0x07])])
+        transport.set_identity_ok()
+        dev = ADXL355(transport)
+        dev.probe()
         with pytest.raises(BusError):
             dev.read_temperature_raw()
 
     def test_temperature_rollover_is_retried(self) -> None:
-        dev = ADXL355(
-            TemperatureSequenceTransport(
-                [bytes([0x07, 0xFF]), bytes([0x08]), bytes([0x08, 0x00]), bytes([0x08])]
-            )
+        transport = TemperatureSequenceTransport(
+            [bytes([0x07, 0xFF]), bytes([0x08]), bytes([0x08, 0x00]), bytes([0x08])]
         )
+        transport.set_identity_ok()
+        dev = ADXL355(transport)
+        dev.probe()
         assert dev.read_temperature_raw() == 2048
 
     def test_unstable_temperature_raises_not_ready(self) -> None:
-        dev = ADXL355(
-            TemperatureSequenceTransport(
-                [
-                    bytes([0x07, 0xFF]), bytes([0x08]),
-                    bytes([0x08, 0xFF]), bytes([0x09]),
-                    bytes([0x09, 0xFF]), bytes([0x0A]),
-                ]
-            )
+        transport = TemperatureSequenceTransport(
+            [
+                bytes([0x07, 0xFF]), bytes([0x08]),
+                bytes([0x08, 0xFF]), bytes([0x09]),
+                bytes([0x09, 0xFF]), bytes([0x0A]),
+            ]
         )
+        transport.set_identity_ok()
+        dev = ADXL355(transport)
+        dev.probe()
         with pytest.raises(DataNotReadyError):
             dev.read_temperature_raw()
 

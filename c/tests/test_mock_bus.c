@@ -8,7 +8,8 @@
 static int mock_read(void *ctx, uint8_t reg, uint8_t *data, size_t len)
 {
     adxl355_mock_bus_t *mock = (adxl355_mock_bus_t *)ctx;
-    if (mock->force_error != 0 || mock->force_read_error != 0) {
+    if (mock->force_error != 0 || mock->force_read_error != 0 ||
+        (mock->fail_read_reg >= 0 && reg == (uint8_t)mock->fail_read_reg)) {
         return -1;
     }
     /* Log the call */
@@ -31,6 +32,13 @@ static int mock_write(void *ctx, uint8_t reg, const uint8_t *data, size_t len)
     adxl355_mock_bus_t *mock = (adxl355_mock_bus_t *)ctx;
     if (mock->force_error != 0 || mock->force_write_error != 0) {
         return -1;
+    }
+    if (mock->fail_write_reg >= 0 && reg == (uint8_t)mock->fail_write_reg) {
+        mock->fail_write_matches++;
+        if (mock->fail_write_occurrence == 0U ||
+            mock->fail_write_matches == mock->fail_write_occurrence) {
+            return -1;
+        }
     }
     /* Log the call */
     if (mock->call_count < ADXL355_MOCK_MAX_CALLS) {
@@ -66,7 +74,10 @@ static void mock_delay(void *ctx, uint32_t ms)
 void adxl355_mock_bus_init(adxl355_mock_bus_t *mock)
 {
     memset(mock, 0, sizeof(*mock));
+    mock->fail_read_reg = -1;
+    mock->fail_write_reg = -1;
     mock->regs[ADXL355_REG_RANGE] = ADXL355_RANGE_2G;
+    mock->regs[ADXL355_REG_POWER_CTL] = ADXL355_POWER_STANDBY;
 }
 
 void adxl355_mock_bus_set_identity_ok(adxl355_mock_bus_t *mock)

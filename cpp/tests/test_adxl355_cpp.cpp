@@ -25,6 +25,9 @@ public:
     uint8_t regs[128]{};
     bool fail_reads{false};
     bool fail_writes{false};
+    int fail_write_reg{-1};
+    size_t fail_write_occurrence{0};
+    size_t fail_write_matches{0};
     size_t read_count{0};
     size_t write_count{0};
 
@@ -57,6 +60,12 @@ public:
         write_count++;
         if (fail_writes) {
             return -1;
+        }
+        if (fail_write_reg >= 0 && reg == static_cast<uint8_t>(fail_write_reg)) {
+            fail_write_matches++;
+            if (fail_write_occurrence == 0U || fail_write_matches == fail_write_occurrence) {
+                return -1;
+            }
         }
         std::memcpy(&regs[reg], data, len);
         if (reg == ADXL355_REG_RESET && len > 0 && data[0] == ADXL355_RESET_CODE) {
@@ -137,6 +146,34 @@ void test_reset_restores_2g_range() {
     }
 }
 
+void test_pre_probe_calls_throw_invalid_state() {
+    auto bus = std::make_unique<MockBus>();
+    auto *mock = bus.get();
+    adxl355::Device dev(std::move(bus));
+
+    try {
+        dev.setRange(adxl355::Range::G4);
+        TEST(false, "setRange before probe should throw");
+    } catch (const adxl355::InvalidStateError &) {
+        TEST(mock->read_count == 0U && mock->write_count == 0U,
+             "pre-probe state failure should not access the bus");
+    }
+}
+
+void test_cpp_range_configuration_restores_measurement() {
+    auto bus = std::make_unique<MockBus>();
+    auto *mock = bus.get();
+    adxl355::Device dev(std::move(bus));
+    dev.probe();
+    mock->regs[ADXL355_REG_POWER_CTL] = ADXL355_POWER_MEASUREMENT;
+
+    dev.setRange(adxl355::Range::G4);
+    TEST(mock->regs[ADXL355_REG_POWER_CTL] == ADXL355_POWER_MEASUREMENT,
+         "C++ range configuration restores measurement mode");
+    TEST(mock->regs[ADXL355_REG_RANGE] == ADXL355_RANGE_4G,
+         "C++ range configuration updates range");
+}
+
 void test_set_range_preserves_unrelated_bits() {
     auto bus = std::make_unique<MockBus>();
     auto *mock = bus.get();
@@ -147,7 +184,7 @@ void test_set_range_preserves_unrelated_bits() {
         dev.probe();
         const size_t reads_before = mock->read_count;
         dev.setRange(adxl355::Range::G4);
-        TEST(mock->read_count == reads_before + 1U, "setRange reads RANGE before writing");
+        TEST(mock->read_count == reads_before + 2U, "setRange reads RANGE before writing");
         TEST(mock->regs[ADXL355_REG_RANGE] == 0xC2,
              "setRange preserves I2C_HS and INT_POL bits");
     } catch (const adxl355::Error &) {
@@ -210,6 +247,8 @@ int main() {
     test_probe();
     test_probe_synchronizes_range();
     test_reset_restores_2g_range();
+    test_pre_probe_calls_throw_invalid_state();
+    test_cpp_range_configuration_restores_measurement();
     test_set_range_preserves_unrelated_bits();
     test_set_range_read_error_prevents_write();
     test_set_range_write_error_preserves_state();
