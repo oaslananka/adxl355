@@ -119,20 +119,23 @@ class FinalizeReleaseSbomTests(unittest.TestCase):
     def test_rejects_incomplete_release_manifest(self) -> None:
         manifest = self.manifest()
         manifest["archives"] = manifest["archives"][:-1]
+        document = self.syft_document()
         with self.assertRaisesRegex(SbomFinalizeError, "exactly five"):
-            finalize_release_sbom(self.syft_document(), manifest)
+            finalize_release_sbom(document, manifest)
 
     def test_rejects_invalid_artifact_checksum(self) -> None:
         manifest = self.manifest()
         manifest["archives"][0]["sha256"] = "not-a-checksum"
+        document = self.syft_document()
         with self.assertRaisesRegex(SbomFinalizeError, "invalid SHA-256"):
-            finalize_release_sbom(self.syft_document(), manifest)
+            finalize_release_sbom(document, manifest)
 
     def test_rejects_non_spdx_23_input(self) -> None:
         document = self.syft_document()
         document["spdxVersion"] = "SPDX-2.2"
+        manifest = self.manifest()
         with self.assertRaisesRegex(SbomFinalizeError, "SPDX-2.3"):
-            finalize_release_sbom(document, self.manifest())
+            finalize_release_sbom(document, manifest)
 
 
 if __name__ == "__main__":

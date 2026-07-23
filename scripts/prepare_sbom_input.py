@@ -26,6 +26,9 @@ class SelectedArchive:
     path: Path
 
 
+VERSION_FIELD_PREFIX = "version="
+
+
 ARCHIVE_RULES = (
     ("python-wheel", re.compile(r"\.whl$")),
     ("rust-crate", re.compile(r"\.crate$")),
@@ -179,11 +182,11 @@ def _package_identity(kind: str, destination: Path, archive_name: str) -> tuple[
     if kind == "native":
         build_info = _require_single(destination, "BUILD_INFO.txt").read_text(encoding="utf-8")
         version_line = next(
-            (line for line in build_info.splitlines() if line.startswith("version=")), None
+            (line for line in build_info.splitlines() if line.startswith(VERSION_FIELD_PREFIX)), None
         )
-        if version_line is None or not version_line.removeprefix("version="):
+        if version_line is None or not version_line.removeprefix(VERSION_FIELD_PREFIX):
             raise SbomInputError("native artifact is missing version metadata")
-        version = version_line.removeprefix("version=")
+        version = version_line.removeprefix(VERSION_FIELD_PREFIX)
         name = "adxl355-c-cpp"
         return name, version, f"pkg:generic/{name}@{version}"
 
