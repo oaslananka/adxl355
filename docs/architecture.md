@@ -74,7 +74,7 @@ export interface Transport {
 
 ## Device Lifecycle and Configuration State
 
-Every implementation exposes the same two-state lifecycle:
+Every maintained implementation follows the same two-state lifecycle for its implemented core device methods:
 
 ```text
 constructed / unprobed -- successful probe --> probed + standby
@@ -114,7 +114,9 @@ a bus error, hardware remains in standby, and the cache retains the successfully
 written target value so software and hardware remain consistent.
 
 The guard applies to `set_range` in every implementation and to the public
-ODR/filter configuration APIs currently provided by C and Python. Explicit
+ODR/filter configuration APIs currently provided by C and Python. Other methods
+and adapter coverage are not assumed to be identical across languages; see the
+root feature matrix. Explicit
 power-mode changes are not wrapped by the guard because changing that mode is the
 operation requested by the caller.
 
@@ -140,11 +142,19 @@ reads detectable instead of relying on an ambiguous `0 == success` convention.
 language suites cover its `TR-1-*`, `TR-2-*`, and `TR-9-*` scenarios and verify that
 failed reads do not modify caller-provided output values or fabricate measurements.
 
+## Register definitions versus public API
+
+The shared register model documents the device even when a high-level method is
+not present. Register presence does not imply a public API. For example,
+`FIFO_DATA`, offset registers, and `SELF_TEST` are defined for consistency and
+future work, but `SELF_TEST` is not implemented as a public driver method and
+full FIFO/offset APIs are not available uniformly across languages.
+
 ## Register Specification as Single Source of Truth
 
 Register addresses, bit fields, and expected ID values are defined in `spec/adxl355.registers.yaml`. This YAML file is the authoritative reference. Every language package duplicates these values in its native format (header files, enums, constants), but they must all match the YAML.
 
-**Verification status**: All register values in the spec are marked `datasheet_verified: false` until confirmed against the official ADXL355 datasheet.
+**Verification status**: Datasheet-derived register values and constants are traced to the ADXL354/ADXL355 Rev. D tables in the shared YAML specifications and are checked for cross-language consistency in CI.
 
 ## Test Vectors
 
@@ -198,12 +208,12 @@ normal CI; it produces separate diagnostic evidence.
 - Status register readback
 - Coherent 12-bit temperature read and nominal conversion
 
-### Hardware tests (optional, separated)
+### Hardware tests (manual-only, separated)
 
-- Located in `tests/hardware/` or language-specific hardware test files
-- Require real ADXL355 connected via SPI or I2C
-- Not executed during default test suite
-- Methods described in `docs/hardware-test-plan.md`
+- Run through `scripts/hil_runner.py` and `.github/workflows/hil.yml`
+- Require a real ADXL355 connected through Linux SPI or I2C
+- Are not executed during default tests or pull-request CI
+- Follow `docs/hardware-testing.md`; no successful physical artifact is claimed yet
 
 ## Cross-Language Consistency
 

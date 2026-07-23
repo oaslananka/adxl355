@@ -1,7 +1,9 @@
 # Publishing Guide
 
-> ⚠️ **Do not publish until the 1.0.0 release.**
-> All register values must be verified against the ADXL355 datasheet first.
+> **Current state:** The repository provides a verification and packaging dry run.
+> It does not publish to PyPI, npm, crates.io, GitHub Releases, or a Go proxy.
+> Registry publication requires an explicit maintainer decision after version,
+> physical HIL, security, and release-evidence gates are satisfied.
 
 ## Automated release verification
 
@@ -41,7 +43,7 @@ Requires:
 
 ```bash
 cd node
-npm build
+npm run build
 npm publish
 
 # For scoped package:
@@ -78,7 +80,7 @@ git push origin go/v0.1.0
 This project follows Semantic Versioning:
 
 - **0.x** (current): API may change; changes documented in CHANGELOG.
-- **1.0.0**: All core APIs stable across all languages.
+- **1.0.0**: Each published language surface is documented and stable; exact feature parity is not implied.
 
 ## Pre-Publish Checklist
 
@@ -88,7 +90,7 @@ This project follows Semantic Versioning:
 - [ ] All register values verified against datasheet
 - [ ] All test vectors confirmed across all languages
 - [ ] C library builds with CMake on Linux, macOS, Windows
-- [ ] Python package installs cleanly from PyPI
+- [ ] Python wheel installs cleanly from the release artifact; registry publication is separately approved
 - [ ] Rust crate compiles with `no_std` and `std`
 - [ ] Node package builds and tests pass
 - [ ] Go module tests pass

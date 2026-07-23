@@ -5,7 +5,7 @@
 This project uses a dual testing strategy:
 
 1. **Hardware-free tests** (default, mandatory)
-2. **Hardware-in-the-loop tests** (optional, separated)
+2. **Hardware-in-the-loop tests** (manual-only, separated)
 
 ## C Tests
 
@@ -42,15 +42,14 @@ Tests use a minimal custom test framework (no external dependency):
 ### Prerequisites
 
 ```bash
-cd python
-pip install -e .[dev]   # installs pytest
+python -m pip install --no-deps -e ./python
+python -m pip install pytest ruff mypy
 ```
 
 ### Running
 
 ```bash
-cd python
-python -m pytest -v
+PYTHONPATH=python/src python -m pytest python/tests -v
 ```
 
 ### What's Tested
