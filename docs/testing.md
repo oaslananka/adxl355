@@ -177,7 +177,7 @@ unit-test success:
 - **C/C++:** warnings as errors, AddressSanitizer, UndefinedBehaviorSanitizer,
   and independent installed-package consumer builds through
   `scripts/smoke_cmake_packages.sh`.
-- **Python:** 3.9/3.11/3.12 tests, Ruff, strict mypy for the package and public
+- **Python:** 3.10/3.11/3.12 tests, Ruff, strict mypy for the package and public
   examples, sdist/wheel construction, isolated wheel installation, and example
   smoke execution.
 - **Rust:** rustfmt, all-feature and optional-HAL clippy, all-feature and

@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Updated the Python build backend to `setuptools==83.0.0` to resolve
+  GHSA-h35f-9h28-mq5c / CVE-2026-59890.
 - Synchronized reset and constructor range state with the ADXL355 reset default
   across all maintained drivers.
 - Corrected Python and Rust SPI command framing and kept command/payload bytes in
@@ -48,6 +50,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Breaking (Python):** Raised the minimum supported Python version from 3.9 to
+  3.10 so release builds do not depend on a vulnerable legacy setuptools line.
 - **Breaking (C/C++):** Transport read/write callbacks return the exact
   transferred byte count on success and a negative value on failure.
 - The repository now describes package outputs as verified build artifacts, not

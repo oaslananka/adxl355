@@ -32,6 +32,11 @@ Dependency PRs must pass the same CI, CodeQL, dependency review, and package
 checks as contributor PRs. Do not merge an update only because it is automated;
 review release notes, lockfile changes, package contents, and any bot comments.
 
+Compatibility caps must be narrow and documented. The Python package now requires
+Python 3.10 or later so its build backend can use patched `setuptools>=83` rather
+than retaining a vulnerable backend for Python 3.9 compatibility. Dependency
+updates must not be capped below a security fix without a dated, reviewed exception.
+
 ## Immutable GitHub Actions
 
 Every external `uses:` reference is pinned to a **full commit SHA**. A version
