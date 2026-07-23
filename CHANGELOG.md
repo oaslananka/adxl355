@@ -38,7 +38,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Manual-only Linux SPI/I2C HIL runner and self-hosted workflow with bounded,
   sanitized JSON evidence and public wiring/troubleshooting guidance.
 - Regression tests for lifecycle, transport contracts, release automation,
-  package metadata, HIL behavior, and public documentation claims.
+  package metadata, HIL behavior, public documentation, and supply-chain policy.
+- Grouped weekly Dependabot updates for GitHub Actions, Python, Rust, Node.js,
+  and Go, plus primary CodeQL analysis for C/C++, Python, JavaScript/TypeScript,
+  and Go.
+- SPDX SBOM generation, a high-severity Grype release gate, immutable workflow
+  action pins, GitHub OIDC provenance/SBOM attestations, and a private security
+  disclosure process with response targets.
 
 ### Changed
 

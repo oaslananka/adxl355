@@ -43,10 +43,18 @@ class ReleaseWorkflowTests(unittest.TestCase):
     def test_release_has_job_scoped_least_privilege_and_bundle_artifact(self) -> None:
         release = self.load_release()
         jobs = release["jobs"]
-        self.assertNotIn("permissions", release)
+        self.assertEqual(release["permissions"], {})
         for job_name in {"ci", "preflight", *PACKAGE_JOBS}:
             self.assertEqual(jobs[job_name]["permissions"], {"contents": "read"})
-        self.assertEqual(jobs["release-bundle"]["permissions"], {})
+        self.assertEqual(
+            jobs["release-bundle"]["permissions"],
+            {
+                "contents": "read",
+                "id-token": "write",
+                "attestations": "write",
+                "artifact-metadata": "write",
+            },
+        )
         self.assertIn("release-bundle", jobs)
         self.assertIn("actions/upload-artifact", RELEASE_WORKFLOW.read_text())
 

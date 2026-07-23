@@ -37,7 +37,9 @@ Linux device adapter for that language. The repository contains buildable packag
 - Raw 20-bit decode, g and m/s² conversion, temperature, and status reads.
 - Mock-based tests in all six languages and a required zero-skip vector gate.
 - CI quality gates for sanitizers, lint/type analysis, package smoke tests,
-  dependency auditing, race detection, and coverage reporting.
+  dependency auditing, CodeQL, race detection, and coverage reporting.
+- Grouped dependency updates, immutable workflow action pins, release SBOM and
+  high-severity vulnerability gates, and OIDC-backed artifact attestations.
 - Manual-only Linux SPI/I2C HIL workflow with sanitized diagnostic evidence.
 
 ## Explicitly not claimed
@@ -136,6 +138,7 @@ go test ./...
 - [Physical hardware validation](docs/hardware-testing.md)
 - [Calibration procedure](docs/calibration.md)
 - [Versioning and package names](docs/versioning.md)
+- [Security and supply-chain policy](docs/security/supply-chain.md)
 - [Release verification and publishing](docs/publishing.md)
 
 ## License

@@ -12,9 +12,11 @@ re-runs the required CI workflow, verifies that the tag points to the packaged
 commit, validates every maintained version declaration, builds all package
 formats without publishing, and uploads checksummed artifacts for inspection.
 
-The workflow has read-only repository permissions and intentionally has no
-registry credentials or provenance identity permissions. See
-[`docs/releasing.md`](releasing.md) for the enforced checks and local fixture.
+Package jobs have read-only repository permissions and no registry credentials.
+The final bundle job receives narrowly scoped GitHub OIDC and attestation
+permissions to generate provenance and an SBOM attestation. See
+[`releasing.md`](releasing.md) and
+[`security/supply-chain.md`](security/supply-chain.md) for the enforced gates.
 
 ## Python (PyPI)
 
@@ -35,9 +37,9 @@ twine upload --repository testpypi dist/*
 twine upload dist/*
 ```
 
-Requires:
-- PyPI account with API token
-- `~/.pypirc` configured with token
+Publication is not enabled by this repository. Before enabling it, configure a
+PyPI Trusted Publisher bound to the protected release environment and exact
+workflow. Do not add a stored PyPI API token to the default workflow.
 
 ## Node.js (npm)
 
@@ -47,9 +49,9 @@ npm run build
 npm publish --access public
 ```
 
-Requires:
-- npm account
-- `npm login` completed
+Publication is not enabled by this repository. Before enabling it, configure
+npm trusted publishing for `@oaslananka/adxl355` on a GitHub-hosted runner and a
+protected environment. Do not add a stored npm token to the default workflow.
 
 ## Rust (crates.io: `adxl355-driver`)
 
@@ -59,8 +61,10 @@ cargo publish --dry-run
 cargo publish
 ```
 
-Requires:
-- `cargo login` with crates.io API token
+Publication is not enabled by this repository. Before enabling it, configure
+crates.io trusted publishing for `adxl355-driver` and enable
+trusted-publishing-only mode after the first verified release. Do not add a
+stored Cargo registry token to the default workflow.
 
 ## Go Module
 
@@ -115,6 +119,10 @@ This project follows Semantic Versioning:
 - [ ] Both I2C addresses (`0x1D` and `0x53`) are validated where the release hardware permits changing the address strap
 - [ ] All register values verified against datasheet
 - [ ] All test vectors confirmed across all languages
+- [ ] Release SBOM contains every verified artifact and the high-severity scan passes
+- [ ] Final bundle checksum and GitHub provenance/SBOM attestations verify successfully
+- [ ] Trusted publishers are bound to the protected environment and exact workflow
+- [ ] No long-lived registry token is configured in the default release workflow
 - [ ] C library builds with CMake on Linux, macOS, Windows
 - [ ] Python wheel installs cleanly from the release artifact; registry publication is separately approved
 - [ ] Rust crate compiles with `no_std` and `std`

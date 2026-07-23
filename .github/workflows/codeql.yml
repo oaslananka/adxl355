@@ -1,0 +1,82 @@
+name: CodeQL
+
+"on":
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: "17 3 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: read
+  security-events: write
+
+concurrency:
+  group: codeql-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  analyze:
+    name: CodeQL (${{ matrix.language }})
+    if: github.repository_owner == 'oaslananka'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - language: c-cpp
+            build_mode: manual
+          - language: python
+            build_mode: none
+          - language: javascript-typescript
+            build_mode: none
+          - language: go
+            build_mode: manual
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Go
+        if: matrix.language == 'go'
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: "1.21"
+          cache: false
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@e4fba868fa4b1b91e1fdab776edc8cfbe6e9fb81 # v4.37.3
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: ${{ matrix.build_mode }}
+          queries: security-extended
+
+      - name: Build C and C++
+        if: matrix.language == 'c-cpp'
+        run: |
+          cmake -S c -B build/codeql-c \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DADXL355_BUILD_TESTS=OFF \
+            -DADXL355_BUILD_EXAMPLES=OFF
+          cmake --build build/codeql-c --parallel 2
+          cmake -S cpp -B build/codeql-cpp \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DADXL355_BUILD_TESTS=OFF \
+            -DADXL355_BUILD_EXAMPLES=OFF \
+            -DCMAKE_PREFIX_PATH="$PWD/build/codeql-c"
+          cmake --build build/codeql-cpp --parallel 2
+
+      - name: Build Go
+        if: matrix.language == 'go'
+        working-directory: go
+        run: go build ./...
+
+      - name: Analyze
+        uses: github/codeql-action/analyze@e4fba868fa4b1b91e1fdab776edc8cfbe6e9fb81 # v4.37.3
+        with:
+          category: "/language:${{ matrix.language }}"
