@@ -192,11 +192,24 @@ pytest python/tests/hardware/
 
 ## Cross-Language Test Vector Verification
 
-Before release, verify that all languages produce identical results:
+`spec/test_vectors.json` is the authoritative decode and acceleration reference.
+The required CI gate runs the same verifier from a clean checkout:
 
 ```bash
-# Run all tests and check decode_raw20 outputs match
-python -c "from spec import test_vectors; print(test_vectors)"
+python scripts/verify_vectors.py --ci
 ```
 
-The shared `spec/test_vectors.json` file is the authoritative reference.
+The verifier evaluates the Python implementation directly against all golden
+values, validates the shared specs, and runs C, C++, Python, Rust, Node.js, and Go.
+C/C++ build trees, the Rust target directory, the Node workspace, and the pytest
+cache are isolated under a temporary build root. In `--ci` mode, a missing
+required toolchain or any skipped language is a failure. A per-language summary
+and nonzero process status make conversion or constant divergence visible to the
+required `Cross-language Consistency` check.
+
+For local diagnosis, omit `--ci` to allow unavailable toolchains to be reported as
+explicit `SKIP` entries, or retain build output with:
+
+```bash
+python scripts/verify_vectors.py --build-root /tmp/adxl355-vector-debug
+```

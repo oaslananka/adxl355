@@ -71,6 +71,6 @@
 - [x] Publishing guide
 
 ### Testing
-- [x] Cross-language test vector verification (all languages produce same decode results)
+- [x] Required clean-checkout vector gate (`scripts/verify_vectors.py --ci`) for C, C++, Python, Rust, Node.js, and Go with zero permitted skips
 - [ ] Hardware-in-the-loop test procedure
 - [ ] Continuous integration with hardware test runner

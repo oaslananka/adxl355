@@ -22,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Corrected the Linux spidev example to perform sustained multi-byte reads in one command-plus-payload transaction and discard the command-phase receive byte
 - Updated all test assertions to match new enum values and temperature formula
 - Marked all datasheet-derived values with traceable datasheet section references
+- Repaired the shared vector verifier to use real range enums, active Python, isolated clean builds, deterministic all-language commands, strict CI toolchain enforcement, and a per-language summary; the existing required consistency job now executes it in `--ci` mode
 
 ### Added
 

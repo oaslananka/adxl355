@@ -159,6 +159,12 @@ Every language must pass the same test vectors. Floating-point tolerance:
 - m/s² conversion: ±1e-5
 - temperature conversion: ±0.01°C
 
+`scripts/verify_vectors.py --ci` is the required clean-checkout gate. It maps
+range names to each implementation's real enum values, validates shared specs,
+constructs isolated C/C++ builds, and executes every maintained language suite.
+The required mode rejects missing toolchains and skips, so a constant or conversion
+regression cannot be silently omitted from CI.
+
 ## Testing Strategy
 
 ### Hardware-free tests (required, run by default)
