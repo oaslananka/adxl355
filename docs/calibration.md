@@ -1,5 +1,10 @@
 # Calibration
 
+> **Scope:** This document is a calibration procedure and design reference.
+> There is no public calibration helper or offset-register programming API in
+> the maintained drivers. Applications must collect samples and apply any
+> correction externally until those APIs are implemented and tested.
+
 ## Overview
 
 ADXL355 calibration adjusts:
@@ -45,6 +50,10 @@ The ADXL355 has temperature-dependent offset drift. For high-accuracy applicatio
 - Measure offset at multiple temperatures
 - Create a temperature compensation table
 - Interpolate correction values during normal operation
+
+## Implementation status
+
+The register map includes offset registers, but register presence does not imply a public API. The offset registers are not implemented as a public driver method in this release line.
 
 ## TODO
 

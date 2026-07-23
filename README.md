@@ -1,51 +1,66 @@
 # ADXL355
 
-Cross-platform ADXL355 accelerometer driver for C, C++, Python, Rust, Node.js and Go.
+Cross-platform ADXL355 accelerometer driver family for C, C++, Python, Rust,
+Node.js/TypeScript, and Go.
 
-Transport-agnostic, testable, production-ready driver family with shared register specification and consistent API across all languages.
+This repository is an **alpha-stage, hardware-focused driver project**. The
+shared register model, conversion behavior, lifecycle contract, automated CI,
+package dry runs, and an opt-in physical HIL framework are implemented. A
+production maturity claim remains intentionally deferred until recent successful
+physical HIL evidence exists for both SPI and I2C on the release-candidate
+commit.
 
-## Status
+## Current status
 
-| Language | Package | Status |
-|---|---|---|
-| C | CMake library | ✅ MVP |
-| C++ | C++17 wrapper | ✅ MVP |
-| Python | PyPI package | ✅ MVP |
-| Rust | crates.io crate | ✅ MVP |
-| Node.js | npm package | ✅ MVP |
-| Go | Go module | ✅ MVP |
+All six implementations provide the tested core device path: probe, reset,
+range and power-mode control, raw XYZ reads, acceleration conversion,
+temperature, status, and stateless decode/conversion helpers. Feature coverage
+outside that core is intentionally language-specific.
 
-## Features
+| Language | Core device API | ODR configuration | FIFO entry count | Linux SPI adapter | Linux I2C adapter | embedded-hal SPI/I2C | Packaging dry run | Physical HIL evidence |
+|---|---|---|---|---|---|---|---|---|
+| C | Yes | Yes | No public method | Example only | No | No | Yes, CMake install/export | Framework available; no recorded pass |
+| C++ | Yes, C wrapper | No | No public method | User `BusInterface` | User `BusInterface` | No | Yes, CMake install/export | Framework available; no recorded pass |
+| Python | Yes | Yes | Yes, count only | Yes, `spidev` | Yes, `smbus2` | No | Yes, sdist/wheel | HIL runner implementation; no recorded pass |
+| Rust | Yes | No | No public method | No Linux-specific adapter | No Linux-specific adapter | Yes | Yes, `cargo package` | Framework available; no recorded pass |
+| Node.js | Yes | No | No public method | User `Transport` | User `Transport` | No | Yes, `npm pack` | Framework available; no recorded pass |
+| Go | Yes | No | No public method | User `Transport` | User `Transport` | No | Module/build checks | Framework available; no recorded pass |
 
-- Transport-agnostic design (SPI/I2C abstraction via bus interface)
-- C core reference implementation
-- Python package with type hints
-- Rust, Node.js, Go and C++ packages with shared API design
-- Mock transport testing (no hardware required)
-- Raw 20-bit acceleration decoding with golden test vectors
-- Required clean-checkout cross-language vector gate with zero permitted CI skips
-- CI quality gates for sanitizers, static analysis, package smoke tests, dependency audit, race detection, and coverage reporting
-- Manual Linux SPI/I2C hardware-in-the-loop runner with sanitized revision and diagnostics evidence
-- Range-based g and m/s² conversion
-- Temperature sensor readout
-- FIFO basic support
-- Self-test and offset calibration API
-- Register map specification and documentation
+“User transport” means the driver exposes a bus contract but does not ship a
+Linux device adapter for that language. The repository contains buildable package metadata and verification artifacts, but packages are not published by this repository to PyPI, crates.io, npm, or a Go proxy.
 
-## Hardware Validation Status
+## Implemented and verified
 
-The opt-in HIL runner and self-hosted workflow are implemented, but this
-repository does not claim a physical pass until a public workflow artifact from a
-connected ADXL355 is available. Wiring, runner setup, supported SPI/I2C settings,
-and release evidence requirements are documented in
+- Shared datasheet-derived register specification and golden test vectors.
+- Exact-length transport validation and stable driver-level bus errors.
+- Probe-before-use lifecycle and standby-safe range/configuration behavior.
+- Raw 20-bit decode, g and m/s² conversion, temperature, and status reads.
+- Mock-based tests in all six languages and a required zero-skip vector gate.
+- CI quality gates for sanitizers, lint/type analysis, package smoke tests,
+  dependency auditing, race detection, and coverage reporting.
+- Manual-only Linux SPI/I2C HIL workflow with sanitized diagnostic evidence.
+
+## Explicitly not claimed
+
+Register constants document the chip, but **Register presence does not imply a public API**. `FIFO_DATA`, offset registers, and `SELF_TEST` are represented in
+the register map; full FIFO sample decoding, hardware offset programming,
+self-test control, interrupt configuration, and public calibration helpers are
+not implemented consistently as public driver methods. The calibration document
+is a procedure, not a callable calibration API.
+
+## Hardware validation status
+
+The HIL runner and self-hosted workflow are implemented and unit-tested, but no
+successful physical HIL artifact is currently recorded in this repository.
+Wiring, runner setup, supported SPI/I2C settings, diagnostics, and release
+evidence requirements are documented in
 [`docs/hardware-testing.md`](docs/hardware-testing.md).
 
-## Device Lifecycle Contract
+## Device lifecycle contract
 
 Creating a driver object only stores the transport; it does not verify hardware.
-Call `probe()` successfully before any stateful hardware operation such as reset,
-range or filter configuration, status/data reads, or power-mode changes. Stateless
-conversion helpers remain usable without a device.
+Call `probe()` successfully before stateful hardware operations. Stateless decode
+and unit-conversion helpers remain usable without a device.
 
 | Language | Required startup | Pre-probe error |
 |---|---|---|
@@ -56,51 +71,54 @@ conversion helpers remain usable without a device.
 | Node.js | construct `ADXL355` → `await probe()` | `DeviceStateError` |
 | Go | `New()` → `Probe()` | `ErrInvalidState` |
 
-The datasheet requires range and filter changes in standby. If measurement mode is
-active, the drivers automatically preserve the complete `POWER_CTL` byte, enter
-standby, perform the configuration write, and restore the previous mode. No power
-write is performed when the device is already in standby. A successful target
-write updates cached state before restoration, so the cache continues to match the
-hardware even if restoring measurement mode fails.
+All transports must return exactly the requested read length. Zero, truncated,
+and overlong responses are rejected before indexing. C and C++ callbacks return
+the exact transferred byte count on success and a negative value on failure.
 
-All transports must return exactly the requested read length. Zero, truncated, and
-overlong responses are rejected as bus errors before data is indexed. C and C++
-callbacks return the exact transferred byte count on success and a negative value
-on failure; other language transports return the complete payload or raise/return
-an error.
+## Quick start from the repository root
 
-## Quick Start
+These commands are reproducible from a clean checkout and do not require real
+hardware.
 
 ### Python
 
 ```bash
-cd python
-pip install -e .
-python examples/basic_read.py
+python -m pip install --no-deps -e ./python
+PYTHONPATH=python/src python python/examples/basic_read.py
 ```
 
 ### C
 
 ```bash
-cmake -S c -B c/build -DADXL355_BUILD_TESTS=ON -DADXL355_BUILD_EXAMPLES=ON
-cmake --build c/build
-ctest --test-dir c/build --output-on-failure
-./c/build/examples/basic_read
+cmake -S c -B build/c -DADXL355_BUILD_TESTS=ON -DADXL355_BUILD_EXAMPLES=ON
+cmake --build build/c
+ctest --test-dir build/c --output-on-failure
+./build/c/examples/basic_read
+```
+
+### C++
+
+```bash
+cmake -S c -B build/c-core -DADXL355_BUILD_TESTS=OFF -DADXL355_BUILD_EXAMPLES=OFF
+cmake --build build/c-core
+cmake -S cpp -B build/cpp -DADXL355_BUILD_TESTS=ON -DADXL355_BUILD_EXAMPLES=ON -DCMAKE_PREFIX_PATH="$PWD/build/c-core"
+cmake --build build/cpp
+ctest --test-dir build/cpp --output-on-failure
 ```
 
 ### Rust
 
 ```bash
-cd rust
-cargo test
-cargo run --example basic
+cargo test --manifest-path rust/Cargo.toml --all-features
+cargo run --manifest-path rust/Cargo.toml --example basic
 ```
 
 ### Node.js
 
 ```bash
 cd node
-npm install
+npm ci --ignore-scripts
+npm run build
 npm test
 ```
 
@@ -111,21 +129,13 @@ cd go
 go test ./...
 ```
 
-### C++
+## Documentation
 
-```bash
-cmake -S cpp -B cpp/build -DADXL355_BUILD_TESTS=ON
-cmake --build cpp/build
-ctest --test-dir cpp/build --output-on-failure
-```
-
-## Architecture
-
-See [docs/architecture.md](docs/architecture.md) for detailed architecture documentation.
-
-## Testing
-
-See [docs/testing.md](docs/testing.md) for testing methodology.
+- [Architecture](docs/architecture.md)
+- [Testing and CI](docs/testing.md)
+- [Physical hardware validation](docs/hardware-testing.md)
+- [Calibration procedure](docs/calibration.md)
+- [Release verification and publishing](docs/publishing.md)
 
 ## License
 

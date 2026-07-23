@@ -30,6 +30,8 @@ fn main() -> Result<(), Error> {
     bus.regs[reg::DEVID_AD as usize] = id::DEVID_AD;
     bus.regs[reg::DEVID_MST as usize] = id::DEVID_MST;
     bus.regs[reg::PARTID as usize] = id::PARTID;
+    bus.regs[reg::RANGE as usize] = Range::G2 as u8;
+    bus.regs[reg::POWER_CTL as usize] = PowerMode::Standby as u8;
 
     let mut dev = Adxl355::new(bus);
 
