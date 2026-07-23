@@ -131,8 +131,9 @@ credentials in command-line values or the public `runner_id` field.
 
 Use a dedicated Linux machine or isolated lab account:
 
-1. install GitHub's self-hosted runner using the repository/organization setup
-   instructions;
+1. install GitHub Actions Runner **2.327.1 or later** using the
+   repository/organization setup instructions; the pinned checkout and artifact
+   actions execute on the **Node.js 24** action runtime;
 2. add the labels `self-hosted`, `linux`, and `adxl355-hil`;
 3. add the runner account to the group permitted to access the selected `spidev`
    or `i2c-dev` node, preferably through a narrow udev rule;

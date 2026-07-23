@@ -119,6 +119,43 @@ class SupplyChainTests(unittest.TestCase):
                         continue
                     self.assertRegex(action, SHA_PIN, f"{path.name}:{action}")
 
+
+    def test_reviewed_action_comments_match_immutable_release_pins(self) -> None:
+        expected = {
+            "actions/checkout": (
+                "3d3c42e5aac5ba805825da76410c181273ba90b1",
+                "v7.0.1",
+            ),
+            "actions/setup-node": (
+                "820762786026740c76f36085b0efc47a31fe5020",
+                "v7.0.0",
+            ),
+            "actions/setup-go": (
+                "b7ad1dad31e06c5925ef5d2fc7ad053ef454303e",
+                "v7.0.0",
+            ),
+            "actions/upload-artifact": (
+                "043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
+                "v7.0.1",
+            ),
+            "actions/download-artifact": (
+                "3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c",
+                "v8.0.1",
+            ),
+        }
+        for path in sorted(WORKFLOWS.glob("*.yml")):
+            for line_number, line in enumerate(
+                path.read_text(encoding="utf-8").splitlines(), start=1
+            ):
+                for action, (sha, version) in expected.items():
+                    if f"{action}@" not in line:
+                        continue
+                    self.assertIn(
+                        f"{action}@{sha} # {version}",
+                        line,
+                        f"{path.name}:{line_number}",
+                    )
+
     def test_workflows_declare_least_privilege_permissions(self) -> None:
         for path in sorted(WORKFLOWS.glob("*.yml")):
             workflow = load_yaml(path)

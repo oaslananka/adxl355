@@ -48,7 +48,8 @@ Dependabot groups GitHub Actions updates. When reviewing an action update:
 
 1. confirm the commit belongs to the expected upstream release tag;
 2. read release notes and breaking changes;
-3. inspect permission or runtime changes;
+3. inspect permission or runtime changes, including the minimum self-hosted
+   runner version required by the action's Node.js runtime;
 4. run actionlint and the workflow contract tests;
 5. retain the full commit SHA rather than a mutable major tag.
 
