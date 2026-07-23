@@ -2,7 +2,7 @@
 
 import pytest
 
-from adxl355 import ADXL355, Range, ODR
+from adxl355 import ADXL355, ODR
 from adxl355.registers import Register
 from adxl355.testing import MockTransport
 

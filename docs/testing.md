@@ -97,9 +97,9 @@ cargo test
 ### Prerequisites
 
 ```bash
-# Node.js >= 18
+# Node.js 22, 24, or 26
 cd node
-npm install
+npm ci --ignore-scripts
 ```
 
 ### Running
@@ -169,6 +169,31 @@ C, Python, Rust, Node.js, and Go execute the same behavioral checklist. C++ veri
 the C core mapping through its exception wrapper. Tests additionally inject native
 read/write failures and require the stable driver-level bus error rather than an
 index exception, panic, or fabricated numeric result.
+
+## Required CI Quality Gates
+
+The primary workflow keeps stable language job names while enforcing more than
+unit-test success:
+
+- **C/C++:** warnings as errors, AddressSanitizer, UndefinedBehaviorSanitizer,
+  and independent installed-package consumer builds through
+  `scripts/smoke_cmake_packages.sh`.
+- **Python:** 3.9/3.11/3.12 tests, Ruff, strict mypy for the package and public
+  examples, sdist/wheel construction, isolated wheel installation, and example
+  smoke execution.
+- **Rust:** rustfmt, all-feature and optional-HAL clippy, all-feature and
+  no-default-feature tests, documentation tests, and `cargo package` verification.
+- **Node.js:** supported Node 22/24/26 tests, TypeScript build/type checking,
+  allow-listed npm package contents, and an audit gate at moderate severity.
+- **Go:** gofmt, vet, the race detector, and a full coverage profile plus
+  function report. Coverage is reported as evidence and is not reduced to an
+  arbitrary pass/fail percentage.
+
+Run the native package smoke locally with:
+
+```bash
+./scripts/smoke_cmake_packages.sh
+```
 
 ## Hardware-in-the-Loop Tests
 

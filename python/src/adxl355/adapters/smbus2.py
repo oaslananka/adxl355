@@ -11,10 +11,25 @@ Usage:
 
 from __future__ import annotations
 
+import importlib
 import time
-from typing import Optional
+from typing import Callable, Optional, Protocol, cast
 
 from adxl355.transport import Transport
+
+
+class _SMBus(Protocol):
+    """Subset of ``smbus2.SMBus`` required by this adapter."""
+
+    def read_byte_data(self, address: int, reg: int) -> int: ...
+
+    def read_i2c_block_data(self, address: int, reg: int, length: int) -> list[int]: ...
+
+    def write_byte_data(self, address: int, reg: int, value: int) -> None: ...
+
+    def write_i2c_block_data(self, address: int, reg: int, data: list[int]) -> None: ...
+
+    def close(self) -> None: ...
 
 
 class Smbus2Transport(Transport):
@@ -32,13 +47,13 @@ class Smbus2Transport(Transport):
     ) -> None:
         self._bus = bus
         self._address = address
-        self._i2c: Optional[object] = None
+        self._i2c: Optional[_SMBus] = None
 
-    def _ensure_open(self) -> object:
+    def _ensure_open(self) -> _SMBus:
         if self._i2c is None:
-            import smbus2  # type: ignore[import-untyped]
-
-            self._i2c = smbus2.SMBus(self._bus)
+            module = importlib.import_module("smbus2")
+            factory = cast(Callable[[int], _SMBus], getattr(module, "SMBus"))
+            self._i2c = factory(self._bus)
         return self._i2c
 
     def read_register(self, reg: int, length: int = 1) -> bytes:

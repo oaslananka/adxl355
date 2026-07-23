@@ -6,14 +6,14 @@ from pathlib import Path
 
 import pytest
 
-from adxl355.device import _decode_raw20, raw_to_g, raw_to_mps2
-from adxl355.registers import Range
 from adxl355.constants import (
     SCALE_2G_G_PER_LSB,
     SCALE_4G_G_PER_LSB,
     SCALE_8G_G_PER_LSB,
     STANDARD_GRAVITY_M_S2,
 )
+from adxl355.device import _decode_raw20, raw_to_g, raw_to_mps2
+from adxl355.registers import Range
 
 # Load test vectors from shared spec
 _SPEC_DIR = Path(__file__).resolve().parents[2] / "spec"

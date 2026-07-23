@@ -1,0 +1,5 @@
+cmake_minimum_required(VERSION 3.14)
+project(adxl355-c-consumer LANGUAGES C)
+find_package(adxl355 0.1 CONFIG REQUIRED)
+add_executable(adxl355_c_consumer main.c)
+target_link_libraries(adxl355_c_consumer PRIVATE adxl355::adxl355)

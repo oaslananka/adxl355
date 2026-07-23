@@ -1,0 +1,5 @@
+@PACKAGE_INIT@
+
+include(CMakeFindDependencyMacro)
+find_dependency(adxl355 CONFIG)
+include("${CMAKE_CURRENT_LIST_DIR}/adxl355-cpp-targets.cmake")

@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Updated all test assertions to match new enum values and temperature formula
 - Marked all datasheet-derived values with traceable datasheet section references
 - Repaired the shared vector verifier to use real range enums, active Python, isolated clean builds, deterministic all-language commands, strict CI toolchain enforcement, and a per-language summary; the existing required consistency job now executes it in `--ci` mode
+- Expanded required CI with C/C++ warnings-as-errors and ASan/UBSan, install/export consumer smoke tests, Python Ruff/strict mypy/wheel examples, Rust format/HAL/docs/package checks, Node package-content and zero-vulnerability audit gates, and Go race/coverage reporting
 
 ### Added
 

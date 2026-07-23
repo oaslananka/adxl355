@@ -165,6 +165,15 @@ constructs isolated C/C++ builds, and executes every maintained language suite.
 The required mode rejects missing toolchains and skips, so a constant or conversion
 regression cannot be silently omitted from CI.
 
+## CI Quality Architecture
+
+Each maintained language retains one stable primary job name for branch
+protection. Runtime safety, static analysis, package-consumer validation,
+dependency auditing, race detection, and coverage generation are steps in those
+jobs rather than parallel duplicate scanners. The final cross-language job still
+depends on all language jobs, so the shared-vector gate cannot pass around a
+failed language-specific quality check.
+
 ## Testing Strategy
 
 ### Hardware-free tests (required, run by default)

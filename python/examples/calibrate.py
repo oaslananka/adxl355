@@ -1,45 +1,43 @@
-"""ADXL355 calibration example using mock transport.
+"""ADXL355 offset measurement example using the mock transport."""
 
-Measures offset by averaging N samples at rest,
-then computes the offset register values.
-"""
-
-from adxl355 import ADXL355, MockTransport, Range
+from adxl355 import ADXL355, PowerMode, Range
+from adxl355.testing import MockTransport
 
 
-def measure_offsets(dev: ADXL355, samples: int = 100):
-    """Average `samples` raw readings per axis."""
-    sx = sy = sz = 0
+def measure_offsets(device: ADXL355, samples: int = 100) -> tuple[float, float, float]:
+    """Return average raw readings for each axis."""
+
+    sum_x = sum_y = sum_z = 0
     for _ in range(samples):
-        raw = dev.read_raw()
-        sx += raw.x
-        sy += raw.y
-        sz += raw.z
-    n = float(samples)
-    return (sx / n, sy / n, sz / n)
+        raw = device.read_raw()
+        sum_x += raw.x
+        sum_y += raw.y
+        sum_z += raw.z
+    divisor = float(samples)
+    return (sum_x / divisor, sum_y / divisor, sum_z / divisor)
 
 
 def main() -> None:
     transport = MockTransport()
-    dev = ADXL355(transport)
+    transport.set_identity_ok()
+    device = ADXL355(transport)
+    device.probe()
 
-    if not dev.probe():
-        print("ERROR: Device not found")
-        return
+    device.set_range(Range.G4)
+    device.set_power_mode(PowerMode.MEASUREMENT)
+    offset_x, offset_y, offset_z = measure_offsets(device)
 
-    dev.set_range(Range.G4)
-    dev.set_power_mode(adxl355.PowerMode.MEASUREMENT)
-
-    ox, oy, oz = measure_offsets(dev)
-
-    # At 4g range, scale = 7.8 µg/LSB
     scale_g = 7.8e-6
-    print(f"Offsets (raw LSB):  x={ox:.1f}  y={oy:.1f}  z={oz:.1f}")
-    print(f"Offsets (g):        x={ox * scale_g:.6f}  y={oy * scale_g:.6f}  z={oz * scale_g:.6f}")
+    print(
+        f"Offsets (raw LSB):  x={offset_x:.1f}  "
+        f"y={offset_y:.1f}  z={offset_z:.1f}"
+    )
+    print(
+        f"Offsets (g):        x={offset_x * scale_g:.6f}  "
+        f"y={offset_y * scale_g:.6f}  z={offset_z * scale_g:.6f}"
+    )
     print("(Mock data — real hardware will show actual offsets)")
 
 
 if __name__ == "__main__":
-    import adxl355  # noqa — enums
-
     main()

@@ -9,6 +9,17 @@ option(ADXL355_BUILD_TESTS    "Build tests"    OFF)
 option(ADXL355_BUILD_EXAMPLES "Build examples" OFF)
 option(ADXL355_ENABLE_WARNINGS    "Enable compiler warnings"             ON)
 option(ADXL355_WARNINGS_AS_ERRORS "Treat compiler warnings as errors"    OFF)
+option(ADXL355_ENABLE_SANITIZERS   "Enable Address/Undefined sanitizers" OFF)
+
+# ---- Sanitizers ------------------------------------------------------------
+if(ADXL355_ENABLE_SANITIZERS)
+    if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
+        add_compile_options(-fsanitize=address,undefined -fno-omit-frame-pointer)
+        add_link_options(-fsanitize=address,undefined)
+    else()
+        message(FATAL_ERROR "ADXL355_ENABLE_SANITIZERS requires GCC or Clang")
+    endif()
+endif()
 
 # ---- Public headers --------------------------------------------------------
 set(ADXL355_PUBLIC_HEADERS
@@ -60,15 +71,43 @@ endif()
 
 # ---- Install ---------------------------------------------------------------
 include(GNUInstallDirs)
+include(CMakePackageConfigHelpers)
+
+set(ADXL355_INSTALL_CMAKEDIR "${CMAKE_INSTALL_LIBDIR}/cmake/adxl355")
+set_target_properties(adxl355 PROPERTIES EXPORT_NAME adxl355)
+
+configure_package_config_file(
+    cmake/adxl355-config.cmake.in
+    "${CMAKE_CURRENT_BINARY_DIR}/adxl355-config.cmake"
+    INSTALL_DESTINATION "${ADXL355_INSTALL_CMAKEDIR}"
+)
+write_basic_package_version_file(
+    "${CMAKE_CURRENT_BINARY_DIR}/adxl355-config-version.cmake"
+    VERSION "${PROJECT_VERSION}"
+    COMPATIBILITY SameMajorVersion
+)
+
+export(TARGETS adxl355
+    FILE "${CMAKE_CURRENT_BINARY_DIR}/adxl355-targets.cmake"
+    NAMESPACE adxl355::
+)
+
 install(TARGETS adxl355 EXPORT adxl355-targets
     ARCHIVE  DESTINATION ${CMAKE_INSTALL_LIBDIR}
     LIBRARY  DESTINATION ${CMAKE_INSTALL_LIBDIR}
     RUNTIME  DESTINATION ${CMAKE_INSTALL_BINDIR}
+    INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
 )
 install(FILES ${ADXL355_PUBLIC_HEADERS}
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/adxl355
 )
 install(EXPORT adxl355-targets
+    FILE adxl355-targets.cmake
     NAMESPACE adxl355::
-    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/adxl355
+    DESTINATION "${ADXL355_INSTALL_CMAKEDIR}"
+)
+install(FILES
+    "${CMAKE_CURRENT_BINARY_DIR}/adxl355-config.cmake"
+    "${CMAKE_CURRENT_BINARY_DIR}/adxl355-config-version.cmake"
+    DESTINATION "${ADXL355_INSTALL_CMAKEDIR}"
 )

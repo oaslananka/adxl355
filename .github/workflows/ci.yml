@@ -27,14 +27,23 @@ jobs:
       run:
         working-directory: c
     steps:
-      - uses: actions/checkout@v6
-      - name: Install deps
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - name: Install native build tools
         run: sudo apt-get update && sudo apt-get install -y cmake gcc
-      - name: Configure
-        run: cmake -S . -B build -DADXL355_BUILD_TESTS=ON -DADXL355_BUILD_EXAMPLES=ON
+      - name: Configure warnings and sanitizers
+        run: >
+          cmake -S . -B build
+          -DCMAKE_BUILD_TYPE=Debug
+          -DADXL355_BUILD_TESTS=ON
+          -DADXL355_BUILD_EXAMPLES=ON
+          -DADXL355_WARNINGS_AS_ERRORS=ON
+          -DADXL355_ENABLE_SANITIZERS=ON
       - name: Build
-        run: cmake --build build
-      - name: Test
+        run: cmake --build build --parallel
+      - name: Test with ASan and UBSan
+        env:
+          ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
+          UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1
         run: ctest --test-dir build --output-on-failure
 
   # ── C++ ──────────────────────────────────────────────────────────────
@@ -45,23 +54,36 @@ jobs:
       run:
         working-directory: cpp
     steps:
-      - uses: actions/checkout@v6
-      - name: Install deps
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - name: Install native build tools
         run: sudo apt-get update && sudo apt-get install -y cmake g++
-      - name: Build C core first
+      - name: Build C core
         run: |
           cmake -S ${{ github.workspace }}/c -B ${{ github.workspace }}/c/build \
-            -DADXL355_BUILD_TESTS=OFF -DADXL355_BUILD_EXAMPLES=OFF
-          cmake --build ${{ github.workspace }}/c/build
-      - name: Configure C++
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DADXL355_BUILD_TESTS=OFF \
+            -DADXL355_BUILD_EXAMPLES=OFF \
+            -DADXL355_WARNINGS_AS_ERRORS=ON
+          cmake --build ${{ github.workspace }}/c/build --parallel
+      - name: Configure warnings and sanitizers
         run: >
           cmake -S . -B build
-          -DADXL355_BUILD_TESTS=ON -DADXL355_BUILD_EXAMPLES=ON
+          -DCMAKE_BUILD_TYPE=Debug
+          -DADXL355_BUILD_TESTS=ON
+          -DADXL355_BUILD_EXAMPLES=ON
+          -DADXL355_WARNINGS_AS_ERRORS=ON
+          -DADXL355_ENABLE_SANITIZERS=ON
           -DCMAKE_PREFIX_PATH=${{ github.workspace }}/c/build
       - name: Build
-        run: cmake --build build
-      - name: Test
+        run: cmake --build build --parallel
+      - name: Test with ASan and UBSan
+        env:
+          ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
+          UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1
         run: ctest --test-dir build --output-on-failure
+      - name: Verify installed CMake packages
+        working-directory: ${{ github.workspace }}
+        run: ./scripts/smoke_cmake_packages.sh "${{ runner.temp }}/cmake-package-smoke"
 
   # ── Python ────────────────────────────────────────────────────────────
   python:
@@ -74,15 +96,41 @@ jobs:
       matrix:
         python-version: ["3.9", "3.11", "3.12"]
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
           python-version: ${{ matrix.python-version }}
-      - name: Install
-        run: pip install -e .[dev]
+      - name: Install package and test runner
+        run: |
+          python -m pip install --disable-pip-version-check --no-deps -e .
+          python -m pip install --disable-pip-version-check pytest==8.4.2
       - name: Test
         run: python -m pytest -v
+      - name: Install quality and package tools
+        if: matrix.python-version == '3.12'
+        run: >
+          python -m pip install --disable-pip-version-check
+          ruff==0.15.22 mypy==1.20.2 build==1.3.0
+          setuptools==80.9.0 wheel==0.45.1
+      - name: Lint with Ruff
+        if: matrix.python-version == '3.12'
+        run: ruff check src tests examples
+      - name: Type check with strict mypy
+        if: matrix.python-version == '3.12'
+        run: mypy src examples
+      - name: Build and verify wheel
+        if: matrix.python-version == '3.12'
+        run: |
+          rm -rf build dist
+          python -m build --no-isolation
+          python -m venv "${{ runner.temp }}/adxl355-wheel"
+          "${{ runner.temp }}/adxl355-wheel/bin/python" -m pip install \
+            --disable-pip-version-check --no-deps dist/*.whl
+          "${{ runner.temp }}/adxl355-wheel/bin/python" -c \
+            "import adxl355; assert adxl355.__version__ == '0.1.0'"
+          "${{ runner.temp }}/adxl355-wheel/bin/python" examples/basic_read.py
+          "${{ runner.temp }}/adxl355-wheel/bin/python" examples/calibrate.py
 
   # ── Rust ──────────────────────────────────────────────────────────────
   rust:
@@ -92,21 +140,27 @@ jobs:
       run:
         working-directory: rust
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
       - name: Install Rust
         uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4
         with:
-          components: clippy
-      - name: Check
+          components: clippy,rustfmt
+      - name: Format
+        run: cargo fmt --all -- --check
+      - name: Check all targets and features
         run: cargo check --all-targets --all-features
-      - name: Lint
+      - name: Lint all targets and features
         run: cargo clippy --all-targets --all-features -- -D warnings
-      - name: Test (all features)
+      - name: Lint optional HAL without default features
+        run: cargo clippy --no-default-features --features hal -- -D warnings
+      - name: Test all features
         run: cargo test --all-features
-      - name: Check (no_std + hal)
-        run: cargo check --no-default-features --features hal
-      - name: Test (no_std)
+      - name: Test no_std configuration
         run: cargo test --no-default-features
+      - name: Test documentation
+        run: cargo test --doc --all-features
+      - name: Verify crate package
+        run: cargo package
 
   # ── Node.js ───────────────────────────────────────────────────────────
   node:
@@ -117,23 +171,29 @@ jobs:
         working-directory: node
     strategy:
       matrix:
-        node-version: ["18", "20", "22"]
+        node-version: ["22", "24", "26"]
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
       - name: Use Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: ${{ matrix.node-version }}
           cache: "npm"
           cache-dependency-path: node/package-lock.json
-      - name: Install
-        run: npm ci
+      - name: Install locked dependencies
+        run: npm ci --ignore-scripts
       - name: Build
         run: npm run build
+      - name: Type check
+        run: npm run typecheck
       - name: Test
         run: npm test
-      - name: Type check
-        run: npx tsc --noEmit
+      - name: Verify package contents
+        if: matrix.node-version == '24'
+        run: npm run pack:check
+      - name: Audit dependencies
+        if: matrix.node-version == '24'
+        run: npm run audit:ci
 
   # ── Go ────────────────────────────────────────────────────────────────
   go:
@@ -143,14 +203,24 @@ jobs:
       run:
         working-directory: go
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
       - name: Set up Go
-        uses: actions/setup-go@v6
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
         with:
           go-version: "1.21"
           cache: false
-      - name: Test
-        run: go test ./...
+      - name: Check formatting
+        run: |
+          files=$(gofmt -l .)
+          test -z "$files" || { printf '%s\n' "$files"; exit 1; }
+      - name: Vet
+        run: go vet ./...
+      - name: Test with race detector
+        run: go test -race ./...
+      - name: Generate coverage report
+        run: |
+          go test -covermode=atomic -coverprofile=coverage.out ./...
+          go tool cover -func=coverage.out
 
   # ── Required shared-vector gate ────────────────────────────────────────
   consistency:
@@ -158,23 +228,23 @@ jobs:
     runs-on: ubuntu-latest
     needs: [c, cpp, python, rust, node, go]
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
       - name: Install native build tools
         run: sudo apt-get update && sudo apt-get install -y cmake gcc g++
       - name: Set up Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
           python-version: "3.11"
       - name: Set up Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
-          node-version: "20"
+          node-version: "22"
           cache: "npm"
           cache-dependency-path: node/package-lock.json
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4
       - name: Set up Go
-        uses: actions/setup-go@v6
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
         with:
           go-version: "1.21"
           cache: false

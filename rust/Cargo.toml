@@ -4,6 +4,10 @@ version = "0.1.0"
 edition = "2021"
 description = "ADXL355 accelerometer driver for embedded and desktop Rust"
 license = "MIT"
+repository = "https://github.com/oaslananka/adxl355"
+homepage = "https://github.com/oaslananka/adxl355"
+documentation = "https://docs.rs/adxl355"
+readme = "README.md"
 keywords = ["adxl355", "accelerometer", "embedded-hal", "sensor"]
 categories = ["embedded", "hardware-support", "no-std"]
 

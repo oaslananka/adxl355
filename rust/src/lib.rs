@@ -15,13 +15,13 @@ pub mod types;
 #[cfg(feature = "hal")]
 pub mod hal;
 
-pub use device::Adxl355;
-pub use device::Transport;
 pub use device::decode_raw20;
 pub use device::raw_to_g;
 pub use device::raw_to_mps2;
+pub use device::Adxl355;
+pub use device::Transport;
 pub use error::Error;
-pub use registers::Range;
-pub use registers::PowerMode;
 pub use registers::Odr;
-pub use types::{RawXyz, AccelXyz};
+pub use registers::PowerMode;
+pub use registers::Range;
+pub use types::{AccelXyz, RawXyz};
