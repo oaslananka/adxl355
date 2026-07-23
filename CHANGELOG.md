@@ -52,6 +52,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Updated core GitHub Actions to their reviewed Node.js 24 major releases,
+  standardized checkout on `v7.0.1`, and documented the HIL runner minimum.
 - Added a seven-day Dependabot cooldown for version updates across all maintained
   ecosystems; security updates remain immediate.
 - **Breaking (Python):** Raised the minimum supported Python version from 3.9 to

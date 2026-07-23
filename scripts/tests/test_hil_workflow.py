@@ -79,6 +79,8 @@ class HilWorkflowTests(unittest.TestCase):
             "SCLK/VSSIO",
             "Troubleshooting",
             "device revision",
+            "2.327.1",
+            "Node.js 24",
         ):
             self.assertIn(text, guide)
 
