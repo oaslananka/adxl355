@@ -129,10 +129,12 @@ credentials in command-line values or the public `runner_id` field.
 
 ## Self-hosted GitHub runner setup
 
-Use a dedicated Linux machine or isolated lab account:
+Use a dedicated Linux machine or isolated lab account. The workflow actions run
+on Node.js 24 and require **GitHub Actions Runner 2.327.1 or newer**. Upgrade the
+runner before assigning the hardware labels.
 
-1. install GitHub's self-hosted runner using the repository/organization setup
-   instructions;
+1. install GitHub's self-hosted runner version 2.327.1 or newer using the
+   repository/organization setup instructions;
 2. add the labels `self-hosted`, `linux`, and `adxl355-hil`;
 3. add the runner account to the group permitted to access the selected `spidev`
    or `i2c-dev` node, preferably through a narrow udev rule;

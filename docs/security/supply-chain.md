@@ -51,7 +51,9 @@ Dependabot groups GitHub Actions updates. When reviewing an action update:
 5. retain the full commit SHA rather than a mutable major tag.
 
 Local reusable workflows under `./.github/workflows/` are repository content and
-do not require an external SHA.
+do not require an external SHA. Node.js 24-based official actions require
+self-hosted GitHub Actions Runner 2.327.1 or newer; the HIL fixture must be upgraded
+before those action revisions are merged.
 
 ## Release dependency gate
 

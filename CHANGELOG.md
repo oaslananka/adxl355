@@ -52,6 +52,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Breaking (Python):** Raised the minimum supported Python version from 3.9 to
   3.10 so release builds do not depend on a vulnerable legacy setuptools line.
+- Updated official checkout, setup, and artifact Actions to their Node.js 24
+  major releases and documented the self-hosted runner 2.327.1 minimum.
 - **Breaking (C/C++):** Transport read/write callbacks return the exact
   transferred byte count on success and a negative value on failure.
 - The repository now describes package outputs as verified build artifacts, not
