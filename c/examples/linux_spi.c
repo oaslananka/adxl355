@@ -17,6 +17,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <fcntl.h>
+#include <limits.h>
 #include <unistd.h>
 #include <sys/ioctl.h>
 #include <linux/spi/spidev.h>
@@ -74,7 +75,10 @@ static int spi_read(void *ctx, uint8_t reg, uint8_t *data, size_t len)
         return -1;
     }
 
-    return adxl355_linux_spi_copy_read_payload(&transfer, data, len);
+    if (adxl355_linux_spi_copy_read_payload(&transfer, data, len) != 0) {
+        return -1;
+    }
+    return len <= (size_t)INT_MAX ? (int)len : -1;
 }
 
 static int spi_write(void *ctx, uint8_t reg, const uint8_t *data, size_t len)
@@ -96,7 +100,10 @@ static int spi_write(void *ctx, uint8_t reg, const uint8_t *data, size_t len)
 
     int ret = ioctl(spi->fd, SPI_IOC_MESSAGE(1), &tr);
     free(buf);
-    return ret < 0 ? -1 : 0;
+    if (ret < 0 || len > (size_t)INT_MAX) {
+        return -1;
+    }
+    return (int)len;
 }
 
 static void spi_delay(void *ctx, uint32_t ms)

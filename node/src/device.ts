@@ -46,13 +46,51 @@ export class ADXL355 {
   // Internal helpers
   // ------------------------------------------------------------------
 
+  private normalizeBusError(operation: string, error: unknown): BusError {
+    if (error instanceof BusError) {
+      return error;
+    }
+    const detail = error instanceof Error ? error.message : String(error);
+    return new BusError(`${operation}: ${detail}`);
+  }
+
+  private async readExact(reg: number, length: number): Promise<Uint8Array> {
+    let data: Uint8Array;
+    try {
+      data = await this.transport.readRegister(reg, length);
+    } catch (error) {
+      throw this.normalizeBusError(`Transport read failed at register 0x${reg.toString(16)}`, error);
+    }
+    if (data.length !== length) {
+      throw new BusError(
+        `Invalid read length at register 0x${reg.toString(16)}: ` +
+        `expected ${length}, got ${data.length}`,
+      );
+    }
+    return data;
+  }
+
   private async readU8(reg: number): Promise<number> {
-    const data = await this.transport.readRegister(reg, 1);
-    return data[0];
+    return (await this.readExact(reg, 1))[0];
   }
 
   private async writeU8(reg: number, value: number): Promise<void> {
-    await this.transport.writeRegister(reg, new Uint8Array([value]));
+    try {
+      await this.transport.writeRegister(reg, new Uint8Array([value]));
+    } catch (error) {
+      throw this.normalizeBusError(`Transport write failed at register 0x${reg.toString(16)}`, error);
+    }
+  }
+
+  private async delayMs(ms: number): Promise<void> {
+    if (!this.transport.delayMs) {
+      return;
+    }
+    try {
+      await this.transport.delayMs(ms);
+    } catch (error) {
+      throw this.normalizeBusError(`Transport delay failed for ${ms} ms`, error);
+    }
   }
 
   private ensureInitialized(): void {
@@ -115,9 +153,7 @@ export class ADXL355 {
   async reset(): Promise<void> {
     this.ensureInitialized();
     await this.writeU8(Reg.RESET, RESET_CODE);
-    if (this.transport.delayMs) {
-      await this.transport.delayMs(10);
-    }
+    await this.delayMs(10);
     this.range = Range.G2;
   }
 
@@ -172,7 +208,7 @@ export class ADXL355 {
   /** Read raw 20-bit acceleration data for all three axes. */
   async readRaw(): Promise<RawXYZ> {
     this.ensureInitialized();
-    const data = await this.transport.readRegister(Reg.XDATA3, 9);
+    const data = await this.readExact(Reg.XDATA3, 9);
     return {
       x: decodeRaw20(data[0], data[1], data[2]),
       y: decodeRaw20(data[3], data[4], data[5]),
@@ -205,14 +241,8 @@ export class ADXL355 {
   async readTemperatureRaw(): Promise<number> {
     this.ensureInitialized();
     for (let attempt = 0; attempt < TEMP_READ_ATTEMPTS; attempt++) {
-      const data = await this.transport.readRegister(Reg.TEMP2, 2);
-      if (data.length !== 2) {
-        throw new BusError(`Short temperature read: expected 2 bytes, got ${data.length}`);
-      }
-      const confirm = await this.transport.readRegister(Reg.TEMP2, 1);
-      if (confirm.length !== 1) {
-        throw new BusError(`Short TEMP2 confirmation read: expected 1 byte, got ${confirm.length}`);
-      }
+      const data = await this.readExact(Reg.TEMP2, 2);
+      const confirm = await this.readExact(Reg.TEMP2, 1);
 
       const temp2 = data[0] & TEMP2_DATA_MASK;
       if (temp2 === (confirm[0] & TEMP2_DATA_MASK)) {

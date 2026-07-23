@@ -54,12 +54,38 @@ class ADXL355:
     # Internal helpers
     # ------------------------------------------------------------------
 
+    def _read_exact(self, reg: int, length: int) -> bytes:
+        try:
+            data = self._transport.read_register(reg, length)
+        except Exception as exc:
+            if isinstance(exc, BusError):
+                raise
+            raise BusError(f"Transport read failed at register 0x{reg:02X}") from exc
+        if len(data) != length:
+            raise BusError(
+                f"Invalid read length at register 0x{reg:02X}: "
+                f"expected {length}, got {len(data)}"
+            )
+        return data
+
     def _read_reg(self, reg: int) -> int:
-        data = self._transport.read_register(reg, 1)
-        return data[0]
+        return self._read_exact(reg, 1)[0]
 
     def _write_reg(self, reg: int, value: int) -> None:
-        self._transport.write_register(reg, bytes([value]))
+        try:
+            self._transport.write_register(reg, bytes([value]))
+        except Exception as exc:
+            if isinstance(exc, BusError):
+                raise
+            raise BusError(f"Transport write failed at register 0x{reg:02X}") from exc
+
+    def _delay_ms(self, ms: int) -> None:
+        try:
+            self._transport.delay_ms(ms)
+        except Exception as exc:
+            if isinstance(exc, BusError):
+                raise
+            raise BusError(f"Transport delay failed for {ms} ms") from exc
 
     def _check_init(self) -> None:
         if not self._initialized:
@@ -119,7 +145,7 @@ class ADXL355:
         """Perform a software reset after a successful probe."""
         self._check_init()
         self._write_reg(Register.RESET, RESET_CODE)
-        self._transport.delay_ms(10)
+        self._delay_ms(10)
         self._range = Range.G2
 
     def set_range(self, range_val: Range) -> None:
@@ -184,7 +210,7 @@ class ADXL355:
     def read_raw(self) -> RawXYZ:
         """Read raw 20-bit acceleration data for all three axes."""
         self._check_init()
-        data = self._transport.read_register(Register.XDATA3, 9)
+        data = self._read_exact(Register.XDATA3, 9)
         x = _decode_raw20(data[0], data[1], data[2])
         y = _decode_raw20(data[3], data[4], data[5])
         z = _decode_raw20(data[6], data[7], data[8])
@@ -218,14 +244,8 @@ class ADXL355:
         """
         self._check_init()
         for _ in range(TEMP_READ_ATTEMPTS):
-            data = self._transport.read_register(Register.TEMP2, 2)
-            if len(data) != 2:
-                raise BusError(f"Short temperature read: expected 2 bytes, got {len(data)}")
-            confirm = self._transport.read_register(Register.TEMP2, 1)
-            if len(confirm) != 1:
-                raise BusError(
-                    f"Short TEMP2 confirmation read: expected 1 byte, got {len(confirm)}"
-                )
+            data = self._read_exact(Register.TEMP2, 2)
+            confirm = self._read_exact(Register.TEMP2, 1)
 
             temp2 = data[0] & TEMP2_DATA_MASK
             if temp2 == (confirm[0] & TEMP2_DATA_MASK):

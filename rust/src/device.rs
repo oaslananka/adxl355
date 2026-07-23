@@ -8,9 +8,11 @@ use crate::types::{AccelXyz, RawXyz};
 
 /// Transport abstraction for ADXL355 communication.
 pub trait Transport {
-    /// Read `len` bytes starting at register `reg`.
+    /// Return exactly `len` bytes starting at `reg` or an error.
+    ///
+    /// Zero-length, truncated, and overlong payloads violate the contract.
     fn read_register(&mut self, reg: u8, len: u8) -> Result<Vec<u8>, Error>;
-    /// Write `data` bytes starting at register `reg`.
+    /// Write the complete payload or return an error; partial success is invalid.
     fn write_register(&mut self, reg: u8, data: &[u8]) -> Result<(), Error>;
     /// Blocking delay in milliseconds.
     fn delay_ms(&mut self, ms: u32);
@@ -43,13 +45,25 @@ impl<T: Transport> Adxl355<T> {
     // Internal helpers
     // ------------------------------------------------------------------
 
+    fn read_exact(&mut self, reg: u8, len: u8) -> Result<Vec<u8>, Error> {
+        let data = self
+            .transport
+            .read_register(reg, len)
+            .map_err(|_| Error::Bus)?;
+        if data.len() != len as usize {
+            return Err(Error::Bus);
+        }
+        Ok(data)
+    }
+
     fn read_u8(&mut self, reg: u8) -> Result<u8, Error> {
-        let data = self.transport.read_register(reg, 1)?;
-        Ok(data[0])
+        Ok(self.read_exact(reg, 1)?[0])
     }
 
     fn write_u8(&mut self, reg: u8, val: u8) -> Result<(), Error> {
-        self.transport.write_register(reg, &[val])
+        self.transport
+            .write_register(reg, &[val])
+            .map_err(|_| Error::Bus)
     }
 
     fn ensure_initialized(&self) -> Result<(), Error> {
@@ -161,10 +175,7 @@ impl<T: Transport> Adxl355<T> {
     /// Read raw 20-bit acceleration for all three axes.
     pub fn read_raw(&mut self) -> Result<RawXyz, Error> {
         self.ensure_initialized()?;
-        let data = self.transport.read_register(registers::reg::XDATA3, 9)?;
-        if data.len() < 9 {
-            return Err(Error::Bus);
-        }
+        let data = self.read_exact(registers::reg::XDATA3, 9)?;
         Ok(RawXyz {
             x: decode_raw20(data[0], data[1], data[2]),
             y: decode_raw20(data[3], data[4], data[5]),
@@ -200,14 +211,8 @@ impl<T: Transport> Adxl355<T> {
     pub fn read_temperature_raw(&mut self) -> Result<i16, Error> {
         self.ensure_initialized()?;
         for _ in 0..registers::temperature::READ_ATTEMPTS {
-            let data = self.transport.read_register(registers::reg::TEMP2, 2)?;
-            if data.len() != 2 {
-                return Err(Error::Bus);
-            }
-            let confirm = self.transport.read_register(registers::reg::TEMP2, 1)?;
-            if confirm.len() != 1 {
-                return Err(Error::Bus);
-            }
+            let data = self.read_exact(registers::reg::TEMP2, 2)?;
+            let confirm = self.read_exact(registers::reg::TEMP2, 1)?;
 
             let temp2 = data[0] & registers::temperature::TEMP2_DATA_MASK;
             if temp2 == (confirm[0] & registers::temperature::TEMP2_DATA_MASK) {

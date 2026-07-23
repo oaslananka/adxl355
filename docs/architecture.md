@@ -118,6 +118,28 @@ ODR/filter configuration APIs currently provided by C and Python. Explicit
 power-mode changes are not wrapped by the guard because changing that mode is the
 operation requested by the caller.
 
+## Exact Transport Contract
+
+Every transport read must return exactly the requested payload length. A successful
+read of one, two, or nine bytes may not return zero bytes, a truncated payload, or
+an overlong payload. The driver validates length before indexing and converts any
+contract violation or backend exception/error into its language-level bus error.
+Identity mismatches, invalid configuration values, and invalid device state remain
+distinct errors.
+
+Write operations must transfer the complete payload or fail. Python and Node.js also
+normalize backend delay exceptions during reset. Rust and Go transports expose
+infallible delay methods, while C retains a `void` delay callback.
+
+The C/C++ callback ABI reports byte counts explicitly: read and write callbacks
+return exactly the requested byte count on success and a negative value on bus
+failure. The C core rejects zero, partial, and overlong counts. This makes partial
+reads detectable instead of relying on an ambiguous `0 == success` convention.
+
+`spec/transport_contract.json` is the shared negative checklist. The maintained
+language suites cover its `TR-1-*`, `TR-2-*`, and `TR-9-*` scenarios and verify that
+failed reads do not modify caller-provided output values or fabricate measurements.
+
 ## Register Specification as Single Source of Truth
 
 Register addresses, bit fields, and expected ID values are defined in `spec/adxl355.registers.yaml`. This YAML file is the authoritative reference. Every language package duplicates these values in its native format (header files, enums, constants), but they must all match the YAML.

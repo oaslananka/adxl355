@@ -1,5 +1,6 @@
 #include <adxl355/adxl355.hpp>
 #include <cstdio>
+#include <climits>
 #include <cstring>
 #include <cmath>
 #include <memory>
@@ -25,6 +26,7 @@ public:
     uint8_t regs[128]{};
     bool fail_reads{false};
     bool fail_writes{false};
+    size_t short_read_length{static_cast<size_t>(-1)};
     int fail_write_reg{-1};
     size_t fail_write_occurrence{0};
     size_t fail_write_matches{0};
@@ -51,8 +53,14 @@ public:
         if (fail_reads) {
             return -1;
         }
-        std::memcpy(data, &regs[reg], len);
-        return 0;
+        const size_t reported_len = short_read_length == static_cast<size_t>(-1)
+                                        ? len
+                                        : short_read_length;
+        const size_t copy_len = reported_len < len ? reported_len : len;
+        std::memcpy(data, &regs[reg], copy_len);
+        return reported_len <= static_cast<size_t>(INT_MAX)
+                   ? static_cast<int>(reported_len)
+                   : -1;
     }
 
     int write(void *ctx, uint8_t reg, const uint8_t *data, size_t len) override {
@@ -71,7 +79,7 @@ public:
         if (reg == ADXL355_REG_RESET && len > 0 && data[0] == ADXL355_RESET_CODE) {
             regs[ADXL355_REG_RANGE] = ADXL355_RANGE_2G;
         }
-        return 0;
+        return len <= static_cast<size_t>(INT_MAX) ? static_cast<int>(len) : -1;
     }
 
     void delayMs(void *ctx, uint32_t ms) override {
@@ -238,6 +246,22 @@ void test_set_range_write_error_preserves_state() {
 // Main
 // ---------------------------------------------------------------------------
 
+
+void test_cpp_short_read_throws_bus_error() {
+    auto bus = std::make_unique<MockBus>();
+    auto *mock = bus.get();
+    adxl355::Device dev(std::move(bus));
+    dev.probe();
+    mock->short_read_length = 8U;
+
+    try {
+        (void)dev.readRaw();
+        TEST(false, "TR-9 truncated read should throw BusError");
+    } catch (const adxl355::BusError &) {
+        TEST(true, "C++ wrapper maps short reads to BusError");
+    }
+}
+
 int main() {
     std::printf("ADXL355 C++ Test Suite\n");
     std::printf("======================\n");
@@ -249,6 +273,7 @@ int main() {
     test_reset_restores_2g_range();
     test_pre_probe_calls_throw_invalid_state();
     test_cpp_range_configuration_restores_measurement();
+    test_cpp_short_read_throws_bus_error();
     test_set_range_preserves_unrelated_bits();
     test_set_range_read_error_prevents_write();
     test_set_range_write_error_preserves_state();

@@ -20,8 +20,16 @@ func New(transport Transport) *Device {
 // Internal helpers
 // ---------------------------------------------------------------------------
 
+func (d *Device) readExact(reg byte, length int) ([]byte, error) {
+	data, err := d.transport.ReadRegister(reg, length)
+	if err != nil || len(data) != length {
+		return nil, ErrBus
+	}
+	return data, nil
+}
+
 func (d *Device) readU8(reg byte) (byte, error) {
-	data, err := d.transport.ReadRegister(reg, 1)
+	data, err := d.readExact(reg, 1)
 	if err != nil {
 		return 0, err
 	}
@@ -29,7 +37,10 @@ func (d *Device) readU8(reg byte) (byte, error) {
 }
 
 func (d *Device) writeU8(reg byte, val byte) error {
-	return d.transport.WriteRegister(reg, []byte{val})
+	if err := d.transport.WriteRegister(reg, []byte{val}); err != nil {
+		return ErrBus
+	}
+	return nil
 }
 
 func (d *Device) ensureInitialized() error {
@@ -189,7 +200,7 @@ func (d *Device) ReadRaw() (*RawXYZ, error) {
 	if err := d.ensureInitialized(); err != nil {
 		return nil, err
 	}
-	data, err := d.transport.ReadRegister(RegXDATA3, 9)
+	data, err := d.readExact(RegXDATA3, 9)
 	if err != nil {
 		return nil, err
 	}
@@ -234,19 +245,13 @@ func (d *Device) ReadTemperatureRaw() (int16, error) {
 		return 0, err
 	}
 	for attempt := 0; attempt < TempReadAttempts; attempt++ {
-		data, err := d.transport.ReadRegister(RegTEMP2, 2)
+		data, err := d.readExact(RegTEMP2, 2)
 		if err != nil {
 			return 0, err
 		}
-		if len(data) != 2 {
-			return 0, ErrBus
-		}
-		confirm, err := d.transport.ReadRegister(RegTEMP2, 1)
+		confirm, err := d.readExact(RegTEMP2, 1)
 		if err != nil {
 			return 0, err
-		}
-		if len(confirm) != 1 {
-			return 0, ErrBus
 		}
 
 		temp2 := data[0] & Temp2DataMask

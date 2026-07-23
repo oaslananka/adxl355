@@ -155,6 +155,21 @@ All language suites verify the same device-state behavior:
 - restore failures leave cached configuration consistent with the successful
   hardware write.
 
+## Shared Negative Transport Checklist
+
+`spec/transport_contract.json` defines the required malformed-response cases:
+
+| IDs | Requested bytes | Invalid responses |
+|---|---:|---:|
+| `TR-1-ZERO`, `TR-1-OVERLONG` | 1 | 0, 2 |
+| `TR-2-ZERO`, `TR-2-TRUNCATED` | 2 | 0, 1 |
+| `TR-9-ZERO`, `TR-9-TRUNCATED` | 9 | 0, 8 |
+
+C, Python, Rust, Node.js, and Go execute the same behavioral checklist. C++ verifies
+the C core mapping through its exception wrapper. Tests additionally inject native
+read/write failures and require the stable driver-level bus error rather than an
+index exception, panic, or fabricated numeric result.
+
 ## Hardware-in-the-Loop Tests
 
 **Not yet implemented.** Hardware tests will be located in:

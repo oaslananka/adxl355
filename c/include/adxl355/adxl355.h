@@ -84,21 +84,26 @@ typedef struct {
 /**
  * Transport abstraction – function-pointer bus interface.
  *
- * All bus operations must return 0 only after transferring the complete
- * requested length, and non-zero on partial transfer or bus failure.
+ * Read and write callbacks return the exact number of bytes transferred on
+ * success and a negative value on bus failure. The driver accepts success only
+ * when the returned count equals the requested length; zero, partial, and
+ * overlong counts are reported as ADXL355_ERR_BUS.
  * The driver does NOT own the context pointer; the caller must ensure it
  * remains valid for the lifetime of the adxl355_t object.
  */
 typedef struct {
     /**
      * Read `len` bytes starting at `reg` into `data`.
-     * Must return 0 on success, non-zero on bus error.
+     * Return exactly `len` on success or a negative value on bus failure.
+     * Returning zero, a partial count, or a count greater than `len` violates
+     * the contract and is detected as ADXL355_ERR_BUS.
      */
     int (*read)(void *ctx, uint8_t reg, uint8_t *data, size_t len);
 
     /**
      * Write `len` bytes from `data` starting at `reg`.
-     * Must return 0 on success, non-zero on bus error.
+     * Return exactly `len` on success or a negative value on bus failure.
+     * Partial and overlong counts are rejected as ADXL355_ERR_BUS.
      */
     int (*write)(void *ctx, uint8_t reg, const uint8_t *data, size_t len);
 

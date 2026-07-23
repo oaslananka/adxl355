@@ -33,8 +33,10 @@ class MockTransport:
         self._regs = [0] * self.NUM_REGS
         self._regs[Register.RANGE] = int(Range.G2)
         self._force_error: Optional[Exception] = None
+        self._short_read_reg: Optional[int] = None
+        self._short_read_length = 0
         self.call_count = 0
-        self.calls: list[dict] = []
+        self.calls: list[dict[str, object]] = []
 
     # ------------------------------------------------------------------
     # Transport protocol
@@ -48,6 +50,10 @@ class MockTransport:
         # Pad if beyond register file size
         if len(data) < length:
             data += b"\x00" * (length - len(data))
+        if self._short_read_reg == reg:
+            if self._short_read_length <= len(data):
+                return data[: self._short_read_length]
+            return data + bytes(self._short_read_length - len(data))
         return data
 
     def write_register(self, reg: int, data: bytes) -> None:
@@ -113,6 +119,18 @@ class MockTransport:
     def clear_error(self) -> None:
         """Clear forced error condition."""
         self._force_error = None
+
+    def inject_short_read(self, reg: int, returned_length: int) -> None:
+        """Return a malformed payload length for reads starting at `reg`."""
+        if returned_length < 0:
+            raise ValueError("returned_length must be non-negative")
+        self._short_read_reg = reg
+        self._short_read_length = returned_length
+
+    def clear_short_read(self) -> None:
+        """Restore exact-length read behavior."""
+        self._short_read_reg = None
+        self._short_read_length = 0
 
     def clear_call_log(self) -> None:
         """Reset call tracking."""

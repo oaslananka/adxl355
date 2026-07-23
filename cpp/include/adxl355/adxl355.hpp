@@ -88,12 +88,11 @@ class BusInterface {
 public:
     virtual ~BusInterface() = default;
 
-    /// Read `len` bytes starting at register `reg` into `data`.
-    /// Must return 0 on success.
+    /// Read `len` bytes and return exactly `len` on success, negative on failure.
+    /// Zero, partial, and overlong counts are rejected by the C core.
     virtual int read(void *ctx, uint8_t reg, uint8_t *data, size_t len) = 0;
 
-    /// Write `len` bytes from `data` starting at register `reg`.
-    /// Must return 0 on success.
+    /// Write all `len` bytes and return exactly `len`, or negative on failure.
     virtual int write(void *ctx, uint8_t reg, const uint8_t *data, size_t len) = 0;
 
     /// Blocking delay in milliseconds.
