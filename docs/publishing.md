@@ -82,6 +82,9 @@ This project follows Semantic Versioning:
 
 ## Pre-Publish Checklist
 
+- [ ] HIL evidence for both SPI and I2C is successful on the release-candidate commit and no older than 30 days
+- [ ] Each HIL artifact records the device revision, tested bus settings, workflow URL, and fixture identifier
+- [ ] Both I2C addresses (`0x1D` and `0x53`) are validated where the release hardware permits changing the address strap
 - [ ] All register values verified against datasheet
 - [ ] All test vectors confirmed across all languages
 - [ ] C library builds with CMake on Linux, macOS, Windows

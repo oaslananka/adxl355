@@ -132,7 +132,7 @@ The following fields have **not** been verified against the official ADXL355 dat
 - [ ] Scale factors (3.9, 7.8, 15.6 µg/LSB)
 - [x] Temperature bit layout, coherent-read strategy, and nominal conversion formula
 - [x] SPI Mode 0 and read/write command format
-- [ ] I2C address options
+- [x] I2C address options
 - [ ] Status register bit definitions
 - [ ] Filter register ODR/LPF field bit positions
 

@@ -2,6 +2,11 @@
 
 from __future__ import annotations
 
+import sys
+from types import SimpleNamespace
+
+import pytest
+
 from adxl355.adapters.spidev import SpiDevTransport
 
 
@@ -14,9 +19,10 @@ class FakeSpi:
         self.responses = list(responses or [])
         self.transfers: list[list[int]] = []
         self.closed = False
+        self.opened: tuple[int, int] | None = None
 
-    def open(self, _bus: int, _device: int) -> None:
-        pass
+    def open(self, bus: int, device: int) -> None:
+        self.opened = (bus, device)
 
     def xfer2(self, payload: list[int]) -> list[int]:
         self.transfers.append(payload.copy())
@@ -47,3 +53,15 @@ def test_write_register_uses_adxl355_command_and_single_transaction() -> None:
     transport.write_register(0x2D, bytes([0x12, 0x34]))
 
     assert fake.transfers == [[0x5A, 0x12, 0x34]]
+
+
+def test_transport_exposes_verified_mode_and_clock(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fake = FakeSpi()
+    monkeypatch.setitem(sys.modules, "spidev", SimpleNamespace(SpiDev=lambda: fake))
+    transport = SpiDevTransport(bus=2, device=1, max_speed_hz=2_000_000)
+
+    assert transport.mode == 0
+    assert transport.speed_hz == 2_000_000
+    assert fake.opened == (2, 1)

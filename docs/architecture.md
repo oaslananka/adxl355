@@ -174,6 +174,18 @@ jobs rather than parallel duplicate scanners. The final cross-language job still
 depends on all language jobs, so the shared-vector gate cannot pass around a
 failed language-specific quality check.
 
+## Hardware Evidence Boundary
+
+Mock transports and required CI verify deterministic register behavior, but they
+cannot prove Linux device-node permissions, electrical mode, chip-select timing,
+address straps, or physical signal integrity. The HIL layer therefore remains an
+explicit boundary: `scripts/hil_runner.py` exercises the public Python hardware
+adapters on one physical sensor, while `.github/workflows/hil.yml` schedules the
+sequence only on a dedicated `adxl355-hil` self-hosted runner. The runner emits a
+bounded, sanitized JSON report containing device revision and bus context rather
+than environment dumps or credentials. A hardware failure never weakens or skips
+normal CI; it produces separate diagnostic evidence.
+
 ## Testing Strategy
 
 ### Hardware-free tests (required, run by default)

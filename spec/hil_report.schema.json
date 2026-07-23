@@ -1,0 +1,113 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/oaslananka/adxl355/spec/hil_report.schema.json",
+  "title": "ADXL355 hardware-in-the-loop report",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "started_at",
+    "finished_at",
+    "duration_ms",
+    "success",
+    "runner",
+    "bus",
+    "device",
+    "configuration",
+    "temperature",
+    "samples",
+    "steps",
+    "diagnostic_hints"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "started_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "finished_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "duration_ms": {
+      "type": "number",
+      "minimum": 0
+    },
+    "success": {
+      "type": "boolean"
+    },
+    "runner": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "git_sha", "os", "kernel", "architecture", "python"],
+      "properties": {
+        "id": { "type": "string", "maxLength": 80 },
+        "git_sha": { "type": "string", "maxLength": 40 },
+        "os": { "type": "string" },
+        "kernel": { "type": "string" },
+        "architecture": { "type": "string" },
+        "python": { "type": "string" }
+      }
+    },
+    "bus": {
+      "type": "object",
+      "required": ["transport", "device_path"],
+      "properties": {
+        "transport": { "enum": ["spi", "i2c"] },
+        "device_path": { "type": "string" },
+        "mode": { "const": 0 },
+        "speed_hz": { "type": "integer", "minimum": 100000, "maximum": 10000000 },
+        "address": { "enum": ["0x1D", "0x53"] }
+      }
+    },
+    "device": {
+      "type": "object"
+    },
+    "configuration": {
+      "type": "object"
+    },
+    "temperature": {
+      "type": "object"
+    },
+    "samples": {
+      "type": "object"
+    },
+    "steps": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "status", "duration_ms"],
+        "properties": {
+          "name": { "type": "string" },
+          "status": { "enum": ["passed", "failed"] },
+          "duration_ms": { "type": "number", "minimum": 0 },
+          "details": {},
+          "error": {
+            "type": "object",
+            "required": ["type", "message"],
+            "properties": {
+              "type": { "type": "string" },
+              "message": { "type": "string", "maxLength": 512 }
+            }
+          }
+        }
+      }
+    },
+    "diagnostic_hints": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "error": {
+      "type": "object",
+      "required": ["type", "message"],
+      "properties": {
+        "type": { "type": "string" },
+        "message": { "type": "string", "maxLength": 512 }
+      }
+    },
+    "cleanup_errors": {
+      "type": "array"
+    }
+  }
+}
