@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import shutil
 import subprocess
 import sys
 import tarfile
@@ -52,8 +53,23 @@ def _run(command: list[str], *, cwd: Path | None = None) -> None:
 
 def _extract_tar(archive: Path, destination: Path) -> list[str]:
     with tarfile.open(archive, "r:*") as handle:
-        names = _safe_members(member.name for member in handle.getmembers())
-        handle.extractall(destination, filter="data")
+        members = handle.getmembers()
+        names = _safe_members(member.name for member in members)
+        for member in members:
+            target = destination.joinpath(*PurePosixPath(member.name).parts)
+            if member.isdir():
+                target.mkdir(parents=True, exist_ok=True)
+                continue
+            if not member.isfile():
+                raise ArtifactError(
+                    f"archive contains unsupported member type: {member.name!r}"
+                )
+            source = handle.extractfile(member)
+            if source is None:
+                raise ArtifactError(f"archive member has no readable data: {member.name!r}")
+            target.parent.mkdir(parents=True, exist_ok=True)
+            with source, target.open("wb") as output:
+                shutil.copyfileobj(source, output)
     return names
 
 

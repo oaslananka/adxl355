@@ -8,7 +8,7 @@ multiple local scanners that enforce the same policy with duplicate findings.
 
 | Category | Primary control | Enforcement |
 |---|---|---|
-| Dependency updates | Dependabot | Weekly, grouped PRs for GitHub Actions, Python, Rust, Node.js, and Go; at most two open version-update PRs per ecosystem |
+| Dependency updates | Dependabot | Weekly, grouped PRs for GitHub Actions, Python, Rust, Node.js, and Go; seven-day cooldown and at most two open version-update PRs per ecosystem |
 | Changed dependencies in pull requests | GitHub Dependency Review | A newly introduced dependency finding at **high severity** or critical severity blocks the PR |
 | Static application security testing | CodeQL | Required analysis for C/C++, Python, JavaScript/TypeScript, and Go on pull requests, `main`, and a weekly schedule |
 | Secret prevention | GitHub secret scanning and push protection | Repository setting; secrets are blocked before push where GitHub can identify them |
@@ -24,9 +24,11 @@ presence does not justify adding another overlapping scanner workflow here.
 ## Dependabot maintenance policy
 
 `.github/dependabot.yml` groups all version updates within each ecosystem into a
-single weekly PR. Schedules are staggered in the `Europe/Istanbul` timezone and
-`open-pull-requests-limit` is set to two per ecosystem. Security updates and
-vulnerability alerts are enabled in repository settings.
+single weekly PR. Schedules are staggered in the `Europe/Istanbul` timezone,
+`open-pull-requests-limit` is set to two per ecosystem, and newly published
+versions wait seven days before Dependabot proposes them. GitHub security updates
+are not delayed by this cooldown; vulnerability alerts and security updates remain
+enabled in repository settings.
 
 Dependency PRs must pass the same CI, CodeQL, dependency review, and package
 checks as contributor PRs. Do not merge an update only because it is automated;
@@ -72,6 +74,27 @@ or private advisory, depending on sensitivity:
 - release notes when users need to take action.
 
 Do not add a blanket ignore or silently lower the severity threshold.
+
+## Supplementary local audits
+
+Hosted checks remain the merge authority, but maintainers can reproduce targeted
+security audits locally without adding duplicate required workflows:
+
+```bash
+semgrep scan --config p/default --config p/security-audit --config p/secrets --metrics off .
+osv-scanner scan source -r --call-analysis=go .
+sonar analyze secrets $(git ls-files)
+```
+
+Use Semgrep for source and configuration patterns, OSV-Scanner for known dependency
+vulnerabilities, and SonarQube CLI for an independent secret scan. Run OSV with a
+supported Go toolchain so call analysis can suppress unreferenced standard-library
+advisories. General SonarQube code analysis requires an authenticated project and
+organization entitlement; lack of that entitlement is not a code finding.
+
+These commands are supplementary evidence. CodeQL remains the primary SAST gate,
+GitHub Dependency Review remains the pull-request dependency gate, and the release
+SBOM/Grype job remains the release vulnerability gate.
 
 ## SBOM, checksums, and attestations
 
