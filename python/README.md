@@ -1,6 +1,6 @@
 # ADXL355 Python Driver
 
-Typed, transport-agnostic Python support for the Analog Devices ADXL355.
+Typed, transport-agnostic Python 3.10+ support for the Analog Devices ADXL355.
 
 ```python
 from adxl355 import ADXL355, PowerMode, Range

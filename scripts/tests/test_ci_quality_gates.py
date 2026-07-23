@@ -50,7 +50,13 @@ class CiQualityGateTests(unittest.TestCase):
         self.assertIn("scripts/smoke_cmake_packages.sh", cpp_commands)
 
     def test_python_runs_lint_type_package_wheel_and_examples(self) -> None:
-        commands = self.commands(self.load_jobs()["python"])
+        python_job = self.load_jobs()["python"]
+        commands = self.commands(python_job)
+        self.assertEqual(
+            python_job["strategy"]["matrix"]["python-version"],
+            ["3.10", "3.11", "3.12"],
+        )
+        self.assertIn("setuptools==83.0.0", commands)
         self.assertIn("ruff check", commands)
         self.assertIn("mypy src examples", commands)
         self.assertIn("python -m build --no-isolation", commands)
