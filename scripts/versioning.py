@@ -13,6 +13,19 @@ from pathlib import Path
 from typing import Any
 
 
+PYTHON_PROJECT_PATH = "python/pyproject.toml"
+PYTHON_RUNTIME_PATH = "python/src/adxl355/_version.py"
+RUST_MANIFEST_PATH = "rust/Cargo.toml"
+RUST_LOCK_PATH = "rust/Cargo.lock"
+NODE_PACKAGE_PATH = "node/package.json"
+NODE_LOCK_PATH = "node/package-lock.json"
+C_CMAKE_PATH = "c/CMakeLists.txt"
+CPP_CMAKE_PATH = "cpp/CMakeLists.txt"
+VECTOR_SPEC_PATH = "spec/test_vectors.json"
+VERSION_HEADER_PATH = "c/include/adxl355/adxl355_version.h"
+CHANGELOG_PATH = "CHANGELOG.md"
+
+
 SEMVER = re.compile(
     r"^(?P<major>0|[1-9]\d*)\."
     r"(?P<minor>0|[1-9]\d*)\."
@@ -88,12 +101,12 @@ def _replace_once(text: str, pattern: str, replacement: str, label: str) -> str:
 
 
 def _current_values(root: Path) -> dict[str, str]:
-    python_project = _read_toml(root / "python/pyproject.toml")
-    rust_manifest = _read_toml(root / "rust/Cargo.toml")
-    rust_lock = _read_toml(root / "rust/Cargo.lock")
-    node_package = json.loads((root / "node/package.json").read_text())
-    node_lock = json.loads((root / "node/package-lock.json").read_text())
-    vectors = json.loads((root / "spec/test_vectors.json").read_text())
+    python_project = _read_toml(root / PYTHON_PROJECT_PATH)
+    rust_manifest = _read_toml(root / RUST_MANIFEST_PATH)
+    rust_lock = _read_toml(root / RUST_LOCK_PATH)
+    node_package = json.loads((root / NODE_PACKAGE_PATH).read_text())
+    node_lock = json.loads((root / NODE_LOCK_PATH).read_text())
+    vectors = json.loads((root / VECTOR_SPEC_PATH).read_text())
 
     rust_package = next(
         (
@@ -106,11 +119,11 @@ def _current_values(root: Path) -> dict[str, str]:
     if rust_package is None:
         raise ValueError("rust/Cargo.lock does not contain this repository's crate")
 
-    c_text = (root / "c/CMakeLists.txt").read_text()
-    cpp_text = (root / "cpp/CMakeLists.txt").read_text()
-    header = (root / "c/include/adxl355/adxl355_version.h").read_text()
-    runtime = (root / "python/src/adxl355/_version.py").read_text()
-    changelog = (root / "CHANGELOG.md").read_text()
+    c_text = (root / C_CMAKE_PATH).read_text()
+    cpp_text = (root / CPP_CMAKE_PATH).read_text()
+    header = (root / VERSION_HEADER_PATH).read_text()
+    runtime = (root / PYTHON_RUNTIME_PATH).read_text()
+    changelog = (root / CHANGELOG_PATH).read_text()
 
     def require(text: str, pattern: str, label: str) -> str:
         match = re.search(pattern, text, flags=re.MULTILINE)
@@ -119,21 +132,21 @@ def _current_values(root: Path) -> dict[str, str]:
         return match.group(1)
 
     return {
-        "python/pyproject.toml": str(python_project["project"]["version"]),
-        "python/src/adxl355/_version.py": require(
+        PYTHON_PROJECT_PATH: str(python_project["project"]["version"]),
+        PYTHON_RUNTIME_PATH: require(
             runtime, r'__version__\s*=\s*"([^"]+)"', "Python runtime version"
         ),
-        "rust/Cargo.toml": str(rust_manifest["package"]["version"]),
-        "rust/Cargo.lock": str(rust_package["version"]),
-        "node/package.json": str(node_package["version"]),
-        "node/package-lock.json": str(node_lock["version"]),
+        RUST_MANIFEST_PATH: str(rust_manifest["package"]["version"]),
+        RUST_LOCK_PATH: str(rust_package["version"]),
+        NODE_PACKAGE_PATH: str(node_package["version"]),
+        NODE_LOCK_PATH: str(node_lock["version"]),
         'node/package-lock.json packages[""]': str(node_lock["packages"][""]["version"]),
-        "c/CMakeLists.txt": require(
+        C_CMAKE_PATH: require(
             c_text,
             r"project\(adxl355\s+VERSION\s+([^\s\)]+)",
             "C project version",
         ),
-        "cpp/CMakeLists.txt": require(
+        CPP_CMAKE_PATH: require(
             cpp_text,
             r"project\(adxl355-cpp\s+VERSION\s+([^\s\)]+)",
             "C++ project version",
@@ -151,7 +164,7 @@ def _current_values(root: Path) -> dict[str, str]:
             )
             for name in ("MAJOR", "MINOR", "PATCH")
         ),
-        "spec/test_vectors.json": str(vectors["version"]),
+        VECTOR_SPEC_PATH: str(vectors["version"]),
         "CHANGELOG.md Unreleased": require(
             changelog,
             r"^## \[([^\]]+)\] - Unreleased$",
@@ -162,24 +175,24 @@ def _current_values(root: Path) -> dict[str, str]:
 
 def _expected_values(version: VersionSet) -> dict[str, str]:
     return {
-        "python/pyproject.toml": version.python,
-        "python/src/adxl355/_version.py": version.python,
-        "rust/Cargo.toml": version.semver,
-        "rust/Cargo.lock": version.semver,
-        "node/package.json": version.semver,
-        "node/package-lock.json": version.semver,
+        PYTHON_PROJECT_PATH: version.python,
+        PYTHON_RUNTIME_PATH: version.python,
+        RUST_MANIFEST_PATH: version.semver,
+        RUST_LOCK_PATH: version.semver,
+        NODE_PACKAGE_PATH: version.semver,
+        NODE_LOCK_PATH: version.semver,
         'node/package-lock.json packages[""]': version.semver,
-        "c/CMakeLists.txt": version.core,
-        "cpp/CMakeLists.txt": version.core,
+        C_CMAKE_PATH: version.core,
+        CPP_CMAKE_PATH: version.core,
         "c/include/adxl355/adxl355_version.h string": version.semver,
         "c/include/adxl355/adxl355_version.h components": version.core,
-        "spec/test_vectors.json": version.semver,
+        VECTOR_SPEC_PATH: version.semver,
         "CHANGELOG.md Unreleased": version.semver,
     }
 
 
 def _write_versions(root: Path, version: VersionSet) -> None:
-    pyproject = root / "python/pyproject.toml"
+    pyproject = root / PYTHON_PROJECT_PATH
     pyproject.write_text(
         _replace_once(
             pyproject.read_text(),
@@ -189,10 +202,10 @@ def _write_versions(root: Path, version: VersionSet) -> None:
         )
     )
 
-    runtime = root / "python/src/adxl355/_version.py"
+    runtime = root / PYTHON_RUNTIME_PATH
     runtime.write_text(f'__version__ = "{version.python}"\n')
 
-    cargo = root / "rust/Cargo.toml"
+    cargo = root / RUST_MANIFEST_PATH
     cargo.write_text(
         _replace_once(
             cargo.read_text(),
@@ -202,7 +215,7 @@ def _write_versions(root: Path, version: VersionSet) -> None:
         )
     )
 
-    cargo_lock = root / "rust/Cargo.lock"
+    cargo_lock = root / RUST_LOCK_PATH
     lock_text = cargo_lock.read_text()
     lock_pattern = (
         r'(\[\[package\]\]\nname = "(?:adxl355|adxl355-driver)"\nversion = )"[^"]+"'
@@ -216,20 +229,20 @@ def _write_versions(root: Path, version: VersionSet) -> None:
         )
     )
 
-    package = root / "node/package.json"
+    package = root / NODE_PACKAGE_PATH
     package_data = json.loads(package.read_text())
     package_data["version"] = version.semver
     package.write_text(json.dumps(package_data, indent=2) + "\n")
 
-    package_lock = root / "node/package-lock.json"
+    package_lock = root / NODE_LOCK_PATH
     package_lock_data = json.loads(package_lock.read_text())
     package_lock_data["version"] = version.semver
     package_lock_data["packages"][""]["version"] = version.semver
     package_lock.write_text(json.dumps(package_lock_data, indent=2) + "\n")
 
     for relative, project in (
-        ("c/CMakeLists.txt", "adxl355"),
-        ("cpp/CMakeLists.txt", "adxl355-cpp"),
+        (C_CMAKE_PATH, "adxl355"),
+        (CPP_CMAKE_PATH, "adxl355-cpp"),
     ):
         path = root / relative
         path.write_text(
@@ -241,7 +254,7 @@ def _write_versions(root: Path, version: VersionSet) -> None:
             )
         )
 
-    header = root / "c/include/adxl355/adxl355_version.h"
+    header = root / VERSION_HEADER_PATH
     header_text = header.read_text()
     for name, value in (
         ("MAJOR", version.major),
@@ -262,7 +275,7 @@ def _write_versions(root: Path, version: VersionSet) -> None:
     )
     header.write_text(header_text)
 
-    vectors = root / "spec/test_vectors.json"
+    vectors = root / VECTOR_SPEC_PATH
     vectors.write_text(
         _replace_once(
             vectors.read_text(),
@@ -272,7 +285,7 @@ def _write_versions(root: Path, version: VersionSet) -> None:
         )
     )
 
-    changelog = root / "CHANGELOG.md"
+    changelog = root / CHANGELOG_PATH
     changelog.write_text(
         _replace_once(
             changelog.read_text(),

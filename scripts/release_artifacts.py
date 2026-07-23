@@ -17,6 +17,10 @@ from pathlib import Path, PurePosixPath
 from typing import Iterable
 
 
+DEVELOPMENT_PATH_MARKERS = ("/tests/", "/examples/")
+RUST_FORBIDDEN_PATH_MARKERS = (*DEVELOPMENT_PATH_MARKERS, "/target/", "/.github/")
+
+
 class ArtifactError(ValueError):
     """Raised when a release artifact violates its package contract."""
 
@@ -74,12 +78,12 @@ def inspect_python(directory: Path, version: str, *, smoke: bool) -> dict[str, o
     ):
         if required_url not in metadata:
             raise ArtifactError(f"Python wheel metadata is missing {required_url!r}")
-    if any("/tests/" in f"/{name}" or "/examples/" in f"/{name}" for name in wheel_names):
+    if any(any(marker in f"/{name}" for marker in DEVELOPMENT_PATH_MARKERS) for name in wheel_names):
         raise ArtifactError("Python wheel contains tests or examples")
 
     with tarfile.open(sdist, "r:gz") as handle:
         sdist_names = _safe_members(member.name for member in handle.getmembers())
-    if any("/tests/" in f"/{name}" or "/examples/" in f"/{name}" for name in sdist_names):
+    if any(any(marker in f"/{name}" for marker in DEVELOPMENT_PATH_MARKERS) for name in sdist_names):
         raise ArtifactError("Python sdist contains tests or examples")
     if not any(name.endswith("/README.md") for name in sdist_names):
         raise ArtifactError("Python sdist is missing README.md")
@@ -124,8 +128,10 @@ def inspect_rust(directory: Path, version: str, *, smoke: bool) -> dict[str, obj
         prefix = f"adxl355-driver-{version}/"
         if not all(name == prefix.rstrip("/") or name.startswith(prefix) for name in names):
             raise ArtifactError("Rust crate contains an unexpected archive prefix")
-        forbidden = ("/tests/", "/examples/", "/target/", "/.github/")
-        if any(any(marker in f"/{name}" for marker in forbidden) for name in names):
+        if any(
+            any(marker in f"/{name}" for marker in RUST_FORBIDDEN_PATH_MARKERS)
+            for name in names
+        ):
             raise ArtifactError("Rust crate contains development-only files")
 
         package_root = extracted / prefix.rstrip("/")

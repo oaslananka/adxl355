@@ -20,6 +20,15 @@ if str(_REPO_ROOT) not in sys.path:
 from scripts.versioning import VersionSet, load_version  # noqa: E402
 
 
+NODE_PACKAGE_PATH = "node/package.json"
+NODE_LOCK_PATH = "node/package-lock.json"
+RUST_MANIFEST_PATH = "rust/Cargo.toml"
+RUST_LOCK_PATH = "rust/Cargo.lock"
+PYTHON_PROJECT_PATH = "python/pyproject.toml"
+PYTHON_RUNTIME_PATH = "python/src/adxl355/_version.py"
+VECTOR_SPEC_PATH = "spec/test_vectors.json"
+
+
 @dataclass(frozen=True)
 class ReleaseVersion:
     tag: str
@@ -81,8 +90,8 @@ def _validate_package_identities(
 
     expected_node = "@oaslananka/adxl355"
     node_names = {
-        "node/package.json": node_package.get("name"),
-        "node/package-lock.json": node_lock.get("name"),
+        NODE_PACKAGE_PATH: node_package.get("name"),
+        NODE_LOCK_PATH: node_lock.get("name"),
         'node/package-lock.json packages[""]': node_lock.get("packages", {})
         .get("", {})
         .get("name"),
@@ -98,12 +107,12 @@ def collect_version_sources(root: Path) -> list[VersionSource]:
     root = root.resolve()
 
     canonical = load_version(root)
-    python_project = _read_toml(root / "python/pyproject.toml")
-    rust_manifest = _read_toml(root / "rust/Cargo.toml")
-    rust_lock = _read_toml(root / "rust/Cargo.lock")
-    node_package = json.loads((root / "node/package.json").read_text(encoding="utf-8"))
-    node_lock = json.loads((root / "node/package-lock.json").read_text(encoding="utf-8"))
-    vectors = json.loads((root / "spec/test_vectors.json").read_text(encoding="utf-8"))
+    python_project = _read_toml(root / PYTHON_PROJECT_PATH)
+    rust_manifest = _read_toml(root / RUST_MANIFEST_PATH)
+    rust_lock = _read_toml(root / RUST_LOCK_PATH)
+    node_package = json.loads((root / NODE_PACKAGE_PATH).read_text(encoding="utf-8"))
+    node_lock = json.loads((root / NODE_LOCK_PATH).read_text(encoding="utf-8"))
+    vectors = json.loads((root / VECTOR_SPEC_PATH).read_text(encoding="utf-8"))
     _validate_package_identities(rust_manifest, node_package, node_lock)
 
     rust_lock_version = next(
@@ -150,7 +159,7 @@ def collect_version_sources(root: Path) -> list[VersionSource]:
     ).group(1)
 
     python_runtime = _require_match(
-        root / "python/src/adxl355/_version.py",
+        root / PYTHON_RUNTIME_PATH,
         r'__version__\s*=\s*"([^"]+)"',
         "Python runtime version",
     ).group(1)
@@ -165,13 +174,13 @@ def collect_version_sources(root: Path) -> list[VersionSource]:
     return [
         VersionSource("VERSION", canonical.semver),
         VersionSource(
-            "python/pyproject.toml", str(python_project["project"]["version"]), "python"
+            PYTHON_PROJECT_PATH, str(python_project["project"]["version"]), "python"
         ),
-        VersionSource("python/src/adxl355/_version.py", python_runtime, "python"),
-        VersionSource("rust/Cargo.toml", str(rust_manifest["package"]["version"])),
-        VersionSource("rust/Cargo.lock", str(rust_lock_version)),
-        VersionSource("node/package.json", str(node_package["version"])),
-        VersionSource("node/package-lock.json", str(node_lock["version"])),
+        VersionSource(PYTHON_RUNTIME_PATH, python_runtime, "python"),
+        VersionSource(RUST_MANIFEST_PATH, str(rust_manifest["package"]["version"])),
+        VersionSource(RUST_LOCK_PATH, str(rust_lock_version)),
+        VersionSource(NODE_PACKAGE_PATH, str(node_package["version"])),
+        VersionSource(NODE_LOCK_PATH, str(node_lock["version"])),
         VersionSource(
             'node/package-lock.json packages[""]',
             str(node_lock["packages"][""]["version"]),
@@ -182,7 +191,7 @@ def collect_version_sources(root: Path) -> list[VersionSource]:
         VersionSource(
             "c/include/adxl355/adxl355_version.h components", header_core, "core"
         ),
-        VersionSource("spec/test_vectors.json", str(vectors["version"])),
+        VersionSource(VECTOR_SPEC_PATH, str(vectors["version"])),
         VersionSource("CHANGELOG.md Unreleased", changelog_version),
     ]
 

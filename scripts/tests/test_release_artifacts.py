@@ -54,10 +54,9 @@ class ReleaseArtifactTests(unittest.TestCase):
         report = inspect_python(self.make_python_artifacts(), "0.1.0a2", smoke=False)
         self.assertEqual(report["package"], "python")
 
+        invalid_artifacts = self.make_python_artifacts(include_tests=True)
         with self.assertRaisesRegex(ArtifactError, "tests or examples"):
-            inspect_python(
-                self.make_python_artifacts(include_tests=True), "0.1.0a2", smoke=False
-            )
+            inspect_python(invalid_artifacts, "0.1.0a2", smoke=False)
 
     def make_rust_artifact(self, *, import_name: str = "adxl355") -> Path:
         directory = self.make_directory()
@@ -80,12 +79,9 @@ class ReleaseArtifactTests(unittest.TestCase):
         report = inspect_rust(self.make_rust_artifact(), "0.1.0-alpha.2", smoke=False)
         self.assertEqual(report["package"], "rust")
 
+        invalid_artifact = self.make_rust_artifact(import_name="adxl355_driver")
         with self.assertRaisesRegex(ArtifactError, "import name"):
-            inspect_rust(
-                self.make_rust_artifact(import_name="adxl355_driver"),
-                "0.1.0-alpha.2",
-                smoke=False,
-            )
+            inspect_rust(invalid_artifact, "0.1.0-alpha.2", smoke=False)
 
     def make_node_artifact(self, *, extra_file: str | None = None) -> Path:
         directory = self.make_directory()
@@ -109,12 +105,9 @@ class ReleaseArtifactTests(unittest.TestCase):
         report = inspect_node(self.make_node_artifact(), "0.1.0-alpha.2", smoke=False)
         self.assertEqual(report["package"], "node")
 
+        invalid_artifact = self.make_node_artifact(extra_file="package/src/device.ts")
         with self.assertRaisesRegex(ArtifactError, "unexpected file"):
-            inspect_node(
-                self.make_node_artifact(extra_file="package/src/device.ts"),
-                "0.1.0-alpha.2",
-                smoke=False,
-            )
+            inspect_node(invalid_artifact, "0.1.0-alpha.2", smoke=False)
 
     def test_archive_path_traversal_is_rejected(self) -> None:
         directory = self.make_node_artifact(extra_file="../escape.txt")
