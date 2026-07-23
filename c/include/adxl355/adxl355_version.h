@@ -9,7 +9,7 @@ extern "C" {
 #define ADXL355_VERSION_MINOR 1
 #define ADXL355_VERSION_PATCH 0
 
-#define ADXL355_VERSION_STRING "0.1.0"
+#define ADXL355_VERSION_STRING "0.1.0-alpha.2"
 
 #ifdef __cplusplus
 }

@@ -1,15 +1,20 @@
 [package]
-name = "adxl355"
-version = "0.1.0"
+name = "adxl355-driver"
+version = "0.1.0-alpha.2"
 edition = "2021"
 description = "ADXL355 accelerometer driver for embedded and desktop Rust"
 license = "MIT"
 repository = "https://github.com/oaslananka/adxl355"
 homepage = "https://github.com/oaslananka/adxl355"
-documentation = "https://docs.rs/adxl355"
+documentation = "https://docs.rs/adxl355-driver"
 readme = "README.md"
 keywords = ["adxl355", "accelerometer", "embedded-hal", "sensor"]
 categories = ["embedded", "hardware-support", "no-std"]
+include = ["src/**", "Cargo.toml", "Cargo.lock", "README.md", "LICENSE"]
+
+[lib]
+name = "adxl355"
+path = "src/lib.rs"
 
 [dependencies]
 embedded-hal = { version = "1.0", optional = true }

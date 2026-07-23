@@ -27,7 +27,7 @@ outside that core is intentionally language-specific.
 | Go | Yes | No | No public method | User `Transport` | User `Transport` | No | Module/build checks | Framework available; no recorded pass |
 
 “User transport” means the driver exposes a bus contract but does not ship a
-Linux device adapter for that language. The repository contains buildable package metadata and verification artifacts, but packages are not published by this repository to PyPI, crates.io, npm, or a Go proxy.
+Linux device adapter for that language. The repository contains buildable package metadata and verification artifacts, but packages are not published by this repository to PyPI, crates.io, npm, or a Go proxy. Intended distribution names are `adxl355` (PyPI), `adxl355-driver` (crates.io, imported as `adxl355`), and `@oaslananka/adxl355` (npm).
 
 ## Implemented and verified
 
@@ -135,6 +135,7 @@ go test ./...
 - [Testing and CI](docs/testing.md)
 - [Physical hardware validation](docs/hardware-testing.md)
 - [Calibration procedure](docs/calibration.md)
+- [Versioning and package names](docs/versioning.md)
 - [Release verification and publishing](docs/publishing.md)
 
 ## License

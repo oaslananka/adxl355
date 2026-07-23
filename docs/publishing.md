@@ -44,9 +44,6 @@ Requires:
 ```bash
 cd node
 npm run build
-npm publish
-
-# For scoped package:
 npm publish --access public
 ```
 
@@ -54,7 +51,7 @@ Requires:
 - npm account
 - `npm login` completed
 
-## Rust (crates.io)
+## Rust (crates.io: `adxl355-driver`)
 
 ```bash
 cd rust
@@ -70,10 +67,39 @@ Requires:
 ```bash
 cd go
 # Tag the release
-git tag go/v0.1.0
-git push origin go/v0.1.0
+git tag go/v0.1.0-alpha.2
+git push origin go/v0.1.0-alpha.2
 # The Go module proxy will pick up the new version automatically
 ```
+
+## Registry names and versioning
+
+The canonical version and package-name decisions are documented in
+[`versioning.md`](versioning.md). The current intended names are `adxl355` on
+PyPI, `@oaslananka/adxl355` on npm, and `adxl355-driver` on crates.io. Registry
+availability must be re-checked immediately before publication.
+
+## Rollback and deprecation
+
+Published artifacts are immutable. Do not delete or overwrite a released
+version to hide a defect.
+
+- **PyPI:** publish a corrected higher version. When appropriate, yank the
+  affected release with a reason so existing locked installs remain resolvable.
+- **npm:** publish a corrected higher version. Use `npm deprecate` with an
+  actionable message for the affected version range; do not use `npm unpublish`
+  as a routine rollback mechanism.
+- **crates.io:** publish a corrected higher version and yank the affected crate
+  version when necessary. Yanking prevents new resolution without breaking
+  existing lockfiles.
+- **Go module:** never move or recreate a public tag. Publish a higher
+  `go/v...` tag. If a module version must be retracted, add a `retract` directive
+  in a newer `go.mod` release with a reason.
+- **GitHub artifacts/tags:** preserve checksums and the original tag. Mark the
+  release as affected and point users to the replacement version.
+
+Every rollback or deprecation must be recorded in the changelog and security
+advisory process when the defect has security impact.
 
 ## Versioning
 

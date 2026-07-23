@@ -55,6 +55,9 @@ class CiQualityGateTests(unittest.TestCase):
         self.assertIn("mypy src examples", commands)
         self.assertIn("python -m build --no-isolation", commands)
         self.assertIn("dist/*.whl", commands)
+        self.assertIn("scripts.versioning import load_version", commands)
+        self.assertIn("EXPECTED_VERSION", commands)
+        self.assertNotIn("__version__ == '0.1.0'", commands)
         self.assertIn("examples/basic_read.py", commands)
         self.assertIn("examples/calibrate.py", commands)
 

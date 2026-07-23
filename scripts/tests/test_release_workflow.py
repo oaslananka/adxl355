@@ -78,6 +78,35 @@ class ReleaseWorkflowTests(unittest.TestCase):
                 )
             )
 
+    def test_preflight_exports_ecosystem_versions_and_package_names(self) -> None:
+        outputs = self.load_release()["jobs"]["preflight"]["outputs"]
+        self.assertEqual(
+            set(outputs),
+            {
+                "tag",
+                "version",
+                "python_version",
+                "core_version",
+                "go_tag",
+                "rust_crate_name",
+                "node_package_name",
+                "release_sha",
+                "short_sha",
+            },
+        )
+
+    def test_every_package_artifact_is_inspected_and_smoke_tested(self) -> None:
+        jobs = self.load_release()["jobs"]
+        for job_name in PACKAGE_JOBS:
+            commands = "\n".join(str(step.get("run", "")) for step in jobs[job_name]["steps"])
+            self.assertIn("scripts/release_artifacts.py", commands, job_name)
+            self.assertNotIn("--no-smoke", commands, job_name)
+        rust_commands = "\n".join(
+            str(step.get("run", "")) for step in jobs["rust-package"]["steps"]
+        )
+        self.assertIn("adxl355-driver-${VERSION}.crate", rust_commands)
+
+
 
 if __name__ == "__main__":
     unittest.main()
