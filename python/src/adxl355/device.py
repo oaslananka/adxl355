@@ -1,5 +1,7 @@
 """Main ADXL355 device driver."""
 
+from __future__ import annotations
+
 from adxl355.constants import (
     DEVID_AD,
     DEVID_MST,
@@ -19,6 +21,7 @@ from adxl355.errors import (
     BusError,
     DataNotReadyError,
     DeviceNotFoundError,
+    DeviceStateError,
     InvalidConfigurationError,
 )
 from adxl355.registers import (
@@ -60,7 +63,19 @@ class ADXL355:
 
     def _check_init(self) -> None:
         if not self._initialized:
-            raise DeviceNotFoundError("Device not initialized. Call probe() first.")
+            raise DeviceStateError("Device has not been probed. Call probe() first.")
+
+    def _enter_configuration_standby(self) -> int | None:
+        """Enter standby for a configuration write and return state to restore."""
+        original_power_ctl = self._read_reg(Register.POWER_CTL)
+        if original_power_ctl & 0x01:
+            return None
+        self._write_reg(Register.POWER_CTL, original_power_ctl | 0x01)
+        return original_power_ctl
+
+    def _restore_configuration_mode(self, original_power_ctl: int | None) -> None:
+        if original_power_ctl is not None:
+            self._write_reg(Register.POWER_CTL, original_power_ctl)
 
     # ------------------------------------------------------------------
     # Core API
@@ -74,6 +89,7 @@ class ADXL355:
         After successful probe, the cached range matches the hardware RANGE register
         and the device is left in standby mode.
         """
+        self._initialized = False
         id_ad = self._read_reg(Register.DEVID_AD)
         id_mst = self._read_reg(Register.DEVID_MST)
         part_id = self._read_reg(Register.PARTID)
@@ -92,33 +108,38 @@ class ADXL355:
                 f"Invalid RANGE register encoding: 0x{range_bits:02X}"
             ) from exc
 
-        # Enter standby mode after probe. Commit state only after all bus operations succeed.
-        self._write_reg(Register.POWER_CTL, PowerMode.STANDBY)
+        power_ctl = self._read_reg(Register.POWER_CTL)
+        if not power_ctl & 0x01:
+            self._write_reg(Register.POWER_CTL, power_ctl | 0x01)
         self._range = detected_range
         self._initialized = True
         return True
 
     def reset(self) -> None:
-        """Perform a software reset."""
+        """Perform a software reset after a successful probe."""
+        self._check_init()
         self._write_reg(Register.RESET, RESET_CODE)
         self._transport.delay_ms(10)
         self._range = Range.G2
 
     def set_range(self, range_val: Range) -> None:
-        """Set the acceleration range.
-
-        Datasheet Rev.D, Table 42: range in bits 1:0 (0x01=2g, 0x02=4g, 0x03=8g).
-        Unrelated bits (INT_POL, I2C_HS) are preserved.
-        """
+        """Set range in standby, restoring measurement mode when necessary."""
+        self._check_init()
         if range_val not in (Range.G2, Range.G4, Range.G8):
             raise InvalidConfigurationError(f"Invalid range: {range_val}")
-        reg = self._read_reg(Register.RANGE)
-        reg = (reg & ~RANGE_SEL_MASK) | (int(range_val) & RANGE_SEL_MASK)
-        self._write_reg(Register.RANGE, reg)
-        self._range = range_val
+
+        original_power_ctl = self._enter_configuration_standby()
+        try:
+            reg = self._read_reg(Register.RANGE)
+            reg = (reg & ~RANGE_SEL_MASK) | (int(range_val) & RANGE_SEL_MASK)
+            self._write_reg(Register.RANGE, reg)
+            self._range = range_val
+        finally:
+            self._restore_configuration_mode(original_power_ctl)
 
     def get_range(self) -> Range:
         """Read the currently configured range from hardware."""
+        self._check_init()
         reg = self._read_reg(Register.RANGE)
         range_bits = reg & RANGE_SEL_MASK
         try:
@@ -129,10 +150,10 @@ class ADXL355:
             ) from exc
 
     def set_power_mode(self, mode: PowerMode) -> None:
-        """Set power mode (standby or measurement).
-
-        Datasheet Rev.D, Table 43: bit 0 = 1 => standby, bit 0 = 0 => measurement.
-        """
+        """Set power mode after a successful probe."""
+        self._check_init()
+        if mode not in (PowerMode.STANDBY, PowerMode.MEASUREMENT):
+            raise InvalidConfigurationError(f"Invalid power mode: {mode}")
         reg = self._read_reg(Register.POWER_CTL)
         if mode == PowerMode.STANDBY:
             reg |= 1
@@ -141,15 +162,20 @@ class ADXL355:
         self._write_reg(Register.POWER_CTL, reg)
 
     def set_odr(self, odr: ODR) -> None:
-        """Set output data rate.
-
-        Datasheet Rev.D, Table 38: ODR_LPF in bits 3:0, HPF_CORNER in bits 6:4.
-        """
+        """Set output data rate in standby and restore the prior mode."""
+        self._check_init()
         if odr not in ODR.__members__.values():
             raise InvalidConfigurationError(f"Invalid ODR: {odr}")
-        reg = self._read_reg(Register.FILTER)
-        reg = (reg & FILTER_HPF_MASK) | ((int(odr) << FILTER_ODR_SHIFT) & FILTER_ODR_MASK)
-        self._write_reg(Register.FILTER, reg)
+
+        original_power_ctl = self._enter_configuration_standby()
+        try:
+            reg = self._read_reg(Register.FILTER)
+            reg = (reg & FILTER_HPF_MASK) | (
+                (int(odr) << FILTER_ODR_SHIFT) & FILTER_ODR_MASK
+            )
+            self._write_reg(Register.FILTER, reg)
+        finally:
+            self._restore_configuration_mode(original_power_ctl)
 
     # ------------------------------------------------------------------
     # Data readout
@@ -157,6 +183,7 @@ class ADXL355:
 
     def read_raw(self) -> RawXYZ:
         """Read raw 20-bit acceleration data for all three axes."""
+        self._check_init()
         data = self._transport.read_register(Register.XDATA3, 9)
         x = _decode_raw20(data[0], data[1], data[2])
         y = _decode_raw20(data[3], data[4], data[5])
@@ -189,6 +216,7 @@ class ADXL355:
         then re-read TEMP2 and retry if its data nibble changed. Reserved
         TEMP2 bits 7:4 are ignored.
         """
+        self._check_init()
         for _ in range(TEMP_READ_ATTEMPTS):
             data = self._transport.read_register(Register.TEMP2, 2)
             if len(data) != 2:
@@ -217,10 +245,12 @@ class ADXL355:
 
     def read_status(self) -> int:
         """Read the status register."""
+        self._check_init()
         return self._read_reg(Register.STATUS)
 
     def read_fifo_entries(self) -> int:
         """Read the number of valid samples in the FIFO."""
+        self._check_init()
         return self._read_reg(Register.FIFO_ENTRIES)
 
 

@@ -52,12 +52,41 @@ impl<T: Transport> Adxl355<T> {
         self.transport.write_register(reg, &[val])
     }
 
+    fn ensure_initialized(&self) -> Result<(), Error> {
+        if self.initialized {
+            Ok(())
+        } else {
+            Err(Error::InvalidState)
+        }
+    }
+
+    fn enter_configuration_standby(&mut self) -> Result<Option<u8>, Error> {
+        let original = self.read_u8(registers::reg::POWER_CTL)?;
+        if original & 0x01 != 0 {
+            return Ok(None);
+        }
+        self.write_u8(registers::reg::POWER_CTL, original | 0x01)?;
+        Ok(Some(original))
+    }
+
+    fn finish_configuration(
+        &mut self,
+        original_power_ctl: Option<u8>,
+        operation: Result<(), Error>,
+    ) -> Result<(), Error> {
+        if let Some(original) = original_power_ctl {
+            self.write_u8(registers::reg::POWER_CTL, original)?;
+        }
+        operation
+    }
+
     // ------------------------------------------------------------------
     // Core API
     // ------------------------------------------------------------------
 
     /// Probe for the ADXL355 and synchronize the cached hardware range.
     pub fn probe(&mut self) -> Result<bool, Error> {
+        self.initialized = false;
         let id_ad = self.read_u8(registers::reg::DEVID_AD)?;
         let id_mst = self.read_u8(registers::reg::DEVID_MST)?;
         let part_id = self.read_u8(registers::reg::PARTID)?;
@@ -72,8 +101,10 @@ impl<T: Transport> Adxl355<T> {
         let range_value = self.read_u8(registers::reg::RANGE)?;
         let detected_range = Range::from_register(range_value).ok_or(Error::InvalidArgument)?;
 
-        // Enter standby mode after probe. Commit state only after all bus operations succeed.
-        self.write_u8(registers::reg::POWER_CTL, PowerMode::Standby as u8)?;
+        let power_ctl = self.read_u8(registers::reg::POWER_CTL)?;
+        if power_ctl & 0x01 == 0 {
+            self.write_u8(registers::reg::POWER_CTL, power_ctl | 0x01)?;
+        }
         self.range = detected_range;
         self.initialized = true;
         Ok(true)
@@ -81,6 +112,7 @@ impl<T: Transport> Adxl355<T> {
 
     /// Perform a software reset.
     pub fn reset(&mut self) -> Result<(), Error> {
+        self.ensure_initialized()?;
         self.write_u8(registers::reg::RESET, registers::RESET_CODE)?;
         self.transport.delay_ms(10);
         self.range = Range::G2;
@@ -89,22 +121,29 @@ impl<T: Transport> Adxl355<T> {
 
     /// Set the acceleration range.
     pub fn set_range(&mut self, range: Range) -> Result<(), Error> {
-        let mut reg = self.read_u8(registers::reg::RANGE)?;
-        reg = (reg & !registers::range_reg::SEL_MASK)
-            | (range.to_register() & registers::range_reg::SEL_MASK);
-        self.write_u8(registers::reg::RANGE, reg)?;
-        self.range = range;
-        Ok(())
+        self.ensure_initialized()?;
+        let original_power_ctl = self.enter_configuration_standby()?;
+        let operation = (|| {
+            let mut reg = self.read_u8(registers::reg::RANGE)?;
+            reg = (reg & !registers::range_reg::SEL_MASK)
+                | (range.to_register() & registers::range_reg::SEL_MASK);
+            self.write_u8(registers::reg::RANGE, reg)?;
+            self.range = range;
+            Ok(())
+        })();
+        self.finish_configuration(original_power_ctl, operation)
     }
 
     /// Read the currently configured range.
     pub fn get_range(&mut self) -> Result<Range, Error> {
+        self.ensure_initialized()?;
         let val = self.read_u8(registers::reg::RANGE)?;
         Range::from_register(val).ok_or(Error::InvalidArgument)
     }
 
     /// Set the power mode.
     pub fn set_power_mode(&mut self, mode: PowerMode) -> Result<(), Error> {
+        self.ensure_initialized()?;
         let mut reg = self.read_u8(registers::reg::POWER_CTL)?;
         /* Datasheet Rev.D, Table 43: bit 0 = 1 => standby, bit 0 = 0 => measurement */
         if mode == PowerMode::Standby {
@@ -121,6 +160,7 @@ impl<T: Transport> Adxl355<T> {
 
     /// Read raw 20-bit acceleration for all three axes.
     pub fn read_raw(&mut self) -> Result<RawXyz, Error> {
+        self.ensure_initialized()?;
         let data = self.transport.read_register(registers::reg::XDATA3, 9)?;
         if data.len() < 9 {
             return Err(Error::Bus);
@@ -158,6 +198,7 @@ impl<T: Transport> Adxl355<T> {
     /// TEMP2/TEMP1 are not double-buffered. Both bytes are read together,
     /// then TEMP2 is re-read; the operation retries if its data nibble changed.
     pub fn read_temperature_raw(&mut self) -> Result<i16, Error> {
+        self.ensure_initialized()?;
         for _ in 0..registers::temperature::READ_ATTEMPTS {
             let data = self.transport.read_register(registers::reg::TEMP2, 2)?;
             if data.len() != 2 {
@@ -189,6 +230,7 @@ impl<T: Transport> Adxl355<T> {
 
     /// Read the status register.
     pub fn read_status(&mut self) -> Result<u8, Error> {
+        self.ensure_initialized()?;
         self.read_u8(registers::reg::STATUS)
     }
 }

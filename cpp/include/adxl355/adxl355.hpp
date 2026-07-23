@@ -37,6 +37,12 @@ public:
         : Error(msg) {}
 };
 
+class InvalidStateError : public Error {
+public:
+    explicit InvalidStateError(const std::string &msg = "Invalid device state")
+        : Error(msg) {}
+};
+
 // ---------------------------------------------------------------------------
 // Enums
 // ---------------------------------------------------------------------------
@@ -256,6 +262,8 @@ private:
                     throw DeviceNotFoundError(std::string(context) + ": bad device");
                 case ADXL355_ERR_INVALID_ARG:
                     throw InvalidArgumentError(std::string(context) + ": invalid argument");
+                case ADXL355_ERR_STATE:
+                    throw InvalidStateError(std::string(context) + ": device has not been probed");
                 default:
                     throw Error(std::string(context) + ": " +
                                 adxl355_status_string(status));

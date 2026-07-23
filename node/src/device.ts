@@ -24,6 +24,7 @@ import {
   BusError,
   DataNotReadyError,
   DeviceNotFoundError,
+  DeviceStateError,
   InvalidConfigurationError,
 } from "./errors.js";
 
@@ -54,12 +55,34 @@ export class ADXL355 {
     await this.transport.writeRegister(reg, new Uint8Array([value]));
   }
 
+  private ensureInitialized(): void {
+    if (!this.initialized) {
+      throw new DeviceStateError("Device has not been probed. Call probe() first.");
+    }
+  }
+
+  private async enterConfigurationStandby(): Promise<number | undefined> {
+    const originalPowerCtl = await this.readU8(Reg.POWER_CTL);
+    if ((originalPowerCtl & 0x01) !== 0) {
+      return undefined;
+    }
+    await this.writeU8(Reg.POWER_CTL, originalPowerCtl | 0x01);
+    return originalPowerCtl;
+  }
+
+  private async restoreConfigurationMode(originalPowerCtl: number | undefined): Promise<void> {
+    if (originalPowerCtl !== undefined) {
+      await this.writeU8(Reg.POWER_CTL, originalPowerCtl);
+    }
+  }
+
   // ------------------------------------------------------------------
   // Core API
   // ------------------------------------------------------------------
 
   /** Probe for the ADXL355 and synchronize the cached hardware range. */
   async probe(): Promise<boolean> {
+    this.initialized = false;
     const idAd = await this.readU8(Reg.DEVID_AD);
     const idMst = await this.readU8(Reg.DEVID_MST);
     const partId = await this.readU8(Reg.PARTID);
@@ -79,8 +102,10 @@ export class ADXL355 {
     }
     const detectedRange = rangeBits as Range;
 
-    // Enter standby mode after probe. Commit state only after all bus operations succeed.
-    await this.writeU8(Reg.POWER_CTL, PowerMode.Standby);
+    const powerCtl = await this.readU8(Reg.POWER_CTL);
+    if ((powerCtl & 0x01) === 0) {
+      await this.writeU8(Reg.POWER_CTL, powerCtl | 0x01);
+    }
     this.range = detectedRange;
     this.initialized = true;
     return true;
@@ -88,6 +113,7 @@ export class ADXL355 {
 
   /** Perform a software reset. */
   async reset(): Promise<void> {
+    this.ensureInitialized();
     await this.writeU8(Reg.RESET, RESET_CODE);
     if (this.transport.delayMs) {
       await this.transport.delayMs(10);
@@ -97,16 +123,24 @@ export class ADXL355 {
 
   /** Set the acceleration range, preserving unrelated bits. */
   async setRange(range: Range): Promise<void> {
+    this.ensureInitialized();
     if (![Range.G2, Range.G4, Range.G8].includes(range)) {
       throw new InvalidConfigurationError(`Invalid range: ${range}`);
     }
-    const reg = (await this.readU8(Reg.RANGE)) & ~RANGE_SEL_MASK;
-    await this.writeU8(Reg.RANGE, reg | (range & RANGE_SEL_MASK));
-    this.range = range;
+
+    const originalPowerCtl = await this.enterConfigurationStandby();
+    try {
+      const reg = (await this.readU8(Reg.RANGE)) & ~RANGE_SEL_MASK;
+      await this.writeU8(Reg.RANGE, reg | (range & RANGE_SEL_MASK));
+      this.range = range;
+    } finally {
+      await this.restoreConfigurationMode(originalPowerCtl);
+    }
   }
 
   /** Read the currently configured range. */
   async getRange(): Promise<Range> {
+    this.ensureInitialized();
     const rangeBits = (await this.readU8(Reg.RANGE)) & RANGE_SEL_MASK;
     if (![Range.G2, Range.G4, Range.G8].includes(rangeBits as Range)) {
       throw new InvalidConfigurationError(
@@ -118,6 +152,10 @@ export class ADXL355 {
 
   /** Set power mode. Datasheet Rev.D, Table 43: bit 0 = 1 => standby. */
   async setPowerMode(mode: PowerMode): Promise<void> {
+    this.ensureInitialized();
+    if (![PowerMode.Standby, PowerMode.Measurement].includes(mode)) {
+      throw new InvalidConfigurationError(`Invalid power mode: ${mode}`);
+    }
     let reg = await this.readU8(Reg.POWER_CTL);
     if (mode === PowerMode.Standby) {
       reg |= 1;
@@ -133,6 +171,7 @@ export class ADXL355 {
 
   /** Read raw 20-bit acceleration data for all three axes. */
   async readRaw(): Promise<RawXYZ> {
+    this.ensureInitialized();
     const data = await this.transport.readRegister(Reg.XDATA3, 9);
     return {
       x: decodeRaw20(data[0], data[1], data[2]),
@@ -164,6 +203,7 @@ export class ADXL355 {
 
   /** Read a coherent 12-bit unsigned temperature sample. */
   async readTemperatureRaw(): Promise<number> {
+    this.ensureInitialized();
     for (let attempt = 0; attempt < TEMP_READ_ATTEMPTS; attempt++) {
       const data = await this.transport.readRegister(Reg.TEMP2, 2);
       if (data.length !== 2) {
@@ -193,6 +233,7 @@ export class ADXL355 {
 
   /** Read status register. */
   async readStatus(): Promise<number> {
+    this.ensureInitialized();
     return this.readU8(Reg.STATUS);
   }
 }

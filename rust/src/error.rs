@@ -11,6 +11,8 @@ pub enum Error {
     BadDevice,
     /// Invalid argument.
     InvalidArgument,
+    /// Operation requires a successful probe or a different device state.
+    InvalidState,
     /// Data not ready.
     NotReady,
     /// Operation timed out.
@@ -25,6 +27,7 @@ impl fmt::Display for Error {
             Error::Bus => write!(f, "bus communication error"),
             Error::BadDevice => write!(f, "bad device (ID mismatch)"),
             Error::InvalidArgument => write!(f, "invalid argument"),
+            Error::InvalidState => write!(f, "invalid device state (call probe first)"),
             Error::NotReady => write!(f, "data not ready"),
             Error::Timeout => write!(f, "timeout"),
             Error::Unsupported => write!(f, "unsupported operation"),

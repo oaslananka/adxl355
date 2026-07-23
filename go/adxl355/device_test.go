@@ -32,6 +32,13 @@ func (m *mockTransport) WriteRegister(reg byte, data []byte) error {
 
 func (m *mockTransport) DelayMs(ms uint32) {}
 
+func mustProbe(t *testing.T, device *Device) {
+	t.Helper()
+	if _, err := device.Probe(); err != nil {
+		t.Fatalf("Probe failed: %v", err)
+	}
+}
+
 func (m *mockTransport) setRawXYZ(x, y, z int32) {
 	encode := func(v int32, base byte) {
 		uv := uint32(v) & 0xFFFFF
@@ -216,7 +223,9 @@ func TestTemperatureReservedNibbleIgnored(t *testing.T) {
 	mock := newMockTransport()
 	mock.regs[RegTEMP2] = 0xF7
 	mock.regs[RegTEMP1] = 0x5D
-	raw, err := New(mock).ReadTemperatureRaw()
+	device := New(mock)
+	mustProbe(t, device)
+	raw, err := device.ReadTemperatureRaw()
 	if err != nil || raw != 1885 {
 		t.Fatalf("ReadTemperatureRaw = (%d, %v), want (1885, nil)", raw, err)
 	}
@@ -224,7 +233,9 @@ func TestTemperatureReservedNibbleIgnored(t *testing.T) {
 
 func TestTemperatureShortReadReturnsBusError(t *testing.T) {
 	transport := &temperatureSequenceTransport{mockTransport: newMockTransport(), responses: [][]byte{{0x07}}}
-	_, err := New(transport).ReadTemperatureRaw()
+	device := New(transport)
+	mustProbe(t, device)
+	_, err := device.ReadTemperatureRaw()
 	if err != ErrBus {
 		t.Fatalf("short read error = %v, want ErrBus", err)
 	}
@@ -235,7 +246,9 @@ func TestTemperatureRolloverRetry(t *testing.T) {
 		mockTransport: newMockTransport(),
 		responses:     [][]byte{{0x07, 0xFF}, {0x08}, {0x08, 0x00}, {0x08}},
 	}
-	raw, err := New(transport).ReadTemperatureRaw()
+	device := New(transport)
+	mustProbe(t, device)
+	raw, err := device.ReadTemperatureRaw()
 	if err != nil || raw != 2048 {
 		t.Fatalf("rollover read = (%d, %v), want (2048, nil)", raw, err)
 	}
@@ -246,7 +259,9 @@ func TestTemperatureUnstableReturnsNotReady(t *testing.T) {
 		mockTransport: newMockTransport(),
 		responses:     [][]byte{{0x07, 0xFF}, {0x08}, {0x08, 0xFF}, {0x09}, {0x09, 0xFF}, {0x0A}},
 	}
-	_, err := New(transport).ReadTemperatureRaw()
+	device := New(transport)
+	mustProbe(t, device)
+	_, err := device.ReadTemperatureRaw()
 	if err != ErrNotReady {
 		t.Fatalf("unstable read error = %v, want ErrNotReady", err)
 	}
@@ -255,6 +270,7 @@ func TestTemperatureUnstableReturnsNotReady(t *testing.T) {
 func TestTemperatureBoundaries(t *testing.T) {
 	mock := newMockTransport()
 	dev := New(mock)
+	mustProbe(t, dev)
 	raw, err := dev.ReadTemperatureRaw()
 	if err != nil || raw != 0 {
 		t.Fatalf("minimum raw = (%d, %v), want (0, nil)", raw, err)
@@ -277,6 +293,7 @@ func TestTemperatureRaw(t *testing.T) {
 	mock.regs[RegTEMP2] = 0x07
 	mock.regs[RegTEMP1] = 0x5D
 	dev := New(mock)
+	mustProbe(t, dev)
 	raw, err := dev.ReadTemperatureRaw()
 	if err != nil {
 		t.Fatalf("ReadTemperatureRaw failed: %v", err)
@@ -291,6 +308,7 @@ func TestTemperatureCelsiusNominal(t *testing.T) {
 	mock.regs[RegTEMP2] = 0x07
 	mock.regs[RegTEMP1] = 0x5D
 	dev := New(mock)
+	mustProbe(t, dev)
 	temp, err := dev.ReadTemperatureC()
 	if err != nil {
 		t.Fatalf("ReadTemperatureC failed: %v", err)
@@ -305,6 +323,7 @@ func TestTemperatureCelsius50C(t *testing.T) {
 	mock.regs[RegTEMP2] = 0x06
 	mock.regs[RegTEMP1] = 0x7B
 	dev := New(mock)
+	mustProbe(t, dev)
 	temp, err := dev.ReadTemperatureC()
 	if err != nil {
 		t.Fatalf("ReadTemperatureC failed: %v", err)
@@ -318,6 +337,7 @@ func TestReadStatusAllClear(t *testing.T) {
 	mock := newMockTransport()
 	mock.regs[RegSTATUS] = 0x00
 	dev := New(mock)
+	mustProbe(t, dev)
 	status, err := dev.ReadStatus()
 	if err != nil {
 		t.Fatalf("ReadStatus failed: %v", err)
@@ -331,6 +351,7 @@ func TestReadStatusDataReady(t *testing.T) {
 	mock := newMockTransport()
 	mock.regs[RegSTATUS] = 0x01
 	dev := New(mock)
+	mustProbe(t, dev)
 	status, err := dev.ReadStatus()
 	if err != nil {
 		t.Fatalf("ReadStatus failed: %v", err)
@@ -344,6 +365,7 @@ func TestReadStatusFifoFull(t *testing.T) {
 	mock := newMockTransport()
 	mock.regs[RegSTATUS] = 0x02
 	dev := New(mock)
+	mustProbe(t, dev)
 	status, err := dev.ReadStatus()
 	if err != nil {
 		t.Fatalf("ReadStatus failed: %v", err)
@@ -367,6 +389,7 @@ func TestFilterDefaultODR(t *testing.T) {
 func TestReset(t *testing.T) {
 	mock := newMockTransport()
 	dev := New(mock)
+	mustProbe(t, dev)
 	if err := dev.Reset(); err != nil {
 		t.Fatalf("Reset failed: %v", err)
 	}

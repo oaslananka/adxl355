@@ -7,6 +7,7 @@ export {
   ADXL355Error,
   BusError,
   DeviceNotFoundError,
+  DeviceStateError,
   InvalidConfigurationError,
   DataNotReadyError,
 } from "./errors.js";

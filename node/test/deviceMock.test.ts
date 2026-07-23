@@ -2,12 +2,20 @@ import { describe, it, expect } from "vitest";
 import { ADXL355 } from "../src/device.js";
 import { Range, PowerMode, Reg, RESET_CODE } from "../src/registers.js";
 import { Transport } from "../src/transport.js";
-import { BusError, DataNotReadyError, InvalidConfigurationError } from "../src/errors.js";
+import {
+  BusError,
+  DataNotReadyError,
+  DeviceStateError,
+  InvalidConfigurationError,
+} from "../src/errors.js";
 
 class MockTransport implements Transport {
   private regs: Uint8Array;
   callCount = 0;
   calls: Array<{ isWrite: boolean; reg: number }> = [];
+  failWriteReg: number | undefined;
+  failWriteOccurrence = 0;
+  private matchingWrites = 0;
 
   constructor() {
     this.regs = new Uint8Array(128);
@@ -37,6 +45,12 @@ class MockTransport implements Transport {
   }
 
   async writeRegister(reg: number, data: Uint8Array): Promise<void> {
+    if (this.failWriteReg === reg) {
+      this.matchingWrites++;
+      if (this.failWriteOccurrence === 0 || this.matchingWrites === this.failWriteOccurrence) {
+        throw new BusError(`injected write failure at register 0x${reg.toString(16)}`);
+      }
+    }
     this.calls.push({ isWrite: true, reg });
     this.callCount++;
     this.regs.set(data, reg);
@@ -47,6 +61,19 @@ class MockTransport implements Transport {
 
   async delayMs(_ms: number): Promise<void> {
     // no-op
+  }
+
+  setRegister(reg: number, value: number): void {
+    this.regs[reg] = value;
+  }
+
+  register(reg: number): number {
+    return this.regs[reg];
+  }
+
+  clearCalls(): void {
+    this.calls = [];
+    this.callCount = 0;
   }
 }
 
@@ -68,6 +95,77 @@ class TemperatureSequenceTransport extends MockTransport {
 
 
 describe("ADXL355", () => {
+  it("should reject pre-probe operations without bus access", async () => {
+    const transport = new MockTransport();
+    const dev = new ADXL355(transport);
+
+    await expect(dev.setRange(Range.G4)).rejects.toBeInstanceOf(DeviceStateError);
+    await expect(dev.readStatus()).rejects.toBeInstanceOf(DeviceStateError);
+    await expect(dev.reset()).rejects.toBeInstanceOf(DeviceStateError);
+    expect(transport.calls).toEqual([]);
+  });
+
+  it("should restore measurement mode after range configuration", async () => {
+    const transport = new MockTransport();
+    const dev = new ADXL355(transport);
+    await dev.probe();
+    transport.setRegister(Reg.POWER_CTL, PowerMode.Measurement);
+    transport.clearCalls();
+
+    await dev.setRange(Range.G4);
+
+    expect(transport.register(Reg.POWER_CTL)).toBe(PowerMode.Measurement);
+    expect(transport.register(Reg.RANGE)).toBe(Range.G4);
+    expect((dev as unknown as { range: Range }).range).toBe(Range.G4);
+    expect(transport.calls.filter((call) => call.isWrite).map((call) => call.reg)).toEqual([
+      Reg.POWER_CTL,
+      Reg.RANGE,
+      Reg.POWER_CTL,
+    ]);
+  });
+
+  it("should avoid power writes when already in standby", async () => {
+    const transport = new MockTransport();
+    const dev = new ADXL355(transport);
+    await dev.probe();
+    transport.clearCalls();
+
+    await dev.setRange(Range.G8);
+
+    expect(transport.calls.filter((call) => call.isWrite).map((call) => call.reg)).toEqual([
+      Reg.RANGE,
+    ]);
+  });
+
+  it("should restore measurement and preserve cache after target failure", async () => {
+    const transport = new MockTransport();
+    const dev = new ADXL355(transport);
+    await dev.probe();
+    transport.setRegister(Reg.POWER_CTL, PowerMode.Measurement);
+    transport.failWriteReg = Reg.RANGE;
+
+    await expect(dev.setRange(Range.G4)).rejects.toBeInstanceOf(BusError);
+
+    expect(transport.register(Reg.POWER_CTL)).toBe(PowerMode.Measurement);
+    expect(transport.register(Reg.RANGE)).toBe(Range.G2);
+    expect((dev as unknown as { range: Range }).range).toBe(Range.G2);
+  });
+
+  it("should preserve successful range cache when restore fails", async () => {
+    const transport = new MockTransport();
+    const dev = new ADXL355(transport);
+    await dev.probe();
+    transport.setRegister(Reg.POWER_CTL, PowerMode.Measurement);
+    transport.failWriteReg = Reg.POWER_CTL;
+    transport.failWriteOccurrence = 2;
+
+    await expect(dev.setRange(Range.G4)).rejects.toBeInstanceOf(BusError);
+
+    expect(transport.register(Reg.POWER_CTL)).toBe(PowerMode.Standby);
+    expect(transport.register(Reg.RANGE)).toBe(Range.G4);
+    expect((dev as unknown as { range: Range }).range).toBe(Range.G4);
+  });
+
   it("should default cached range to 2g", () => {
     const dev = new ADXL355(new MockTransport());
     expect((dev as unknown as { range: Range }).range).toBe(Range.G2);
@@ -164,12 +262,14 @@ describe("ADXL355", () => {
     transport["regs"][Reg.TEMP2] = 0xf7;
     transport["regs"][Reg.TEMP1] = 0x5d;
     const dev = new ADXL355(transport);
+    await dev.probe();
     await expect(dev.readTemperatureRaw()).resolves.toBe(1885);
     await expect(dev.readTemperatureC()).resolves.toBeCloseTo(25.0, 2);
   });
 
   it("should reject short temperature reads", async () => {
     const dev = new ADXL355(new TemperatureSequenceTransport([[0x07]]));
+    await dev.probe();
     await expect(dev.readTemperatureRaw()).rejects.toBeInstanceOf(BusError);
   });
 
@@ -177,6 +277,7 @@ describe("ADXL355", () => {
     const dev = new ADXL355(
       new TemperatureSequenceTransport([[0x07, 0xff], [0x08], [0x08, 0x00], [0x08]]),
     );
+    await dev.probe();
     await expect(dev.readTemperatureRaw()).resolves.toBe(2048);
   });
 
@@ -188,12 +289,14 @@ describe("ADXL355", () => {
         [0x09, 0xff], [0x0a],
       ]),
     );
+    await dev.probe();
     await expect(dev.readTemperatureRaw()).rejects.toBeInstanceOf(DataNotReadyError);
   });
 
   it("should decode temperature boundary vectors", async () => {
     const transport = new MockTransport();
     const dev = new ADXL355(transport);
+    await dev.probe();
     await expect(dev.readTemperatureRaw()).resolves.toBe(0);
 
     transport["regs"][Reg.TEMP2] = 0x0f;
@@ -207,6 +310,7 @@ describe("ADXL355", () => {
     transport["regs"][Reg.TEMP2] = 0x07;
     transport["regs"][Reg.TEMP1] = 0x5d;
     const dev = new ADXL355(transport);
+    await dev.probe();
     const raw = await dev.readTemperatureRaw();
     expect(raw).toBe(1885);
   });
@@ -216,6 +320,7 @@ describe("ADXL355", () => {
     transport["regs"][Reg.TEMP2] = 0x07;
     transport["regs"][Reg.TEMP1] = 0x5d;
     const dev = new ADXL355(transport);
+    await dev.probe();
     const temp = await dev.readTemperatureC();
     expect(temp).toBeCloseTo(25.0, 1);
   });
@@ -225,6 +330,7 @@ describe("ADXL355", () => {
     transport["regs"][Reg.TEMP2] = 0x06;
     transport["regs"][Reg.TEMP1] = 0x7b;
     const dev = new ADXL355(transport);
+    await dev.probe();
     const temp = await dev.readTemperatureC();
     expect(temp).toBeCloseTo(50.0, 1);
   });
@@ -233,6 +339,7 @@ describe("ADXL355", () => {
     const transport = new MockTransport();
     transport["regs"][Reg.STATUS] = 0x00;
     const dev = new ADXL355(transport);
+    await dev.probe();
     const status = await dev.readStatus();
     expect(status).toBe(0);
   });
@@ -241,6 +348,7 @@ describe("ADXL355", () => {
     const transport = new MockTransport();
     transport["regs"][Reg.STATUS] = 0x01;
     const dev = new ADXL355(transport);
+    await dev.probe();
     const status = await dev.readStatus();
     expect(status).toBe(1);
   });
@@ -249,6 +357,7 @@ describe("ADXL355", () => {
     const transport = new MockTransport();
     transport["regs"][Reg.STATUS] = 0x02;
     const dev = new ADXL355(transport);
+    await dev.probe();
     const status = await dev.readStatus();
     expect(status).toBe(2);
   });
@@ -264,6 +373,8 @@ describe("ADXL355", () => {
   it("should reset call log", async () => {
     const transport = new MockTransport();
     const dev = new ADXL355(transport);
+    await dev.probe();
+    transport.clearCalls();
     await dev.reset();
     expect(transport.callCount).toBeGreaterThanOrEqual(1);
     expect(transport.calls[0].isWrite).toBe(true);

@@ -61,22 +61,42 @@ fn test_set_power_mode() {
 fn test_reset() {
     let bus = MockBus::new();
     let mut dev = Adxl355::new(bus);
+    dev.probe().unwrap();
     assert!(dev.reset().is_ok());
 }
 
 struct TemperatureSequenceBus {
+    regs: [u8; 128],
     responses: Vec<Vec<u8>>,
 }
 
+impl TemperatureSequenceBus {
+    fn new(responses: Vec<Vec<u8>>) -> Self {
+        let mut bus = Self {
+            regs: [0; 128],
+            responses,
+        };
+        bus.regs[registers::reg::DEVID_AD as usize] = registers::id::DEVID_AD;
+        bus.regs[registers::reg::DEVID_MST as usize] = registers::id::DEVID_MST;
+        bus.regs[registers::reg::PARTID as usize] = registers::id::PARTID;
+        bus.regs[registers::reg::RANGE as usize] = registers::Range::G2.to_register();
+        bus
+    }
+}
+
 impl adxl355::device::Transport for TemperatureSequenceBus {
-    fn read_register(&mut self, _reg: u8, _len: u8) -> Result<Vec<u8>, Error> {
-        if self.responses.is_empty() {
-            return Err(Error::Bus);
+    fn read_register(&mut self, reg: u8, len: u8) -> Result<Vec<u8>, Error> {
+        if reg == registers::reg::TEMP2 && !self.responses.is_empty() {
+            return Ok(self.responses.remove(0));
         }
-        Ok(self.responses.remove(0))
+        let start = reg as usize;
+        let end = start + len as usize;
+        Ok(self.regs[start..end].to_vec())
     }
 
-    fn write_register(&mut self, _reg: u8, _data: &[u8]) -> Result<(), Error> {
+    fn write_register(&mut self, reg: u8, data: &[u8]) -> Result<(), Error> {
+        let start = reg as usize;
+        self.regs[start..start + data.len()].copy_from_slice(data);
         Ok(())
     }
 
@@ -89,38 +109,41 @@ fn test_temperature_reserved_nibble_ignored() {
     bus.regs[registers::reg::TEMP2 as usize] = 0xF7;
     bus.regs[registers::reg::TEMP1 as usize] = 0x5D;
     let mut dev = Adxl355::new(bus);
+    dev.probe().unwrap();
     assert_eq!(dev.read_temperature_raw().unwrap(), 1885);
     assert!((dev.read_temperature_c().unwrap() - 25.0).abs() < 0.01);
 }
 
 #[test]
 fn test_temperature_short_read_returns_bus_error() {
-    let mut dev = Adxl355::new(TemperatureSequenceBus {
-        responses: vec![vec![0x07]],
-    });
+    let mut dev = Adxl355::new(TemperatureSequenceBus::new(vec![vec![0x07]]));
+    dev.probe().unwrap();
     assert_eq!(dev.read_temperature_raw(), Err(Error::Bus));
 }
 
 #[test]
 fn test_temperature_rollover_is_retried() {
-    let mut dev = Adxl355::new(TemperatureSequenceBus {
-        responses: vec![vec![0x07, 0xFF], vec![0x08], vec![0x08, 0x00], vec![0x08]],
-    });
+    let mut dev = Adxl355::new(TemperatureSequenceBus::new(vec![
+        vec![0x07, 0xFF],
+        vec![0x08],
+        vec![0x08, 0x00],
+        vec![0x08],
+    ]));
+    dev.probe().unwrap();
     assert_eq!(dev.read_temperature_raw().unwrap(), 2048);
 }
 
 #[test]
 fn test_temperature_unstable_returns_not_ready() {
-    let mut dev = Adxl355::new(TemperatureSequenceBus {
-        responses: vec![
-            vec![0x07, 0xFF],
-            vec![0x08],
-            vec![0x08, 0xFF],
-            vec![0x09],
-            vec![0x09, 0xFF],
-            vec![0x0A],
-        ],
-    });
+    let mut dev = Adxl355::new(TemperatureSequenceBus::new(vec![
+        vec![0x07, 0xFF],
+        vec![0x08],
+        vec![0x08, 0xFF],
+        vec![0x09],
+        vec![0x09, 0xFF],
+        vec![0x0A],
+    ]));
+    dev.probe().unwrap();
     assert_eq!(dev.read_temperature_raw(), Err(Error::NotReady));
 }
 
@@ -131,6 +154,7 @@ fn test_temperature_raw() {
     bus.regs[registers::reg::TEMP2 as usize] = 0x07;
     bus.regs[registers::reg::TEMP1 as usize] = 0x5D;
     let mut dev = Adxl355::new(bus);
+    dev.probe().unwrap();
     let raw = dev.read_temperature_raw().unwrap();
     assert_eq!(raw, 1885);
 }
@@ -139,12 +163,14 @@ fn test_temperature_raw() {
 fn test_temperature_boundaries() {
     let mut bus = MockBus::new();
     let mut dev = Adxl355::new(bus);
+    dev.probe().unwrap();
     assert_eq!(dev.read_temperature_raw().unwrap(), 0);
 
     bus = dev.into_inner();
     bus.regs[registers::reg::TEMP2 as usize] = 0x0F;
     bus.regs[registers::reg::TEMP1 as usize] = 0xFF;
     let mut dev = Adxl355::new(bus);
+    dev.probe().unwrap();
     assert_eq!(dev.read_temperature_raw().unwrap(), 4095);
     let temp = dev.read_temperature_c().unwrap();
     assert!((temp - -219.1989).abs() < 0.01);
@@ -157,6 +183,7 @@ fn test_temperature_celsius_nominal() {
     bus.regs[registers::reg::TEMP2 as usize] = 0x07;
     bus.regs[registers::reg::TEMP1 as usize] = 0x5D;
     let mut dev = Adxl355::new(bus);
+    dev.probe().unwrap();
     let temp = dev.read_temperature_c().unwrap();
     assert!((temp - 25.0).abs() < 0.1);
 }
@@ -168,6 +195,7 @@ fn test_temperature_celsius_fifty() {
     bus.regs[registers::reg::TEMP2 as usize] = 0x06;
     bus.regs[registers::reg::TEMP1 as usize] = 0x7B;
     let mut dev = Adxl355::new(bus);
+    dev.probe().unwrap();
     let temp = dev.read_temperature_c().unwrap();
     assert!((temp - 50.0).abs() < 0.5);
 }
@@ -177,6 +205,7 @@ fn test_read_status_all_clear() {
     let mut bus = MockBus::new();
     bus.regs[registers::reg::STATUS as usize] = 0x00;
     let mut dev = Adxl355::new(bus);
+    dev.probe().unwrap();
     let status = dev.read_status().unwrap();
     assert_eq!(status, 0x00);
 }
@@ -186,6 +215,7 @@ fn test_read_status_data_ready() {
     let mut bus = MockBus::new();
     bus.regs[registers::reg::STATUS as usize] = 0x01; // DATA_RDY bit
     let mut dev = Adxl355::new(bus);
+    dev.probe().unwrap();
     let status = dev.read_status().unwrap();
     assert_eq!(status, 0x01);
 }
@@ -195,6 +225,7 @@ fn test_read_status_fifo_full() {
     let mut bus = MockBus::new();
     bus.regs[registers::reg::STATUS as usize] = 0x02; // FIFO_FULL bit
     let mut dev = Adxl355::new(bus);
+    dev.probe().unwrap();
     let status = dev.read_status().unwrap();
     assert_eq!(status, 0x02);
 }

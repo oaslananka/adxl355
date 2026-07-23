@@ -32,12 +32,43 @@ func (d *Device) writeU8(reg byte, val byte) error {
 	return d.transport.WriteRegister(reg, []byte{val})
 }
 
+func (d *Device) ensureInitialized() error {
+	if !d.initialized {
+		return ErrInvalidState
+	}
+	return nil
+}
+
+func (d *Device) enterConfigurationStandby() (byte, bool, error) {
+	original, err := d.readU8(RegPOWER_CTL)
+	if err != nil {
+		return 0, false, err
+	}
+	if original&0x01 != 0 {
+		return original, false, nil
+	}
+	if err := d.writeU8(RegPOWER_CTL, original|0x01); err != nil {
+		return 0, false, err
+	}
+	return original, true, nil
+}
+
+func (d *Device) finishConfiguration(original byte, restore bool, operationErr error) error {
+	if restore {
+		if err := d.writeU8(RegPOWER_CTL, original); err != nil {
+			return err
+		}
+	}
+	return operationErr
+}
+
 // ---------------------------------------------------------------------------
 // Core API
 // ---------------------------------------------------------------------------
 
 // Probe verifies device identity and synchronizes the cached hardware range.
 func (d *Device) Probe() (bool, error) {
+	d.initialized = false
 	idAd, err := d.readU8(RegDEVID_AD)
 	if err != nil {
 		return false, err
@@ -64,9 +95,14 @@ func (d *Device) Probe() (bool, error) {
 		return false, ErrInvalidArg
 	}
 
-	// Enter standby mode after probe. Commit state only after all bus operations succeed.
-	if err := d.writeU8(RegPOWER_CTL, byte(PowerStandby)); err != nil {
+	powerCtl, err := d.readU8(RegPOWER_CTL)
+	if err != nil {
 		return false, err
+	}
+	if powerCtl&0x01 == 0 {
+		if err := d.writeU8(RegPOWER_CTL, powerCtl|0x01); err != nil {
+			return false, err
+		}
 	}
 
 	d.rangeMode = detectedRange
@@ -76,6 +112,9 @@ func (d *Device) Probe() (bool, error) {
 
 // Reset performs a software reset.
 func (d *Device) Reset() error {
+	if err := d.ensureInitialized(); err != nil {
+		return err
+	}
 	if err := d.writeU8(RegRESET, RESET_CODE); err != nil {
 		return err
 	}
@@ -86,23 +125,33 @@ func (d *Device) Reset() error {
 
 // SetRange sets the acceleration range, preserving unrelated bits.
 func (d *Device) SetRange(r Range) error {
+	if err := d.ensureInitialized(); err != nil {
+		return err
+	}
 	if r < Range2G || r > Range8G {
 		return ErrInvalidArg
 	}
-	reg, err := d.readU8(RegRANGE)
+	original, restore, err := d.enterConfigurationStandby()
 	if err != nil {
 		return err
 	}
-	reg = (reg &^ RangeSEL_MASK) | byte(r)&RangeSEL_MASK
-	if err := d.writeU8(RegRANGE, reg); err != nil {
-		return err
+
+	reg, operationErr := d.readU8(RegRANGE)
+	if operationErr == nil {
+		reg = (reg &^ RangeSEL_MASK) | byte(r)&RangeSEL_MASK
+		operationErr = d.writeU8(RegRANGE, reg)
+		if operationErr == nil {
+			d.rangeMode = r
+		}
 	}
-	d.rangeMode = r
-	return nil
+	return d.finishConfiguration(original, restore, operationErr)
 }
 
 // GetRange reads the currently configured range from hardware.
 func (d *Device) GetRange() (Range, error) {
+	if err := d.ensureInitialized(); err != nil {
+		return 0, err
+	}
 	val, err := d.readU8(RegRANGE)
 	if err != nil {
 		return 0, err
@@ -117,6 +166,12 @@ func (d *Device) GetRange() (Range, error) {
 // SetPowerMode sets the power mode (standby/measurement).
 // Datasheet Rev.D, Table 43: bit 0 = 1 => standby, bit 0 = 0 => measurement.
 func (d *Device) SetPowerMode(mode PowerMode) error {
+	if err := d.ensureInitialized(); err != nil {
+		return err
+	}
+	if mode != PowerStandby && mode != PowerMeasurement {
+		return ErrInvalidArg
+	}
 	reg, err := d.readU8(RegPOWER_CTL)
 	if err != nil {
 		return err
@@ -131,6 +186,9 @@ func (d *Device) SetPowerMode(mode PowerMode) error {
 
 // ReadRaw reads raw 20-bit acceleration data for all three axes.
 func (d *Device) ReadRaw() (*RawXYZ, error) {
+	if err := d.ensureInitialized(); err != nil {
+		return nil, err
+	}
 	data, err := d.transport.ReadRegister(RegXDATA3, 9)
 	if err != nil {
 		return nil, err
@@ -172,6 +230,9 @@ func (d *Device) ReadMps2() (*AccelXYZ, error) {
 // ReadTemperatureRaw reads a coherent 12-bit unsigned temperature sample.
 // TEMP2/TEMP1 are read together, then TEMP2 is re-read to detect high-byte rollover.
 func (d *Device) ReadTemperatureRaw() (int16, error) {
+	if err := d.ensureInitialized(); err != nil {
+		return 0, err
+	}
 	for attempt := 0; attempt < TempReadAttempts; attempt++ {
 		data, err := d.transport.ReadRegister(RegTEMP2, 2)
 		if err != nil {
@@ -208,6 +269,9 @@ func (d *Device) ReadTemperatureC() (float32, error) {
 
 // ReadStatus reads the status register.
 func (d *Device) ReadStatus() (byte, error) {
+	if err := d.ensureInitialized(); err != nil {
+		return 0, err
+	}
 	return d.readU8(RegSTATUS)
 }
 
