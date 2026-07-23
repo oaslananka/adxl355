@@ -23,6 +23,7 @@ Transport-agnostic, testable, production-ready driver family with shared registe
 - Rust, Node.js, Go and C++ packages with shared API design
 - Mock transport testing (no hardware required)
 - Raw 20-bit acceleration decoding with golden test vectors
+- Required clean-checkout cross-language vector gate with zero permitted CI skips
 - Range-based g and m/s² conversion
 - Temperature sensor readout
 - FIFO basic support
