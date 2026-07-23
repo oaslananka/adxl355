@@ -10,8 +10,10 @@ from scripts.hil_runner import (
     I2C_ADDRESSES,
     SPI_MAX_HZ,
     SPI_MIN_HZ,
+    REPORT_ROOT,
     HilConfig,
     parse_i2c_address,
+    parse_report_path,
     run_hil,
     write_report,
 )
@@ -91,21 +93,30 @@ class HilConfigTests(unittest.TestCase):
 
     def test_spi_rejects_clock_outside_datasheet_limits(self) -> None:
         for speed in (SPI_MIN_HZ - 1, SPI_MAX_HZ + 1):
+            config = HilConfig(transport="spi", spi_speed_hz=speed)
             with self.assertRaisesRegex(ValueError, "100000.*10000000"):
-                HilConfig(transport="spi", spi_speed_hz=speed).validate()
+                config.validate()
 
     def test_i2c_accepts_only_documented_addresses(self) -> None:
         self.assertEqual(I2C_ADDRESSES, (0x1D, 0x53))
         self.assertEqual(parse_i2c_address("0x1d"), 0x1D)
         self.assertEqual(parse_i2c_address("0x53"), 0x53)
-        with self.assertRaisesRegex(ValueError, "0x1D.*0x53"):
+        with self.assertRaises(ValueError) as context:
             parse_i2c_address("0x20")
+        self.assertRegex(str(context.exception), "0x1D.*0x53")
 
     def test_sample_count_and_timeout_are_bounded(self) -> None:
+        sample_config = HilConfig(transport="spi", samples=3)
+        timeout_config = HilConfig(transport="spi", sample_timeout_ms=49)
         with self.assertRaises(ValueError):
-            HilConfig(transport="spi", samples=3).validate()
+            sample_config.validate()
         with self.assertRaises(ValueError):
-            HilConfig(transport="spi", sample_timeout_ms=49).validate()
+            timeout_config.validate()
+
+    def test_cli_report_path_cannot_escape_artifacts_root(self) -> None:
+        with self.assertRaisesRegex(ValueError, "must remain under"):
+            parse_report_path("../outside.json")
+        self.assertEqual(parse_report_path("artifacts/hil.json"), REPORT_ROOT / "hil.json")
 
 
 class HilExecutionTests(unittest.TestCase):
@@ -234,9 +245,16 @@ class HilExecutionTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp:
             target = Path(temp) / "nested" / "hil.json"
             report = {"schema_version": 1, "success": True}
-            write_report(target, report)
+            write_report(target, report, allowed_root=Path(temp))
             self.assertEqual(json.loads(target.read_text()), report)
             self.assertFalse(target.with_suffix(".json.tmp").exists())
+
+    def test_write_report_rejects_path_outside_allowed_root(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / "allowed"
+            target = Path(temp) / "outside.json"
+            with self.assertRaisesRegex(ValueError, "must remain under"):
+                write_report(target, {"success": False}, allowed_root=root)
 
     @staticmethod
     def _restore_env(name: str, value: str | None) -> None:

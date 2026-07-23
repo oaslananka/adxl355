@@ -50,6 +50,8 @@ MAX_SAMPLES = 1_000
 MIN_TIMEOUT_MS = 50
 MAX_TIMEOUT_MS = 10_000
 REPORT_SCHEMA_VERSION = 1
+I2C_ADDRESS_ERROR = "I2C address must be 0x1D or 0x53"
+REPORT_ROOT = REPO_ROOT / "artifacts"
 SECRET_PATTERN = re.compile(
     r"(?i)\b(token|secret|password|passwd|api[_-]?key)\s*[:=]\s*[^\s,;]+"
 )
@@ -72,6 +74,13 @@ class HilConfig:
     git_sha: str = "unknown"
 
     def validate(self) -> None:
+        self._validate_common()
+        if self.transport == "spi":
+            self._validate_spi()
+        else:
+            self._validate_i2c()
+
+    def _validate_common(self) -> None:
         if self.transport not in {"spi", "i2c"}:
             raise ValueError("transport must be 'spi' or 'i2c'")
         if not MIN_SAMPLES <= self.samples <= MAX_SAMPLES:
@@ -80,21 +89,23 @@ class HilConfig:
             raise ValueError(
                 f"sample timeout must be between {MIN_TIMEOUT_MS} and {MAX_TIMEOUT_MS} ms"
             )
-        if self.transport == "spi":
-            if self.spi_bus < 0 or self.spi_device < 0:
-                raise ValueError("SPI bus and chip-select values must be nonnegative")
-            if not SPI_MIN_HZ <= self.spi_speed_hz <= SPI_MAX_HZ:
-                raise ValueError(
-                    f"SPI speed must be between {SPI_MIN_HZ} and {SPI_MAX_HZ} Hz"
-                )
-        else:
-            if self.i2c_bus < 0:
-                raise ValueError("I2C bus must be nonnegative")
-            if self.i2c_address not in I2C_ADDRESSES:
-                raise ValueError("I2C address must be 0x1D or 0x53")
-            if self.i2c_bus_hz not in I2C_BUS_SPEEDS:
-                allowed = ", ".join(str(value) for value in I2C_BUS_SPEEDS)
-                raise ValueError(f"declared I2C bus speed must be one of: {allowed}")
+
+    def _validate_spi(self) -> None:
+        if self.spi_bus < 0 or self.spi_device < 0:
+            raise ValueError("SPI bus and chip-select values must be nonnegative")
+        if not SPI_MIN_HZ <= self.spi_speed_hz <= SPI_MAX_HZ:
+            raise ValueError(
+                f"SPI speed must be between {SPI_MIN_HZ} and {SPI_MAX_HZ} Hz"
+            )
+
+    def _validate_i2c(self) -> None:
+        if self.i2c_bus < 0:
+            raise ValueError("I2C bus must be nonnegative")
+        if self.i2c_address not in I2C_ADDRESSES:
+            raise ValueError(I2C_ADDRESS_ERROR)
+        if self.i2c_bus_hz not in I2C_BUS_SPEEDS:
+            allowed = ", ".join(str(value) for value in I2C_BUS_SPEEDS)
+            raise ValueError(f"declared I2C bus speed must be one of: {allowed}")
 
     @property
     def bus(self) -> dict[str, Any]:
@@ -124,9 +135,9 @@ def parse_i2c_address(value: str) -> int:
     try:
         parsed = int(value, 0)
     except ValueError as exc:
-        raise ValueError("I2C address must be 0x1D or 0x53") from exc
+        raise ValueError(I2C_ADDRESS_ERROR) from exc
     if parsed not in I2C_ADDRESSES:
-        raise ValueError("I2C address must be 0x1D or 0x53")
+        raise ValueError(I2C_ADDRESS_ERROR)
     return parsed
 
 
@@ -396,6 +407,127 @@ def _restore_after_failure(
     return errors
 
 
+def _reset_check(device: ADXL355, transport: Transport) -> dict[str, Any]:
+    device.reset()
+    after = _identity(transport)
+    range_after = int(_read_exact(transport, Register.RANGE, 1)[0]) & 0x03
+    if range_after != int(Range.G2):
+        raise RuntimeError(
+            f"reset did not restore RANGE to G2: register encoding 0x{range_after:02X}"
+        )
+    return {
+        "revision_after_reset": after["revision"],
+        "range_after_reset": "G2",
+    }
+
+
+def _configure_device(device: ADXL355, transport: Transport) -> dict[str, Any]:
+    device.set_range(Range.G4)
+    device.set_odr(ODR.HZ_125)
+    verified_range = device.get_range()
+    filter_value = _read_exact(transport, Register.FILTER, 1)[0]
+    if verified_range != Range.G4:
+        raise RuntimeError(f"range verification failed: {verified_range.name}")
+    if filter_value & 0x0F != int(ODR.HZ_125):
+        raise RuntimeError(f"ODR verification failed: FILTER=0x{filter_value:02X}")
+    device.set_power_mode(PowerMode.MEASUREMENT)
+    transport.delay_ms(20)
+    power_ctl = _read_exact(transport, Register.POWER_CTL, 1)[0]
+    if power_ctl & 0x01:
+        raise RuntimeError("device remained in standby after measurement-mode request")
+    return {
+        "verified_range": verified_range.name,
+        "odr": ODR.HZ_125.name,
+        "power_mode": PowerMode.MEASUREMENT.name,
+    }
+
+
+def _read_temperature(device: ADXL355) -> dict[str, Any]:
+    raw = device.read_temperature_raw()
+    celsius = TEMP_INTERCEPT_C + (
+        raw - TEMP_INTERCEPT_LSB
+    ) / TEMP_SLOPE_LSB_PER_C
+    if not math.isfinite(celsius) or not -40.0 <= celsius <= 125.0:
+        raise RuntimeError(
+            f"temperature {celsius:.2f} °C is outside the ADXL355 operating range"
+        )
+    return {"raw": raw, "celsius": round(celsius, 4)}
+
+
+def _restore_device(
+    device: ADXL355,
+    transport: Transport,
+    restore_range: Range,
+    restore_odr: ODR,
+) -> dict[str, Any]:
+    device.set_power_mode(PowerMode.STANDBY)
+    device.set_range(restore_range)
+    device.set_odr(restore_odr)
+    power_ctl = _read_exact(transport, Register.POWER_CTL, 1)[0]
+    if not power_ctl & 0x01:
+        raise RuntimeError("device did not return to standby")
+    return {
+        "power_mode": "STANDBY",
+        "range": restore_range.name,
+        "odr": restore_odr.name,
+    }
+
+
+def _run_post_probe_sequence(
+    report: dict[str, Any],
+    config: HilConfig,
+    device: ADXL355,
+    transport: Transport,
+    monotonic: Callable[[], float],
+    sleep: Callable[[float], None],
+    restore_range: Range,
+    restore_odr: ODR,
+) -> None:
+    report["device"]["reset"] = _step(
+        report,
+        "reset",
+        lambda: _reset_check(device, transport),
+        monotonic,
+    )
+    report["configuration"] = _step(
+        report,
+        "configuration",
+        lambda: _configure_device(device, transport),
+        monotonic,
+    )
+    report["temperature"] = _step(
+        report,
+        "temperature",
+        lambda: _read_temperature(device),
+        monotonic,
+    )
+    report["samples"] = _step(
+        report,
+        "continuous-read",
+        lambda: _sample_summary(device, config, monotonic, sleep),
+        monotonic,
+    )
+    _step(
+        report,
+        "restore-standby",
+        lambda: _restore_device(device, transport, restore_range, restore_odr),
+        monotonic,
+    )
+
+
+def _close_transport(report: dict[str, Any], transport: Optional[Transport]) -> None:
+    if transport is None:
+        return
+    close = getattr(transport, "close", None)
+    if not callable(close):
+        return
+    try:
+        close()
+    except Exception as exc:
+        report.setdefault("cleanup_errors", []).append(_error_payload(exc))
+        report["success"] = False
+
+
 def run_hil(
     config: HilConfig,
     *,
@@ -409,6 +541,7 @@ def run_hil(
     overall_started = monotonic()
     active_transport = transport
     device: Optional[ADXL355] = None
+    probed = False
     restore_range = Range.G2
     restore_odr = ODR.HZ_4000
 
@@ -435,111 +568,65 @@ def run_hil(
 
         device = ADXL355(active_transport)
         _step(report, "probe", device.probe, monotonic)
-
-        def reset_check() -> dict[str, Any]:
-            device.reset()
-            after = _identity(active_transport)
-            range_after = int(_read_exact(active_transport, Register.RANGE, 1)[0]) & 0x03
-            if range_after != int(Range.G2):
-                raise RuntimeError(
-                    f"reset did not restore RANGE to G2: register encoding 0x{range_after:02X}"
-                )
-            return {
-                "revision_after_reset": after["revision"],
-                "range_after_reset": "G2",
-            }
-
-        report["device"]["reset"] = _step(
-            report, "reset", reset_check, monotonic
-        )
-
-        def configure() -> dict[str, Any]:
-            device.set_range(Range.G4)
-            device.set_odr(ODR.HZ_125)
-            verified_range = device.get_range()
-            filter_value = _read_exact(active_transport, Register.FILTER, 1)[0]
-            if verified_range != Range.G4:
-                raise RuntimeError(f"range verification failed: {verified_range.name}")
-            if filter_value & 0x0F != int(ODR.HZ_125):
-                raise RuntimeError(
-                    f"ODR verification failed: FILTER=0x{filter_value:02X}"
-                )
-            device.set_power_mode(PowerMode.MEASUREMENT)
-            active_transport.delay_ms(20)
-            power_ctl = _read_exact(active_transport, Register.POWER_CTL, 1)[0]
-            if power_ctl & 0x01:
-                raise RuntimeError("device remained in standby after measurement-mode request")
-            return {
-                "verified_range": verified_range.name,
-                "odr": ODR.HZ_125.name,
-                "power_mode": PowerMode.MEASUREMENT.name,
-            }
-
-        report["configuration"] = _step(
-            report, "configuration", configure, monotonic
-        )
-
-        def read_temperature() -> dict[str, Any]:
-            raw = device.read_temperature_raw()
-            celsius = TEMP_INTERCEPT_C + (
-                raw - TEMP_INTERCEPT_LSB
-            ) / TEMP_SLOPE_LSB_PER_C
-            if not math.isfinite(celsius) or not -40.0 <= celsius <= 125.0:
-                raise RuntimeError(
-                    f"temperature {celsius:.2f} °C is outside the ADXL355 operating range"
-                )
-            return {"raw": raw, "celsius": round(celsius, 4)}
-
-        report["temperature"] = _step(
-            report, "temperature", read_temperature, monotonic
-        )
-        report["samples"] = _step(
+        probed = True
+        _run_post_probe_sequence(
             report,
-            "continuous-read",
-            lambda: _sample_summary(device, config, monotonic, sleep),
+            config,
+            device,
+            active_transport,
             monotonic,
+            sleep,
+            restore_range,
+            restore_odr,
         )
-
-        def restore() -> dict[str, Any]:
-            device.set_power_mode(PowerMode.STANDBY)
-            device.set_range(restore_range)
-            device.set_odr(restore_odr)
-            power_ctl = _read_exact(active_transport, Register.POWER_CTL, 1)[0]
-            if not power_ctl & 0x01:
-                raise RuntimeError("device did not return to standby")
-            return {"power_mode": "STANDBY", "range": restore_range.name, "odr": restore_odr.name}
-
-        _step(report, "restore-standby", restore, monotonic)
         report["success"] = True
     except Exception as exc:
         report["error"] = _error_payload(exc)
         report["diagnostic_hints"] = _diagnostic_hints(config, exc)
-        if device is not None:
+        if device is not None and probed:
             cleanup_errors = _restore_after_failure(device, restore_range, restore_odr)
             if cleanup_errors:
                 report["cleanup_errors"] = cleanup_errors
     finally:
-        if active_transport is not None:
-            close = getattr(active_transport, "close", None)
-            if callable(close):
-                try:
-                    close()
-                except Exception as exc:
-                    report.setdefault("cleanup_errors", []).append(_error_payload(exc))
-                    report["success"] = False
+        _close_transport(report, active_transport)
         report["finished_at"] = _utc_now()
         report["duration_ms"] = round((monotonic() - overall_started) * 1000, 3)
 
     return report
 
 
-def write_report(path: Path, report: dict[str, Any]) -> None:
-    """Atomically write the public HIL result document."""
+def _validated_report_path(path: Path, allowed_root: Path) -> Path:
+    root = allowed_root.resolve(strict=False)
+    candidate = path if path.is_absolute() else REPO_ROOT / path
+    candidate = candidate.resolve(strict=False)
+    try:
+        candidate.relative_to(root)
+    except ValueError as exc:
+        raise ValueError(f"report path must remain under {root}") from exc
+    if candidate == root or candidate.suffix.lower() != ".json":
+        raise ValueError("report path must name a JSON file under the artifacts directory")
+    return candidate
 
-    path.parent.mkdir(parents=True, exist_ok=True)
-    temporary = path.with_suffix(path.suffix + ".tmp")
+
+def parse_report_path(value: str) -> Path:
+    """Resolve a CLI report path beneath the repository artifacts directory."""
+
+    return _validated_report_path(Path(value), REPORT_ROOT)
+
+
+def write_report(
+    path: Path,
+    report: dict[str, Any],
+    *,
+    allowed_root: Path = REPORT_ROOT,
+) -> None:
+    """Atomically write the public HIL result document inside an allowed root."""
+
+    target = _validated_report_path(path, allowed_root)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    temporary = target.with_name(target.name + ".tmp")
     temporary.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n")
-    os.replace(temporary, path)
+    os.replace(temporary, target)
 
 
 def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
@@ -555,7 +642,11 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     parser.add_argument("--i2c-bus-hz", type=int, default=400_000)
     parser.add_argument("--runner-id", default="local")
     parser.add_argument("--git-sha", default="unknown")
-    parser.add_argument("--report", type=Path, default=Path("artifacts/hil-report.json"))
+    parser.add_argument(
+        "--report",
+        type=parse_report_path,
+        default=REPORT_ROOT / "hil-report.json",
+    )
     return parser.parse_args(argv)
 
 
