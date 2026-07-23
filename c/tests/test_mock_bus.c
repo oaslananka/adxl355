@@ -1,4 +1,5 @@
 #include "test_mock_bus.h"
+#include <limits.h>
 #include <string.h>
 
 /* ---------------------------------------------------------------------------
@@ -20,11 +21,15 @@ static int mock_read(void *ctx, uint8_t reg, uint8_t *data, size_t len)
     }
     mock->call_count++;
 
-    /* Simulate register read */
-    for (size_t i = 0; i < len && (reg + i) < ADXL355_MOCK_NUM_REGS; i++) {
+    size_t reported_len = len;
+    if (mock->short_read_reg >= 0 && reg == (uint8_t)mock->short_read_reg) {
+        reported_len = mock->short_read_length;
+    }
+    size_t copy_len = reported_len < len ? reported_len : len;
+    for (size_t i = 0; i < copy_len && (reg + i) < ADXL355_MOCK_NUM_REGS; i++) {
         data[i] = mock->regs[reg + i];
     }
-    return 0;
+    return reported_len <= (size_t)INT_MAX ? (int)reported_len : -1;
 }
 
 static int mock_write(void *ctx, uint8_t reg, const uint8_t *data, size_t len)
@@ -57,7 +62,7 @@ static int mock_write(void *ctx, uint8_t reg, const uint8_t *data, size_t len)
     if (reg == ADXL355_REG_RESET && len > 0 && data[0] == ADXL355_RESET_CODE) {
         mock->regs[ADXL355_REG_RANGE] = ADXL355_RANGE_2G;
     }
-    return 0;
+    return len <= (size_t)INT_MAX ? (int)len : -1;
 }
 
 static void mock_delay(void *ctx, uint32_t ms)
@@ -75,6 +80,7 @@ void adxl355_mock_bus_init(adxl355_mock_bus_t *mock)
 {
     memset(mock, 0, sizeof(*mock));
     mock->fail_read_reg = -1;
+    mock->short_read_reg = -1;
     mock->fail_write_reg = -1;
     mock->regs[ADXL355_REG_RANGE] = ADXL355_RANGE_2G;
     mock->regs[ADXL355_REG_POWER_CTL] = ADXL355_POWER_STANDBY;

@@ -12,11 +12,16 @@ class Transport(Protocol):
     """
 
     def read_register(self, reg: int, length: int = 1) -> bytes:
-        """Read `length` bytes starting at register address `reg`."""
+        """Return exactly `length` bytes or raise an exception.
+
+        Zero-length, truncated, and overlong payloads violate the transport
+        contract and are converted to :class:`adxl355.errors.BusError` by the
+        driver.
+        """
         ...
 
     def write_register(self, reg: int, data: bytes) -> None:
-        """Write `data` bytes starting at register address `reg`."""
+        """Write all bytes or raise an exception; partial success is invalid."""
         ...
 
     def delay_ms(self, ms: int) -> None:

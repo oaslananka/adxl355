@@ -1,5 +1,6 @@
 #include "adxl355/adxl355.h"
 
+#include <limits.h>
 #include <string.h>
 
 enum {
@@ -15,14 +16,30 @@ static const float ADXL355_TEMP_SLOPE_LSB_PER_C = -9.05f;
  * Internal helpers
  * --------------------------------------------------------------------------- */
 
+static int read_exact(adxl355_t *dev, uint8_t reg, uint8_t *data, size_t len)
+{
+    if (len > (size_t)INT_MAX) {
+        return -1;
+    }
+    return dev->bus.read(dev->bus.ctx, reg, data, len) == (int)len ? 0 : -1;
+}
+
+static int write_exact(adxl355_t *dev, uint8_t reg, const uint8_t *data, size_t len)
+{
+    if (len > (size_t)INT_MAX) {
+        return -1;
+    }
+    return dev->bus.write(dev->bus.ctx, reg, data, len) == (int)len ? 0 : -1;
+}
+
 static inline int read_reg(adxl355_t *dev, uint8_t reg, uint8_t *byte)
 {
-    return dev->bus.read(dev->bus.ctx, reg, byte, 1);
+    return read_exact(dev, reg, byte, 1U);
 }
 
 static inline int write_reg(adxl355_t *dev, uint8_t reg, uint8_t byte)
 {
-    return dev->bus.write(dev->bus.ctx, reg, &byte, 1);
+    return write_exact(dev, reg, &byte, 1U);
 }
 
 typedef struct {
@@ -307,7 +324,7 @@ adxl355_status_t adxl355_read_raw(adxl355_t *dev, adxl355_raw_xyz_t *out)
     }
 
     uint8_t buf[9];
-    if (dev->bus.read(dev->bus.ctx, ADXL355_REG_XDATA3, buf, 9) != 0) {
+    if (read_exact(dev, ADXL355_REG_XDATA3, buf, 9U) != 0) {
         return ADXL355_ERR_BUS;
     }
 
@@ -361,10 +378,10 @@ adxl355_status_t adxl355_read_temperature_raw(adxl355_t *dev, int16_t *out)
     for (uint8_t attempt = 0U; attempt < ADXL355_TEMP_READ_ATTEMPTS; attempt++) {
         uint8_t sample[2];
         uint8_t confirm_temp2;
-        if (dev->bus.read(dev->bus.ctx, ADXL355_REG_TEMP2, sample, 2U) != 0) {
+        if (read_exact(dev, ADXL355_REG_TEMP2, sample, 2U) != 0) {
             return ADXL355_ERR_BUS;
         }
-        if (dev->bus.read(dev->bus.ctx, ADXL355_REG_TEMP2, &confirm_temp2, 1U) != 0) {
+        if (read_exact(dev, ADXL355_REG_TEMP2, &confirm_temp2, 1U) != 0) {
             return ADXL355_ERR_BUS;
         }
 

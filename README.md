@@ -52,6 +52,12 @@ write is performed when the device is already in standby. A successful target
 write updates cached state before restoration, so the cache continues to match the
 hardware even if restoring measurement mode fails.
 
+All transports must return exactly the requested read length. Zero, truncated, and
+overlong responses are rejected as bus errors before data is indexed. C and C++
+callbacks return the exact transferred byte count on success and a negative value
+on failure; other language transports return the complete payload or raise/return
+an error.
+
 ## Quick Start
 
 ### Python

@@ -70,6 +70,7 @@ class SpecValidator:
         self.registers_path = spec_dir / "adxl355.registers.yaml"
         self.constants_path = spec_dir / "adxl355.constants.yaml"
         self.vectors_path = spec_dir / "test_vectors.json"
+        self.transport_contract_path = spec_dir / "transport_contract.json"
         self.errors: list[str] = []
         self.warnings: list[str] = []
 
@@ -88,18 +89,30 @@ class SpecValidator:
         registers = self._load_yaml(self.registers_path)
         constants = self._load_yaml(self.constants_path)
         vectors = self._load_json(self.vectors_path)
-        if registers is None or constants is None or vectors is None:
+        transport_contract = self._load_json(self.transport_contract_path)
+        if (
+            registers is None
+            or constants is None
+            or vectors is None
+            or transport_contract is None
+        ):
             return False
 
         self._validate_registers(registers)
         self._validate_constants(constants)
         self._validate_cross_references(registers, constants)
         self._validate_test_vectors(vectors)
+        self._validate_transport_contract(transport_contract)
 
         return len(self.errors) == 0
 
     def _check_files_exist(self):
-        for p in [self.registers_path, self.constants_path, self.vectors_path]:
+        for p in [
+            self.registers_path,
+            self.constants_path,
+            self.vectors_path,
+            self.transport_contract_path,
+        ]:
             if not p.exists():
                 self.error(f"File not found: {p}")
 
@@ -381,6 +394,70 @@ class SpecValidator:
             self.error("test_vectors.json: temperature vectors must include raw boundaries 0 and 4095")
         if not any(has_reserved_nibble for _, has_reserved_nibble in validated):
             self.error("test_vectors.json: temperature vectors must include a nonzero reserved TEMP2 nibble")
+
+    def _validate_transport_contract(self, data: dict) -> None:
+        prefix = "transport_contract.json"
+        if data.get("schema_version") != 1:
+            self.error(f"{prefix}: schema_version must be 1")
+        if data.get("expected_error") != "bus":
+            self.error(f"{prefix}: expected_error must be 'bus'")
+
+        scenarios = data.get("scenarios")
+        if not isinstance(scenarios, list):
+            self.error(f"{prefix}: scenarios must be a list")
+            return
+
+        required_ids = {
+            "TR-1-ZERO",
+            "TR-1-OVERLONG",
+            "TR-2-ZERO",
+            "TR-2-TRUNCATED",
+            "TR-9-ZERO",
+            "TR-9-TRUNCATED",
+        }
+        seen_ids = set()
+        for index, scenario in enumerate(scenarios):
+            scenario_id = self._validate_transport_scenario(scenario, index)
+            if scenario_id is not None:
+                if scenario_id in seen_ids:
+                    self.error(f"{prefix}: duplicate scenario id {scenario_id}")
+                seen_ids.add(scenario_id)
+
+        missing = required_ids - seen_ids
+        extra = seen_ids - required_ids
+        if missing:
+            self.error(f"{prefix}: missing required scenarios {sorted(missing)}")
+        if extra:
+            self.error(f"{prefix}: unexpected scenarios {sorted(extra)}")
+
+    def _validate_transport_scenario(self, scenario: object, index: int):
+        prefix = f"transport_contract.json: scenario[{index}]"
+        if not isinstance(scenario, dict):
+            self.error(f"{prefix}: must be an object")
+            return None
+
+        required = {"id", "operation", "expected_length", "returned_length"}
+        missing = required - set(scenario)
+        if missing:
+            self.error(f"{prefix}: missing fields {sorted(missing)}")
+            return None
+
+        scenario_id = scenario["id"]
+        operation = scenario["operation"]
+        expected = scenario["expected_length"]
+        returned = scenario["returned_length"]
+        if not isinstance(scenario_id, str) or not scenario_id:
+            self.error(f"{prefix}: id must be a non-empty string")
+            return None
+        if operation not in {"single_register", "temperature_burst", "xyz_burst"}:
+            self.error(f"{prefix}: unsupported operation {operation!r}")
+        if not isinstance(expected, int) or isinstance(expected, bool) or expected not in {1, 2, 9}:
+            self.error(f"{prefix}: expected_length must be 1, 2, or 9")
+        if not isinstance(returned, int) or isinstance(returned, bool) or returned < 0:
+            self.error(f"{prefix}: returned_length must be a non-negative integer")
+        elif returned == expected:
+            self.error(f"{prefix}: negative scenario must violate the expected length")
+        return scenario_id
 
     def _validate_cross_references(self, registers: dict, constants: dict):
         """Check references between the two spec files."""

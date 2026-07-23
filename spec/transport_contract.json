@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "description": "Shared negative transport-response checklist for every maintained driver",
+  "expected_error": "bus",
+  "scenarios": [
+    {
+      "id": "TR-1-ZERO",
+      "operation": "single_register",
+      "expected_length": 1,
+      "returned_length": 0
+    },
+    {
+      "id": "TR-1-OVERLONG",
+      "operation": "single_register",
+      "expected_length": 1,
+      "returned_length": 2
+    },
+    {
+      "id": "TR-2-ZERO",
+      "operation": "temperature_burst",
+      "expected_length": 2,
+      "returned_length": 0
+    },
+    {
+      "id": "TR-2-TRUNCATED",
+      "operation": "temperature_burst",
+      "expected_length": 2,
+      "returned_length": 1
+    },
+    {
+      "id": "TR-9-ZERO",
+      "operation": "xyz_burst",
+      "expected_length": 9,
+      "returned_length": 0
+    },
+    {
+      "id": "TR-9-TRUNCATED",
+      "operation": "xyz_burst",
+      "expected_length": 9,
+      "returned_length": 8
+    }
+  ]
+}

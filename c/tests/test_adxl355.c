@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#include <limits.h>
 
 /* ---------------------------------------------------------------------------
  * Simple test framework (no external deps)
@@ -550,7 +551,7 @@ static int temperature_script_read(void *ctx, uint8_t reg, uint8_t *data, size_t
     size_t copy_length = response_length < len ? response_length : len;
     memcpy(data, script->responses[script->response_index], copy_length);
     script->response_index++;
-    return response_length == len ? 0 : -1;
+    return response_length <= (size_t)INT_MAX ? (int)response_length : -1;
 }
 
 static int temperature_script_write(void *ctx, uint8_t reg, const uint8_t *data, size_t len)
@@ -558,8 +559,7 @@ static int temperature_script_write(void *ctx, uint8_t reg, const uint8_t *data,
     (void)ctx;
     (void)reg;
     (void)data;
-    (void)len;
-    return 0;
+    return len <= (size_t)INT_MAX ? (int)len : -1;
 }
 
 static adxl355_t temperature_script_device(temperature_script_bus_t *script)
@@ -929,6 +929,70 @@ static void test_decode_half_scale_negative(void)
 /* ---------------------------------------------------------------------------
  * Main
  * --------------------------------------------------------------------------- */
+
+static void test_transport_contract_single_register_exact_length(void)
+{
+    TEST_START("transport_contract_single_register_exact_length");
+    const size_t returned_lengths[] = {0U, 2U};
+    for (size_t i = 0U; i < 2U; i++) {
+        adxl355_mock_bus_t mock;
+        adxl355_mock_bus_init(&mock);
+        adxl355_mock_bus_set_identity_ok(&mock);
+        mock.short_read_reg = ADXL355_REG_DEVID_AD;
+        mock.short_read_length = returned_lengths[i];
+        adxl355_bus_t bus = adxl355_mock_bus_get_interface(&mock);
+        adxl355_t dev;
+        adxl355_init(&dev, &bus);
+        TEST_ASSERT(adxl355_probe(&dev) == ADXL355_ERR_BUS,
+                    "TR-1 zero/overlong response should be a bus error");
+    }
+    TEST_END();
+}
+
+static void test_transport_contract_temperature_exact_length(void)
+{
+    TEST_START("transport_contract_temperature_exact_length");
+    for (size_t returned = 0U; returned <= 1U; returned++) {
+        adxl355_mock_bus_t mock;
+        adxl355_mock_bus_init(&mock);
+        adxl355_mock_bus_set_identity_ok(&mock);
+        adxl355_bus_t bus = adxl355_mock_bus_get_interface(&mock);
+        adxl355_t dev;
+        adxl355_init(&dev, &bus);
+        TEST_ASSERT(adxl355_probe(&dev) == ADXL355_OK, "probe should succeed");
+        mock.short_read_reg = ADXL355_REG_TEMP2;
+        mock.short_read_length = returned;
+        int16_t raw = 1234;
+        TEST_ASSERT(adxl355_read_temperature_raw(&dev, &raw) == ADXL355_ERR_BUS,
+                    "TR-2 zero/truncated response should be a bus error");
+        TEST_ASSERT(raw == 1234, "short read must not fabricate temperature output");
+    }
+    TEST_END();
+}
+
+static void test_transport_contract_xyz_exact_length(void)
+{
+    TEST_START("transport_contract_xyz_exact_length");
+    const size_t returned_lengths[] = {0U, 8U};
+    for (size_t i = 0U; i < 2U; i++) {
+        adxl355_mock_bus_t mock;
+        adxl355_mock_bus_init(&mock);
+        adxl355_mock_bus_set_identity_ok(&mock);
+        adxl355_bus_t bus = adxl355_mock_bus_get_interface(&mock);
+        adxl355_t dev;
+        adxl355_init(&dev, &bus);
+        TEST_ASSERT(adxl355_probe(&dev) == ADXL355_OK, "probe should succeed");
+        mock.short_read_reg = ADXL355_REG_XDATA3;
+        mock.short_read_length = returned_lengths[i];
+        adxl355_raw_xyz_t raw = {11, 22, 33};
+        TEST_ASSERT(adxl355_read_raw(&dev, &raw) == ADXL355_ERR_BUS,
+                    "TR-9 zero/truncated response should be a bus error");
+        TEST_ASSERT(raw.x == 11 && raw.y == 22 && raw.z == 33,
+                    "short read must not fabricate acceleration output");
+    }
+    TEST_END();
+}
+
 int main(void)
 {
     printf("ADXL355 C Test Suite\n");
@@ -982,6 +1046,9 @@ int main(void)
     test_bus_error_probe();
     test_bus_error_read_raw();
     test_bus_error_set_range();
+    test_transport_contract_single_register_exact_length();
+    test_transport_contract_temperature_exact_length();
+    test_transport_contract_xyz_exact_length();
 
     printf("\n====================\n");
     printf("Results: %d/%d passed, %d failed\n",

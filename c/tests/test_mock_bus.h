@@ -36,6 +36,8 @@ typedef struct {
     int      force_read_error;                   /**< If non-zero, reads fail. */
     int      force_write_error;                  /**< If non-zero, writes fail. */
     int      fail_read_reg;                      /**< Register-specific read failure; -1 disables. */
+    int      short_read_reg;                     /**< Register-specific malformed read; -1 disables. */
+    size_t   short_read_length;                  /**< Byte count reported for the malformed read. */
     int      fail_write_reg;                     /**< Register-specific write failure; -1 disables. */
     size_t   fail_write_occurrence;              /**< 1-based matching write to fail; 0 fails all. */
     size_t   fail_write_matches;                 /**< Matching write attempts observed. */
