@@ -94,7 +94,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4
         with:
           components: clippy
       - name: Check
@@ -172,14 +172,16 @@ jobs:
           cache: "npm"
           cache-dependency-path: node/package-lock.json
       - name: Set up Rust
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4
       - name: Set up Go
         uses: actions/setup-go@v6
         with:
           go-version: "1.21"
           cache: false
       - name: Install verifier dependencies
-        run: python -m pip install -e ./python[dev] pyyaml
+        run: |
+          python -m pip install --no-deps -e ./python
+          python -m pip install pytest==9.1.1 PyYAML==6.0.3
       - name: Run required cross-language vector gate
         run: python scripts/verify_vectors.py --ci
       - name: Test release and CI automation

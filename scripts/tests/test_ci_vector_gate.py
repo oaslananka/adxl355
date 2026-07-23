@@ -40,6 +40,22 @@ class VectorGateWorkflowTests(unittest.TestCase):
         self.assertIn("cmake", commands)
         self.assertIn("g++", commands)
 
+    def test_vector_gate_pins_new_dependencies(self) -> None:
+        job = self.load_ci()["jobs"]["consistency"]
+        uses = [step.get("uses", "") for step in job["steps"] if isinstance(step, dict)]
+        rust_actions = [value for value in uses if value.startswith("dtolnay/rust-toolchain@")]
+        self.assertGreaterEqual(len(rust_actions), 1)
+        for rust_action in rust_actions:
+            self.assertRegex(rust_action, r"@[0-9a-f]{40}$")
+
+        commands = "\n".join(
+            step.get("run", "") for step in job["steps"] if isinstance(step, dict)
+        )
+        self.assertIn("python -m pip install --no-deps -e ./python", commands)
+        self.assertIn("pytest==9.1.1", commands)
+        self.assertIn("PyYAML==6.0.3", commands)
+        self.assertNotIn("./python[dev]", commands)
+
 
 if __name__ == "__main__":
     unittest.main()
