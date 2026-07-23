@@ -58,7 +58,9 @@ class ReleaseArtifactTests(unittest.TestCase):
         with self.assertRaisesRegex(ArtifactError, "tests or examples"):
             inspect_python(invalid_artifacts, "0.1.0a2", smoke=False)
 
-    def make_rust_artifact(self, *, import_name: str = "adxl355") -> Path:
+    def make_rust_artifact(
+        self, *, import_name: str = "adxl355", add_link: bool = False
+    ) -> Path:
         directory = self.make_directory()
         prefix = "adxl355-driver-0.1.0-alpha.2"
         with tarfile.open(directory / f"{prefix}.crate", "w:gz") as handle:
@@ -73,6 +75,11 @@ class ReleaseArtifactTests(unittest.TestCase):
             self.add_tar_text(handle, f"{prefix}/README.md", "readme")
             self.add_tar_text(handle, f"{prefix}/LICENSE", "license")
             self.add_tar_text(handle, f"{prefix}/src/lib.rs", "")
+            if add_link:
+                link = tarfile.TarInfo(f"{prefix}/README-link.md")
+                link.type = tarfile.SYMTYPE
+                link.linkname = "README.md"
+                handle.addfile(link)
         return directory
 
     def test_rust_artifact_preserves_distribution_and_import_names(self) -> None:
@@ -82,6 +89,11 @@ class ReleaseArtifactTests(unittest.TestCase):
         invalid_artifact = self.make_rust_artifact(import_name="adxl355_driver")
         with self.assertRaisesRegex(ArtifactError, "import name"):
             inspect_rust(invalid_artifact, "0.1.0-alpha.2", smoke=False)
+
+    def test_rust_artifact_rejects_link_members(self) -> None:
+        linked_artifact = self.make_rust_artifact(add_link=True)
+        with self.assertRaisesRegex(ArtifactError, "unsupported member type"):
+            inspect_rust(linked_artifact, "0.1.0-alpha.2", smoke=False)
 
     def make_node_artifact(self, *, extra_file: str | None = None) -> Path:
         directory = self.make_directory()

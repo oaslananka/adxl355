@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Hardened release artifact extraction by rejecting links and special archive
+  members and copying only validated regular files and directories.
 - Updated the Python build backend to `setuptools==83.0.0` to resolve
   GHSA-h35f-9h28-mq5c / CVE-2026-59890.
 - Synchronized reset and constructor range state with the ADXL355 reset default
@@ -50,6 +52,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Added a seven-day Dependabot cooldown for version updates across all maintained
+  ecosystems; security updates remain immediate.
 - **Breaking (Python):** Raised the minimum supported Python version from 3.9 to
   3.10 so release builds do not depend on a vulnerable legacy setuptools line.
 - **Breaking (C/C++):** Transport read/write callbacks return the exact

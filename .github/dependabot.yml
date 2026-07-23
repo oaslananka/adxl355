@@ -10,6 +10,8 @@ updates:
       timezone: Europe/Istanbul
     open-pull-requests-limit: 2
     rebase-strategy: auto
+    cooldown:
+      default-days: 7
     labels: [dependencies, area/ci]
     commit-message:
       prefix: "deps(actions)"
@@ -26,6 +28,8 @@ updates:
       timezone: Europe/Istanbul
     open-pull-requests-limit: 2
     rebase-strategy: auto
+    cooldown:
+      default-days: 7
     labels: [dependencies, area/python]
     commit-message:
       prefix: "deps(python)"
@@ -42,6 +46,8 @@ updates:
       timezone: Europe/Istanbul
     open-pull-requests-limit: 2
     rebase-strategy: auto
+    cooldown:
+      default-days: 7
     labels: [dependencies, area/rust]
     commit-message:
       prefix: "deps(rust)"
@@ -58,6 +64,8 @@ updates:
       timezone: Europe/Istanbul
     open-pull-requests-limit: 2
     rebase-strategy: auto
+    cooldown:
+      default-days: 7
     labels: [dependencies, area/node]
     commit-message:
       prefix: "deps(node)"
@@ -74,6 +82,8 @@ updates:
       timezone: Europe/Istanbul
     open-pull-requests-limit: 2
     rebase-strategy: auto
+    cooldown:
+      default-days: 7
     labels: [dependencies, area/go]
     commit-message:
       prefix: "deps(go)"

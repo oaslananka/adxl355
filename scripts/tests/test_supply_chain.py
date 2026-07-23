@@ -51,6 +51,7 @@ class SupplyChainTests(unittest.TestCase):
             self.assertEqual(entry["schedule"]["timezone"], "Europe/Istanbul")
             self.assertLessEqual(entry["open-pull-requests-limit"], 3)
             self.assertIn("dependencies", entry["labels"])
+            self.assertEqual(entry["cooldown"], {"default-days": 7})
             groups = entry["groups"]
             self.assertEqual(len(groups), 1)
             group = next(iter(groups.values()))
