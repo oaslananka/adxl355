@@ -148,7 +148,7 @@ void test_reset_restores_2g_range() {
 
 void test_pre_probe_calls_throw_invalid_state() {
     auto bus = std::make_unique<MockBus>();
-    auto *mock = bus.get();
+    const auto *mock = bus.get();
     adxl355::Device dev(std::move(bus));
 
     try {
