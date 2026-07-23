@@ -1,17 +1,18 @@
-import { spawnSync } from "node:child_process";
+import { readFileSync, rmSync } from "node:fs";
+import { resolve } from "node:path";
 
-const result = spawnSync("npm", ["pack", "--dry-run", "--json"], {
-  cwd: new URL("..", import.meta.url),
-  encoding: "utf8",
-  shell: process.platform === "win32",
-});
-
-if (result.status !== 0) {
-  process.stderr.write(result.stderr || result.stdout);
-  process.exit(result.status ?? 1);
+const reportPath = resolve(".npm-pack.json");
+let metadata;
+try {
+  [metadata] = JSON.parse(readFileSync(reportPath, "utf8"));
+} finally {
+  rmSync(reportPath, { force: true });
 }
 
-const [metadata] = JSON.parse(result.stdout);
+if (!metadata || !Array.isArray(metadata.files)) {
+  throw new Error("npm pack report did not contain a package file list");
+}
+
 const files = metadata.files.map((entry) => entry.path).sort();
 const required = [
   "LICENSE",

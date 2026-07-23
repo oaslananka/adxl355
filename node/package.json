@@ -20,7 +20,7 @@
     "test": "vitest run",
     "lint": "tsc --noEmit",
     "typecheck": "tsc --noEmit",
-    "pack:check": "npm run build && node scripts/check-package.mjs",
+    "pack:check": "npm run build && npm pack --dry-run --json > .npm-pack.json && node scripts/check-package.mjs",
     "audit:ci": "npm audit --audit-level=moderate"
   },
   "devDependencies": {

@@ -20,6 +20,7 @@ rust/target/
 # Node
 node/node_modules/
 node/dist/
+node/.npm-pack.json
 
 # Go
 go/bin/

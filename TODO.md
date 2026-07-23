@@ -46,6 +46,7 @@
 - [ ] spi-device adapter
 - [ ] i2c-bus adapter
 - [x] npm package.json publish configuration
+- [ ] Reassess the documented `@emnapi/runtime@1.11.1` dev-only risk by 2026-10-23
 - [x] Full device API (24 tests passing)
 
 ### Go

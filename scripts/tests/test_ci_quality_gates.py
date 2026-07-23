@@ -9,6 +9,7 @@ import yaml  # type: ignore[import-untyped]
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 CI_WORKFLOW = REPO_ROOT / ".github/workflows/ci.yml"
+NODE_RISK_ACCEPTANCE = REPO_ROOT / "docs/security/node-dev-dependency-risk.md"
 
 
 class CiQualityGateTests(unittest.TestCase):
@@ -63,6 +64,13 @@ class CiQualityGateTests(unittest.TestCase):
         self.assertIn("cargo clippy --no-default-features --features hal -- -D warnings", commands)
         self.assertIn("cargo test --doc --all-features", commands)
         self.assertIn("cargo package", commands)
+
+    def test_node_optional_dependency_risk_is_scoped_and_expires(self) -> None:
+        text = NODE_RISK_ACCEPTANCE.read_text()
+        self.assertIn("@emnapi/runtime@1.11.1", text)
+        self.assertIn("2026-10-23", text)
+        self.assertIn("not part of the published", text)
+        self.assertIn("not a blanket ignore", text)
 
     def test_node_uses_supported_matrix_and_enforces_pack_and_audit(self) -> None:
         node = self.load_jobs()["node"]
