@@ -9,7 +9,8 @@
 - [x] Confirm SPI read/write command format: `(reg<<1)|0x01`
 - [x] Confirm I2C 7-bit address options: `0x1D` (default), `0x53` (alternate)
 - [x] Add CI configuration (GitHub Actions) — spec validation + cross-language consistency
-- [x] Add enforceable release gate (required CI, tag/version validation, dry-run artifacts, checksums)
+- [x] Add enforceable release gate (canonical version mapping, artifact inspection/smoke, checksums)
+- [x] Canonical multi-ecosystem version and package-name strategy
 - [x] Add required language quality gates (lint/type, sanitizers, package smoke, audit, race, coverage)
 - [x] Fix copyright holder name in LICENSE
 

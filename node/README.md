@@ -3,7 +3,7 @@
 Typed ESM support for the Analog Devices ADXL355 with a transport-agnostic API.
 
 ```ts
-import { ADXL355, PowerMode, Range } from "adxl355";
+import { ADXL355, PowerMode, Range } from "@oaslananka/adxl355";
 
 const device = new ADXL355(transport);
 await device.probe();

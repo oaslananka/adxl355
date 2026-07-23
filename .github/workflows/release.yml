@@ -33,7 +33,11 @@ jobs:
     outputs:
       tag: ${{ steps.preflight.outputs.tag }}
       version: ${{ steps.preflight.outputs.version }}
+      python_version: ${{ steps.preflight.outputs.python_version }}
       core_version: ${{ steps.preflight.outputs.core_version }}
+      go_tag: ${{ steps.preflight.outputs.go_tag }}
+      rust_crate_name: ${{ steps.preflight.outputs.rust_crate_name }}
+      node_package_name: ${{ steps.preflight.outputs.node_package_name }}
       release_sha: ${{ steps.preflight.outputs.release_sha }}
       short_sha: ${{ steps.preflight.outputs.short_sha }}
     steps:
@@ -57,7 +61,7 @@ jobs:
             --tag "$RELEASE_TAG" \
             --sha "$RELEASE_SHA" > "$report"
           jq -r '
-            {tag, version, core_version, release_sha, short_sha}
+            {tag, version, python_version, core_version, go_tag, rust_crate_name, node_package_name, release_sha, short_sha}
             | to_entries[]
             | "\(.key)=\(.value)"
           ' "$report" >> "$GITHUB_OUTPUT"
@@ -86,6 +90,7 @@ jobs:
       - name: Build wheel and source distribution
         env:
           OUT: ${{ runner.temp }}/release/python
+          PYTHON_VERSION: ${{ needs.preflight.outputs.python_version }}
         run: |
           mkdir -p "$OUT"
           python -m pip install --disable-pip-version-check "build==1.5.0"
@@ -101,6 +106,9 @@ jobs:
             done
           ) > "$OUT/CONTENTS.txt"
           (cd "$OUT" && sha256sum -- ./*.whl ./*.tar.gz > SHA256SUMS)
+          python scripts/release_artifacts.py python \
+            --directory "$OUT" \
+            --version "$PYTHON_VERSION" > "$OUT/VERIFY.json"
       - uses: actions/upload-artifact@v4
         with:
           name: package-python-${{ needs.preflight.outputs.version }}-${{ needs.preflight.outputs.short_sha }}
@@ -135,8 +143,11 @@ jobs:
           mkdir -p "$OUT"
           cargo package --locked
           cargo package --list > "$OUT/CONTENTS.txt"
-          cp "target/package/adxl355-${VERSION}.crate" "$OUT/"
+          cp "target/package/adxl355-driver-${VERSION}.crate" "$OUT/"
           (cd "$OUT" && sha256sum -- ./*.crate > SHA256SUMS)
+          python3 ../scripts/release_artifacts.py rust \
+            --directory "$OUT" \
+            --version "$VERSION" > "$OUT/VERIFY.json"
       - uses: actions/upload-artifact@v4
         with:
           name: package-rust-${{ needs.preflight.outputs.version }}-${{ needs.preflight.outputs.short_sha }}
@@ -177,6 +188,9 @@ jobs:
           npm pack --dry-run --json > "$OUT/PACK_CONTENTS.json"
           npm pack --pack-destination "$OUT"
           (cd "$OUT" && sha256sum -- ./*.tgz > SHA256SUMS)
+          python3 ../scripts/release_artifacts.py node \
+            --directory "$OUT" \
+            --version "${{ needs.preflight.outputs.version }}" > "$OUT/VERIFY.json"
       - uses: actions/upload-artifact@v4
         with:
           name: package-node-${{ needs.preflight.outputs.version }}-${{ needs.preflight.outputs.short_sha }}
@@ -221,6 +235,9 @@ jobs:
             "${RELEASE_SHA}:go"
           git show -s --format='commit=%H%ncommitted_at=%cI' "$RELEASE_SHA" > "$OUT/BUILD_INFO.txt"
           (cd "$OUT" && sha256sum -- ./*.tar.gz > SHA256SUMS)
+          python3 scripts/release_artifacts.py go \
+            --directory "$OUT" \
+            --version "$VERSION" > "$OUT/VERIFY.json"
       - uses: actions/upload-artifact@v4
         with:
           name: package-go-${{ needs.preflight.outputs.version }}-${{ needs.preflight.outputs.short_sha }}
@@ -270,9 +287,9 @@ jobs:
           ctest --test-dir cpp/build --output-on-failure
 
           STAGE="$RUNNER_TEMP/release/c-cpp-stage"
-          mkdir -p "$OUT" "$STAGE/include" "$STAGE/bin" "$STAGE/lib"
+          mkdir -p "$OUT" "$STAGE/include/adxl355-cpp" "$STAGE/bin" "$STAGE/lib"
           cmake --install c/build --prefix "$STAGE"
-          cp -R cpp/include/adxl355 "$STAGE/include/adxl355-cpp"
+          cp cpp/include/adxl355/adxl355.hpp "$STAGE/include/adxl355-cpp/adxl355.hpp"
           cp c/build/libadxl355.a "$STAGE/lib/"
           cp c/build/examples/basic_read "$STAGE/bin/adxl355-c-basic-read"
           cp cpp/build/examples/basic_read "$STAGE/bin/adxl355-cpp-basic-read"
@@ -280,6 +297,9 @@ jobs:
           tar -C "$STAGE" -czf "$OUT/adxl355-c-cpp-${VERSION}.tar.gz" .
           find "$STAGE" -type f -printf '%P\n' | sort > "$OUT/CONTENTS.txt"
           (cd "$OUT" && sha256sum -- ./*.tar.gz > SHA256SUMS)
+          python3 scripts/release_artifacts.py native \
+            --directory "$OUT" \
+            --version "$VERSION" > "$OUT/VERIFY.json"
       - uses: actions/upload-artifact@v4
         with:
           name: package-c-cpp-${{ needs.preflight.outputs.version }}-${{ needs.preflight.outputs.short_sha }}
@@ -321,6 +341,10 @@ jobs:
           metadata = {
               "tag": os.environ["RELEASE_TAG"],
               "version": os.environ["VERSION"],
+              "python_version": "${{ needs.preflight.outputs.python_version }}",
+              "go_tag": "${{ needs.preflight.outputs.go_tag }}",
+              "rust_crate_name": "${{ needs.preflight.outputs.rust_crate_name }}",
+              "node_package_name": "${{ needs.preflight.outputs.node_package_name }}",
               "release_sha": os.environ["RELEASE_SHA"],
               "short_sha": os.environ["SHORT_SHA"],
               "run_id": os.environ["GITHUB_RUN_ID"],

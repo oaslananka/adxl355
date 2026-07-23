@@ -1,6 +1,6 @@
 {
-  "name": "adxl355",
-  "version": "0.1.0",
+  "name": "@oaslananka/adxl355",
+  "version": "0.1.0-alpha.2",
   "description": "Typed, transport-agnostic ADXL355 accelerometer driver for Node.js",
   "type": "module",
   "main": "dist/index.js",
@@ -49,5 +49,8 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     }
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }

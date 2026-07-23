@@ -7,3 +7,6 @@ this repository.
 
 See the repository root documentation for API status, hardware wiring, and
 cross-language verification details.
+
+The crates.io distribution name is `adxl355-driver`; the Rust import remains
+`adxl355` (`use adxl355::...`).

@@ -3,8 +3,8 @@
 version = 4
 
 [[package]]
-name = "adxl355"
-version = "0.1.0"
+name = "adxl355-driver"
+version = "0.1.0-alpha.2"
 dependencies = [
  "embedded-hal",
 ]

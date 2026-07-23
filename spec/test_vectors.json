@@ -1,6 +1,6 @@
 {
   "description": "ADXL355 shared test vectors for cross-language verification",
-  "version": "0.1.0",
+  "version": "0.1.0-alpha.2",
   "raw_decode": [
     {
       "name": "zero",

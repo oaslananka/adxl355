@@ -17,6 +17,8 @@ from scripts.release_preflight import (
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 FIXTURE_FILES = (
+    "VERSION",
+    "CHANGELOG.md",
     "python/pyproject.toml",
     "python/src/adxl355/_version.py",
     "rust/Cargo.toml",
@@ -42,18 +44,20 @@ class ReleasePreflightTests(unittest.TestCase):
             shutil.copy2(source, target)
         return temp
 
-    def test_parse_release_tag_accepts_semver(self) -> None:
+    def test_parse_release_tag_maps_semver_to_ecosystems(self) -> None:
         parsed = parse_release_tag("v1.2.3-alpha.4")
         self.assertEqual(parsed.full, "1.2.3-alpha.4")
+        self.assertEqual(parsed.python, "1.2.3a4")
         self.assertEqual(parsed.core, "1.2.3")
+        self.assertEqual(parsed.go_tag, "go/v1.2.3-alpha.4")
 
     def test_parse_release_tag_rejects_numeric_prerelease_leading_zero(self) -> None:
-        with self.assertRaisesRegex(ValueError, "leading zeros"):
-            parse_release_tag("v1.2.3-01")
+        with self.assertRaisesRegex(ValueError, "supported prerelease"):
+            parse_release_tag("v1.2.3-alpha.04")
 
-    def test_current_fixture_matches_release_version(self) -> None:
+    def test_current_fixture_matches_alpha_release_version(self) -> None:
         root = self.make_fixture()
-        release = parse_release_tag("v0.1.0")
+        release = parse_release_tag("v0.1.0-alpha.2")
         errors = validate_versions(release, collect_version_sources(root))
         self.assertEqual(errors, [])
 
@@ -64,17 +68,27 @@ class ReleasePreflightTests(unittest.TestCase):
         package["version"] = "0.1.1"
         package_path.write_text(json.dumps(package, indent=2) + "\n")
 
-        release = parse_release_tag("v0.1.0")
+        release = parse_release_tag("v0.1.0-alpha.2")
         errors = validate_versions(release, collect_version_sources(root))
 
         self.assertTrue(any("node/package.json" in error and "0.1.1" in error for error in errors))
 
-    def test_prerelease_requires_full_version_sources_to_match(self) -> None:
+    def test_python_pep440_version_is_required_for_prerelease(self) -> None:
         root = self.make_fixture()
+        path = root / "python/pyproject.toml"
+        path.write_text(path.read_text().replace('version = "0.1.0a2"', 'version = "0.1.0-alpha.2"'))
+
         release = parse_release_tag("v0.1.0-alpha.2")
         errors = validate_versions(release, collect_version_sources(root))
-        self.assertTrue(any("python/pyproject.toml" in error for error in errors))
+        self.assertTrue(any("python/pyproject.toml" in error and "0.1.0a2" in error for error in errors))
         self.assertFalse(any("c/CMakeLists.txt" in error for error in errors))
+
+    def test_package_identity_mismatch_is_rejected(self) -> None:
+        root = self.make_fixture()
+        path = root / "rust/Cargo.toml"
+        path.write_text(path.read_text().replace('name = "adxl355-driver"', 'name = "adxl355"', 1))
+        with self.assertRaisesRegex(ValueError, "package name"):
+            collect_version_sources(root)
 
     def make_git_repository(self) -> tuple[Path, str]:
         root = Path(tempfile.mkdtemp(prefix="adxl355-release-git-"))
@@ -89,7 +103,7 @@ class ReleasePreflightTests(unittest.TestCase):
         (root / "tracked.txt").write_text("release fixture\n")
         subprocess.run(["git", "add", "tracked.txt"], cwd=root, check=True)
         subprocess.run(["git", "commit", "-q", "-m", "fixture"], cwd=root, check=True)
-        subprocess.run(["git", "tag", "v0.1.0"], cwd=root, check=True)
+        subprocess.run(["git", "tag", "v0.1.0-alpha.2"], cwd=root, check=True)
         sha = subprocess.run(
             ["git", "rev-parse", "HEAD"],
             cwd=root,
@@ -101,7 +115,9 @@ class ReleasePreflightTests(unittest.TestCase):
 
     def test_tag_must_point_to_release_commit(self) -> None:
         root, tagged_sha = self.make_git_repository()
-        self.assertEqual(validate_git_state(root, "v0.1.0", tagged_sha), tagged_sha)
+        self.assertEqual(
+            validate_git_state(root, "v0.1.0-alpha.2", tagged_sha), tagged_sha
+        )
 
         (root / "tracked.txt").write_text("second commit\n")
         subprocess.run(["git", "add", "tracked.txt"], cwd=root, check=True)
@@ -115,13 +131,13 @@ class ReleasePreflightTests(unittest.TestCase):
         ).stdout.strip()
 
         with self.assertRaisesRegex(ValueError, "tag .* points to"):
-            validate_git_state(root, "v0.1.0", current_sha)
+            validate_git_state(root, "v0.1.0-alpha.2", current_sha)
 
     def test_dirty_release_tree_is_rejected(self) -> None:
         root, tagged_sha = self.make_git_repository()
         (root / "untracked.txt").write_text("dirty\n")
         with self.assertRaisesRegex(ValueError, "source tree is dirty"):
-            validate_git_state(root, "v0.1.0", tagged_sha)
+            validate_git_state(root, "v0.1.0-alpha.2", tagged_sha)
 
 
 if __name__ == "__main__":

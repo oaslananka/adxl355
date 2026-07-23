@@ -32,8 +32,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - C/C++ sanitizer, warning-as-error, install/export, and consumer smoke gates.
 - Python lint/type/package/example gates, Rust format/HAL/package/doc gates,
   Node.js package-content and audit gates, and Go race/coverage reporting.
-- Enforceable release preflight with version/tag validation, checksummed dry-run
-  artifacts, and least-privilege workflow permissions.
+- Enforceable release preflight with a canonical `VERSION` source, ecosystem-
+  specific prerelease mapping, package identity validation, clean artifact
+  installation smoke tests, checksums, and least-privilege workflow permissions.
 - Manual-only Linux SPI/I2C HIL runner and self-hosted workflow with bounded,
   sanitized JSON evidence and public wiring/troubleshooting guidance.
 - Regression tests for lifecycle, transport contracts, release automation,
@@ -44,7 +45,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Breaking (C/C++):** Transport read/write callbacks return the exact
   transferred byte count on success and a negative value on failure.
 - The repository now describes package outputs as verified build artifacts, not
-  as registry-published packages.
+  as registry-published packages; Rust uses the `adxl355-driver` distribution
+  name and npm uses `@oaslananka/adxl355`.
 - Language-specific API and adapter differences are documented explicitly rather
   than described as full feature parity.
 
