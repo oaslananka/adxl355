@@ -75,9 +75,15 @@ class PythonLockTests(unittest.TestCase):
         self.assertGreaterEqual(len(lock_installs), 5)
         for command in lock_installs:
             self.assertIn("--require-hashes", command)
+            self.assertIn("--no-deps", command)
         self.assertIn("-r ../requirements/python/ci-test.txt", rendered)
         self.assertIn("-r ../requirements/python/ci-quality.txt", rendered)
         self.assertIn("--no-build-isolation --no-deps -e ./python", rendered)
+        self.assertGreaterEqual(rendered.count("PIP_CONFIG_FILE: /dev/null"), 3)
+        self.assertGreaterEqual(
+            rendered.count("PIP_INDEX_URL: https://pypi.org/simple"), 3
+        )
+        self.assertNotIn("piwheels", rendered.lower())
         self.assertIn("--no-deps dist/*.whl", rendered)
 
     def test_lock_update_path_is_rate_limited(self) -> None:

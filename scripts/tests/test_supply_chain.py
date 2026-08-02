@@ -73,6 +73,18 @@ class SupplyChainTests(unittest.TestCase):
         self.assertIn('requires-python = ">=3.10"', pyproject)
         self.assertIn('python_version = "3.10"', pyproject)
 
+    def test_python_tool_hash_lock_policy_is_documented(self) -> None:
+        policy = SUPPLY_CHAIN_DOC.read_text(encoding="utf-8")
+        for phrase in (
+            "Hash-locked Python workflow tooling",
+            "requirements/python/",
+            "pip --require-hashes",
+            "scripts/generate_python_locks.py --verify",
+            "--no-build-isolation --no-deps",
+            "No private index or registry credential",
+        ):
+            self.assertIn(phrase, policy)
+
     def test_codeql_write_permission_is_scoped_to_analysis_job(self) -> None:
         workflow = load_yaml(CODEQL)
         self.assertEqual(

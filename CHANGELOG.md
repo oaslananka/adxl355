@@ -46,6 +46,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Regression tests for lifecycle, transport contracts, release automation,
   package metadata, HIL behavior, public documentation, and supply-chain policy.
 - Required bounded C libFuzzer and deterministic Python/release-tool mutation smoke with sanitizer coverage and short-lived failure reproducers.
+- Added reviewed SHA-256 lock groups for Python CI, release, and HIL tooling, an offline policy verifier, deterministic PyPI hash regeneration, and a rate-limited Dependabot update path.
 - Grouped weekly Dependabot updates for GitHub Actions, Python, Rust, Node.js,
   and Go, plus primary CodeQL analysis for C/C++, Python, JavaScript/TypeScript,
   and Go.

@@ -62,6 +62,48 @@ Python 3.10 or later so its build backend can use patched `setuptools>=83` rathe
 than retaining a vulnerable backend for Python 3.9 compatibility. Dependency
 updates must not be capped below a security fix without a dated, reviewed exception.
 
+## Hash-locked Python workflow tooling
+
+Third-party Python packages downloaded by CI, release verification, and the
+self-hosted HIL workflow are installed from reviewed files below
+`requirements/python/` with `pip --require-hashes`. Separate lock groups reflect
+the actual trust and runtime boundaries: the Python test matrix, Python 3.12
+quality/build tools, Python 3.11 cross-language verification, Python 3.11 release
+builds, HIL build tooling, and SPI/I2C adapters.
+
+Each `.in` file is an explicit, sorted list of exact direct and transitive package
+versions. `scripts/generate_python_locks.py` uses only the Python standard library
+to read the public PyPI JSON API and records every non-yanked release-file SHA-256
+for each reviewed version. It rejects ranges, direct URLs, alternate indexes,
+trusted hosts, credentials, duplicates, and unsorted inputs. Generated `.txt`
+files contain no timestamp, index URL, or environment-specific secret. Workflows
+ignore host pip configuration and explicitly use only `https://pypi.org/simple`,
+so an inherited mirror or extra index cannot silently supply a different file.
+
+Regenerate after reviewing an intended package/version change:
+
+```bash
+python scripts/generate_python_locks.py
+python scripts/generate_python_locks.py --verify
+python -m unittest scripts.tests.test_python_locks -v
+```
+
+Review both sides of the change: `.in` files prove which package versions are
+intended, while `.txt` files show the authenticated PyPI artifact set. Unexpected
+new packages, removed hashes, yanked-only releases, source-only substitutions, or
+large platform expansion require investigation before merge. Dependabot checks
+`/requirements/python` weekly with a seven-day cooldown and one open lock-update
+PR, but generated changes are never self-approving and must pass the offline lock
+verifier and full workflow tests.
+
+Workflow installs use `--only-binary=:all:` where every package has a compatible
+wheel. The SPI adapter is the narrow exception because `spidev` is distributed as
+a source archive; HIL installs the locked build tools first, then installs the
+hash-verified adapter with `--no-build-isolation --no-deps`. Repository-local
+editable installs and locally built wheel smoke tests are not external downloads;
+they remain separate, dependency-free, and use `--no-build-isolation` or
+`--no-deps` as appropriate. No private index or registry credential is used.
+
 ## Immutable GitHub Actions
 
 Every external `uses:` reference is pinned to a **full commit SHA**. A version
