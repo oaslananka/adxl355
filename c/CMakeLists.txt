@@ -7,6 +7,7 @@ set(CMAKE_C_STANDARD_REQUIRED ON)
 # ---- Options ---------------------------------------------------------------
 option(ADXL355_BUILD_TESTS    "Build tests"    OFF)
 option(ADXL355_BUILD_EXAMPLES "Build examples" OFF)
+option(ADXL355_BUILD_FUZZERS  "Build Clang/libFuzzer targets" OFF)
 option(ADXL355_ENABLE_WARNINGS    "Enable compiler warnings"             ON)
 option(ADXL355_WARNINGS_AS_ERRORS "Treat compiler warnings as errors"    OFF)
 option(ADXL355_ENABLE_SANITIZERS   "Enable Address/Undefined sanitizers" OFF)
@@ -67,6 +68,11 @@ endif()
 # ---- Examples --------------------------------------------------------------
 if(ADXL355_BUILD_EXAMPLES)
     add_subdirectory(examples)
+endif()
+
+# ---- Fuzzing ---------------------------------------------------------------
+if(ADXL355_BUILD_FUZZERS)
+    add_subdirectory(fuzz)
 endif()
 
 # ---- Install ---------------------------------------------------------------
