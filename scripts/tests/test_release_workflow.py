@@ -11,6 +11,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 RELEASE_WORKFLOW = REPO_ROOT / ".github/workflows/release.yml"
 RELEASE_LOCK = REPO_ROOT / "requirements/python/release.txt"
 CI_WORKFLOW = REPO_ROOT / ".github/workflows/ci.yml"
+PUBLISH_JOBS = {"publish-python", "publish-node", "publish-rust"}
 PACKAGE_JOBS = {
     "python-package",
     "rust-package",
@@ -66,7 +67,11 @@ class ReleaseWorkflowTests(unittest.TestCase):
         self.assertIn("python -m build --no-isolation", text)
         self.assertIn("build==1.5.0", RELEASE_LOCK.read_text())
         self.assertIn("npm ci --ignore-scripts", text)
-        self.assertNotIn("--github-output", text)
+        preflight_commands = "\n".join(
+            str(step.get("run", ""))
+            for step in self.load_release()["jobs"]["preflight"]["steps"]
+        )
+        self.assertNotIn("--github-output", preflight_commands)
 
     def test_package_jobs_checkout_preflight_sha_and_upload_checksums(self) -> None:
         jobs = self.load_release()["jobs"]
@@ -120,15 +125,82 @@ class ReleaseWorkflowTests(unittest.TestCase):
         )
         self.assertIn("adxl355-driver-${VERSION}.crate", rust_commands)
 
+    def test_registry_publication_has_no_untrusted_trigger_or_runner(self) -> None:
+        release = self.load_release()
+        triggers = release.get("on", release.get(True, {}))
+        self.assertNotIn("pull_request", triggers)
+        self.assertNotIn("pull_request_target", triggers)
+        self.assertNotIn("workflow_run", triggers)
+        for job_name in PUBLISH_JOBS:
+            job = release["jobs"][job_name]
+            self.assertEqual(job["runs-on"], "ubuntu-24.04")
+            self.assertNotIn("continue-on-error", job)
+
+    def test_each_registry_job_downloads_only_its_verified_family(self) -> None:
+        jobs = self.load_release()["jobs"]
+        expected = {
+            "publish-python": "package-python-",
+            "publish-node": "package-node-",
+            "publish-rust": "package-rust-",
+        }
+        for job_name, prefix in expected.items():
+            downloads = [
+                step
+                for step in jobs[job_name]["steps"]
+                if str(step.get("uses", "")).startswith("actions/download-artifact@")
+            ]
+            self.assertEqual(len(downloads), 1)
+            self.assertTrue(str(downloads[0]["with"]["name"]).startswith(prefix))
+        self.assertNotIn("skip-existing", RELEASE_WORKFLOW.read_text())
+
+    def test_release_publication_cannot_cancel_an_in_progress_run(self) -> None:
+        release = self.load_release()
+        self.assertFalse(release["concurrency"]["cancel-in-progress"])
+
+    def test_registry_publish_jobs_reuse_verified_artifacts_with_oidc(self) -> None:
+        release = self.load_release()
+        jobs = release["jobs"]
+        for job_name in PUBLISH_JOBS:
+            job = jobs[job_name]
+            self.assertEqual(job["runs-on"], "ubuntu-24.04")
+            self.assertEqual(job["environment"], "release")
+            self.assertEqual(
+                job["permissions"], {"contents": "read", "id-token": "write"}
+            )
+            self.assertIn("release-bundle", job["needs"])
+            self.assertIn("preflight", job["needs"])
+            actions = [str(step.get("uses", "")) for step in job["steps"]]
+            self.assertTrue(
+                any(
+                    action.startswith("actions/download-artifact@")
+                    for action in actions
+                )
+            )
+            commands = "\n".join(str(step.get("run", "")) for step in job["steps"])
+            self.assertIn("scripts/registry_release.py", commands)
+            self.assertIn("sha256sum --check SHA256SUMS", commands)
+
+    def test_registry_publish_jobs_are_idempotent_and_token_free(self) -> None:
+        text = RELEASE_WORKFLOW.read_text()
+        self.assertIn("publish_required", text)
+        self.assertIn("--require-published", text)
+        self.assertIn("vars.REGISTRY_PUBLISHING_ENABLED == 'true'", text)
+        self.assertNotRegex(text, r"secrets\.(NPM|PYPI|CARGO|TWINE|REGISTRY).*TOKEN")
+        self.assertIn(
+            "pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33",
+            text,
+        )
+        self.assertIn(
+            "rust-lang/crates-io-auth-action@c6f97d42243bad5fab37ca0427f495c86d5b1a18",
+            text,
+        )
+
     def test_c_cpp_release_job_reuses_the_verified_c_core_build(self) -> None:
         jobs = self.load_release()["jobs"]
         commands = "\n".join(
-            str(step.get("run", ""))
-            for step in jobs["c-cpp-package"]["steps"]
+            str(step.get("run", "")) for step in jobs["c-cpp-package"]["steps"]
         )
-        self.assertIn(
-            "-DCMAKE_PREFIX_PATH=${{ github.workspace }}/c/build", commands
-        )
+        self.assertIn("-DCMAKE_PREFIX_PATH=${{ github.workspace }}/c/build", commands)
 
     def test_release_enforces_and_uploads_package_size_evidence(self) -> None:
         text = RELEASE_WORKFLOW.read_text()

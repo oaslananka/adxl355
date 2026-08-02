@@ -92,6 +92,8 @@ def inspect_python(directory: Path, version: str, *, smoke: bool) -> dict[str, o
     for required_url in (
         "Project-URL: Repository, https://github.com/oaslananka/adxl355",
         "Project-URL: Documentation, https://github.com/oaslananka/adxl355/tree/main/docs",
+        "Project-URL: Changelog, https://github.com/oaslananka/adxl355/blob/main/CHANGELOG.md",
+        "Project-URL: Security, https://github.com/oaslananka/adxl355/security/policy",
     ):
         if required_url not in metadata:
             raise ArtifactError(f"Python wheel metadata is missing {required_url!r}")
@@ -163,6 +165,10 @@ def inspect_rust(directory: Path, version: str, *, smoke: bool) -> dict[str, obj
         for required in ("README.md", "LICENSE", "src/lib.rs"):
             if not (package_root / required).is_file():
                 raise ArtifactError(f"Rust crate is missing {required}")
+        rust_readme = (package_root / "README.md").read_text(encoding="utf-8")
+        for required_link in ("CHANGELOG.md", "security/policy", "LICENSE"):
+            if required_link not in rust_readme:
+                raise ArtifactError(f"Rust crate README is missing {required_link}")
 
         if smoke:
             consumer = Path(temp) / "consumer"
@@ -199,6 +205,10 @@ def inspect_node(directory: Path, version: str, *, smoke: bool) -> dict[str, obj
         if package_member is None:
             raise ArtifactError("npm tarball is missing package.json")
         package = json.load(package_member)
+        readme_member = handle.extractfile("package/README.md")
+        if readme_member is None:
+            raise ArtifactError("npm tarball is missing README.md")
+        node_readme = readme_member.read().decode("utf-8")
 
     if package.get("name") != "@oaslananka/adxl355":
         raise ArtifactError("npm package name mismatch")
@@ -207,6 +217,9 @@ def inspect_node(directory: Path, version: str, *, smoke: bool) -> dict[str, obj
     expected_exports = {".", "./linux/spi", "./linux/i2c"}
     if set(package.get("exports", {})) != expected_exports:
         raise ArtifactError("npm package exposes unsupported entry points")
+    for required_link in ("CHANGELOG.md", "security/policy", "LICENSE"):
+        if required_link not in node_readme:
+            raise ArtifactError(f"npm package README is missing {required_link}")
     allowed_roots = {"package/LICENSE", "package/README.md", "package/package.json"}
     for name in names:
         if name in allowed_roots or name.startswith("package/dist/"):
