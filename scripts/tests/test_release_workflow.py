@@ -95,6 +95,15 @@ class ReleaseWorkflowTests(unittest.TestCase):
                 )
             )
 
+    def test_preflight_resolves_the_requested_immutable_tag_commit(self) -> None:
+        commands = "\n".join(
+            str(step.get("run", ""))
+            for step in self.load_release()["jobs"]["preflight"]["steps"]
+        )
+        self.assertIn('git rev-parse "${RELEASE_TAG}^{commit}"', commands)
+        self.assertIn('--sha "$resolved_sha"', commands)
+        self.assertNotIn('RELEASE_SHA: ${{ github.sha }}', RELEASE_WORKFLOW.read_text())
+
     def test_preflight_exports_ecosystem_versions_and_package_names(self) -> None:
         outputs = self.load_release()["jobs"]["preflight"]["outputs"]
         self.assertEqual(

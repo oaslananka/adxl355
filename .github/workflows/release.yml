@@ -58,13 +58,12 @@ jobs:
         run: python -m unittest discover -s scripts/tests -p "test_release_preflight.py" -v
       - name: Verify tag, commit, clean tree, and package versions
         id: preflight
-        env:
-          RELEASE_SHA: ${{ github.sha }}
         run: |
+          resolved_sha="$(git rev-parse "${RELEASE_TAG}^{commit}")"
           report="$RUNNER_TEMP/release-preflight.json"
           python scripts/release_preflight.py \
             --tag "$RELEASE_TAG" \
-            --sha "$RELEASE_SHA" > "$report"
+            --sha "$resolved_sha" > "$report"
           jq -r '
             {tag, version, python_version, core_version, go_tag, rust_crate_name, node_package_name, release_sha, short_sha}
             | to_entries[]
