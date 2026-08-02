@@ -146,15 +146,69 @@ def collect_until_semicolon(lines: list[str], start: int) -> tuple[str, int]:
     return normalize(" ".join(collected)), index
 
 
+def split_top_level_items(text: str, delimiter: str = ",") -> list[str]:
+    """Split one declaration body without splitting nested expressions."""
+    items: list[str] = []
+    start = 0
+    paren_depth = 0
+    brace_depth = 0
+    bracket_depth = 0
+    for index, char in enumerate(text):
+        if char == "(":
+            paren_depth += 1
+        elif char == ")":
+            paren_depth = max(0, paren_depth - 1)
+        elif char == "{":
+            brace_depth += 1
+        elif char == "}":
+            brace_depth = max(0, brace_depth - 1)
+        elif char == "[":
+            bracket_depth += 1
+        elif char == "]":
+            bracket_depth = max(0, bracket_depth - 1)
+        elif char == delimiter and paren_depth == brace_depth == bracket_depth == 0:
+            item = normalize(text[start:index])
+            if item:
+                items.append(item)
+            start = index + 1
+    final = normalize(text[start:])
+    if final:
+        items.append(final)
+    return items
+
+
+def c_type_entries(declaration: str) -> set[str]:
+    """Represent trailing C enum additions without erasing older declarations."""
+    if not declaration.startswith("typedef enum {"):
+        return {f"type:{declaration}"}
+    opening = declaration.find("{")
+    try:
+        closing = matching_brace(declaration, opening)
+    except CompatibilityError:
+        return {f"type:{declaration}"}
+    members = split_top_level_items(declaration[opening + 1 : closing])
+    suffix = declaration[closing + 1 :].strip()
+    if not members or not suffix:
+        return {f"type:{declaration}"}
+    header = declaration[: opening + 1].strip()
+    entries: set[str] = set()
+    for count in range(1, len(members) + 1):
+        body = ", ".join(members[:count])
+        entries.add(f"type:{normalize(f'{header} {body} }} {suffix}')}")
+    return entries
+
+
 def c_surface(root: Path) -> set[str]:
-    lines = strip_comments((root / "c/include/adxl355/adxl355.h").read_text()).splitlines()
+    lines = strip_comments(
+        (root / "c/include/adxl355/adxl355.h").read_text()
+    ).splitlines()
     entries: set[str] = set()
     index = 0
     while index < len(lines):
         line = lines[index].strip()
         if line.startswith(("typedef enum {", "typedef struct {")):
             declaration, index = collect_until_semicolon(lines, index)
-            entries.add(f"type:{declaration}")
+            entries.update(c_type_entries(declaration))
         elif "adxl355_" in line and "(" in line and not line.startswith("#"):
             declaration, index = collect_until_semicolon(lines, index)
             entries.add(f"function:{declaration}")
@@ -166,7 +220,9 @@ def word_boundary(text: str, index: int, length: int) -> bool:
     before = text[index - 1] if index > 0 else " "
     after_index = index + length
     after = text[after_index] if after_index < len(text) else " "
-    return not (before.isalnum() or before == "_") and not (after.isalnum() or after == "_")
+    return not (before.isalnum() or before == "_") and not (
+        after.isalnum() or after == "_"
+    )
 
 
 def named_blocks(text: str, keyword: str) -> Iterator[tuple[str, str, str]]:
@@ -260,7 +316,9 @@ def class_signature_entries(name: str, obj: type[Any]) -> set[str]:
     if issubclass(obj, Enum):
         entries.update(f"enum:{name}.{member.name}={member.value!r}" for member in obj)
     for member_name, member in inspect.getmembers(obj):
-        if member_name.startswith("_") or not (inspect.isfunction(member) or inspect.ismethod(member)):
+        if member_name.startswith("_") or not (
+            inspect.isfunction(member) or inspect.ismethod(member)
+        ):
             continue
         signature = safe_signature(member)
         if signature is not None:
@@ -270,7 +328,9 @@ def class_signature_entries(name: str, obj: type[Any]) -> set[str]:
 
 def object_signature(name: str, obj: Any) -> set[str]:
     entries = {f"export:{name}:{type(obj).__name__}"}
-    signature = safe_signature(obj) if inspect.isfunction(obj) or inspect.isclass(obj) else None
+    signature = (
+        safe_signature(obj) if inspect.isfunction(obj) or inspect.isclass(obj) else None
+    )
     if inspect.isclass(obj) and issubclass(obj, Enum):
         entries.add(f"signature:{name}(*values)")
     elif signature is not None:
@@ -308,11 +368,17 @@ def declaration_header(lines: list[str], start: int) -> tuple[str, int]:
         collected.append(line)
         paren_depth += line.count("(") - line.count(")")
         angle_depth += line.count("<") - line.count(">")
-        if paren_depth <= 0 and angle_depth <= 0 and ("{" in line or ";" in line or "=" in line):
+        if (
+            paren_depth <= 0
+            and angle_depth <= 0
+            and ("{" in line or ";" in line or "=" in line)
+        ):
             break
         index += 1
     header = " ".join(collected)
-    terminators = [position for symbol in "{;=" if (position := header.find(symbol)) >= 0]
+    terminators = [
+        position for symbol in "{;=" if (position := header.find(symbol)) >= 0
+    ]
     if terminators:
         header = header[: min(terminators)]
     return normalize(header), index
@@ -320,7 +386,15 @@ def declaration_header(lines: list[str], start: int) -> tuple[str, int]:
 
 def rust_surface(root: Path) -> set[str]:
     entries: set[str] = set()
-    prefixes = ("pub use ", "pub struct ", "pub enum ", "pub trait ", "pub type ", "pub const ", "pub fn ")
+    prefixes = (
+        "pub use ",
+        "pub struct ",
+        "pub enum ",
+        "pub trait ",
+        "pub type ",
+        "pub const ",
+        "pub fn ",
+    )
     for path in sorted((root / "rust/src").glob("*.rs")):
         lines = strip_comments(path.read_text()).splitlines()
         index = 0
@@ -335,7 +409,17 @@ def rust_surface(root: Path) -> set[str]:
 
 def exported_typescript_header(line: str) -> bool:
     stripped = line.strip()
-    return stripped.startswith(("export class ", "export interface ", "export enum ", "export type ", "export const ", "export function ", "export abstract class "))
+    return stripped.startswith(
+        (
+            "export class ",
+            "export interface ",
+            "export enum ",
+            "export type ",
+            "export const ",
+            "export function ",
+            "export abstract class ",
+        )
+    )
 
 
 def typescript_class_methods(name: str, body: str) -> set[str]:
@@ -391,22 +475,35 @@ def go_exported_name(declaration: str, offset: int) -> str | None:
     return name if name and name[0].isupper() else None
 
 
-def go_named_declaration(line: str, lines: list[str], index: int) -> tuple[str | None, int]:
+def go_named_declaration(
+    line: str, lines: list[str], index: int
+) -> tuple[str | None, int]:
     if line.startswith("type "):
         header, end = declaration_header(lines, index)
-        return (f"declaration:{header}" if go_exported_name(header, len("type ")) else None, end)
+        return (
+            f"declaration:{header}" if go_exported_name(header, len("type ")) else None,
+            end,
+        )
     if line.startswith("func "):
         header, end = declaration_header(lines, index)
         paren = header.find(")") if header.startswith("func (") else len("func ")
-        return (f"declaration:{header}" if go_exported_name(header, paren + 1) else None, end)
+        return (
+            f"declaration:{header}" if go_exported_name(header, paren + 1) else None,
+            end,
+        )
     if line.startswith(("const ", "var ")) and "(" not in line:
         header, end = declaration_header(lines, index)
         offset = len("const ") if line.startswith("const ") else len("var ")
-        return (f"declaration:{header}" if go_exported_name(header, offset) else None, end)
+        return (
+            f"declaration:{header}" if go_exported_name(header, offset) else None,
+            end,
+        )
     return None, index
 
 
-def go_group_entries(kind: str, lines: list[str], index: int, filename: str) -> tuple[set[str], int]:
+def go_group_entries(
+    kind: str, lines: list[str], index: int, filename: str
+) -> tuple[set[str], int]:
     entries: set[str] = set()
     cursor = index + 1
     while cursor < len(lines) and lines[cursor].strip() != ")":
@@ -429,7 +526,9 @@ def go_file_surface(path: Path) -> set[str]:
         else:
             declaration, index = go_named_declaration(line, lines, index)
             if declaration:
-                entries.add(f"{declaration.split(':', 1)[0]}:{path.name}:{declaration.split(':', 1)[1]}")
+                entries.add(
+                    f"{declaration.split(':', 1)[0]}:{path.name}:{declaration.split(':', 1)[1]}"
+                )
         index += 1
     return entries
 
@@ -469,7 +568,9 @@ def compare(baseline: dict[str, Any], current: dict[str, Any]) -> list[str]:
     return failures
 
 
-def git(*args: str, cwd: Path = REPO_ROOT, check: bool = True) -> subprocess.CompletedProcess[str]:
+def git(
+    *args: str, cwd: Path = REPO_ROOT, check: bool = True
+) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
         ["git", *args],
         cwd=cwd,
@@ -480,7 +581,9 @@ def git(*args: str, cwd: Path = REPO_ROOT, check: bool = True) -> subprocess.Com
     )
 
 
-def validate_baseline_update(old: dict[str, Any], new: dict[str, Any], changelog_diff: str) -> None:
+def validate_baseline_update(
+    old: dict[str, Any], new: dict[str, Any], changelog_diff: str
+) -> None:
     removed = compare(old, new)
     if removed and BREAKING_MARKER.lower() not in changelog_diff.lower():
         details = "\n".join(f"- {entry}" for entry in removed[:20])
@@ -528,7 +631,9 @@ def run(write: bool, base_ref: str | None) -> dict[str, int] | None:
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--write", action="store_true", help="rewrite baseline from current source")
+    parser.add_argument(
+        "--write", action="store_true", help="rewrite baseline from current source"
+    )
     parser.add_argument("--base-ref", default=os.environ.get("GITHUB_BASE_REF"))
     args = parser.parse_args()
     counts = run(args.write, args.base_ref)
