@@ -254,7 +254,7 @@ class SupplyChainTests(unittest.TestCase):
         self.assertIn("schedule", triggers)
         self.assertIn("workflow_dispatch", triggers)
         self.assertIn("branch_protection_rule", triggers)
-        self.assertEqual(workflow["permissions"], "read-all")
+        self.assertEqual(workflow["permissions"], {"contents": "read"})
 
         job = workflow["jobs"]["analysis"]
         self.assertEqual(
