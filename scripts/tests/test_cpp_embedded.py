@@ -98,6 +98,12 @@ class CppEmbeddedTests(unittest.TestCase):
         self.assertIn("embedded", jobs["consistency"]["needs"])
         lock = parse_lock(LOCK_ROOT / "platformio.txt")
         self.assertEqual(lock["platformio"][0], "6.1.19")
+        self.assertEqual(len(lock), 16)
+        for excluded in ("starlette", "uvicorn", "wsproto", "anyio", "h11"):
+            self.assertNotIn(excluded, lock)
+        self.assertIn("Verify command-scoped PlatformIO dependency boundary", rendered)
+        self.assertIn("u.find_spec(p) is None", commands)
+        self.assertIn("pio --version", commands)
 
 
 if __name__ == "__main__":

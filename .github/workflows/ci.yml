@@ -392,6 +392,10 @@ jobs:
           python -m pip install --disable-pip-version-check
           --require-hashes --no-deps --only-binary=:all:
           -r requirements/python/platformio.txt
+      - name: Verify command-scoped PlatformIO dependency boundary
+        run: |
+          python -c 'import importlib.metadata as m, importlib.util as u; r="\n".join(m.requires("platformio") or []); e={"starlette":"starlette<0.53,>=0.19","uvicorn":"uvicorn<0.41,>=0.16","wsproto":"wsproto==1.*"}; [(d in r and u.find_spec(p) is None) or (_ for _ in ()).throw(AssertionError(p)) for p,d in e.items()]'
+          pio --version
       - name: Verify Arduino library package contents
         env:
           PLATFORMIO_CORE_DIR: ${{ runner.temp }}/platformio

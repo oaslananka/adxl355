@@ -73,7 +73,7 @@ class SupplyChainTests(unittest.TestCase):
         self.assertIn('python_version = "3.10"', pyproject)
 
     def test_python_tool_hash_lock_policy_is_documented(self) -> None:
-        policy = SUPPLY_CHAIN_DOC.read_text(encoding="utf-8")
+        policy = " ".join(SUPPLY_CHAIN_DOC.read_text(encoding="utf-8").split())
         for phrase in (
             "Hash-locked Python workflow tooling",
             "requirements/python/",

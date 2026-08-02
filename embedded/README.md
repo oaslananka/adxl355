@@ -11,6 +11,11 @@ The Arduino/PlatformIO layer is intentionally thin:
 - forwarding headers preserve normal includes such as
   `<adxl355/adxl355.hpp>` while the package retains the repository layout.
 
+The PlatformIO environment is intentionally command-scoped. It installs the
+hash-locked build/pack closure but omits PlatformIO's vulnerable web/server stack
+(`starlette`, `uvicorn`, `wsproto`, `anyio`, and `h11`). Only `pio --version`,
+`pio pkg pack`, and `pio run` are supported by the CI environment.
+
 The representative fixture is Arduino Uno (`atmelavr@5.3.0`) and is compile-only:
 
 ```bash

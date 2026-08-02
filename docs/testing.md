@@ -196,9 +196,11 @@ and compiles `embedded/platformio/uno` with exceptions disabled.
 
 The fixture pins `atmelavr@5.3.0`, Arduino Uno, and the Arduino framework. It proves
 package layout, the thin Mode 0 SPI adapter, AVR C++11 compatibility, and reuse of
-the authoritative C core. It does not access the Raspberry Pi HIL runner, secrets,
-or physical hardware, and it does not claim compatibility for unbuilt boards or
-frameworks.
+the authoritative C core. Its 16-package PlatformIO environment deliberately
+omits the vulnerable web/server dependency stack and supports only version, pack,
+and build commands. It does not access the Raspberry Pi HIL runner, secrets, or
+physical hardware, and it does not claim compatibility for unbuilt boards,
+frameworks, PlatformIO Home, or remote/server commands.
 
 Local reproduction:
 
