@@ -1,6 +1,7 @@
 """ADXL355 accelerometer driver - cross-platform Python package."""
 
 from adxl355._version import __version__
+from adxl355.calibration import calculate_offset
 from adxl355.constants import (
     SCALE_2G_G_PER_LSB,
     SCALE_4G_G_PER_LSB,
@@ -16,13 +17,15 @@ from adxl355.errors import (
     DeviceStateError,
     InvalidConfigurationError,
 )
-from adxl355.registers import ODR, PowerMode, Range, Register
+from adxl355.registers import ODR, Axis, PowerMode, Range, Register
 from adxl355.transport import Transport
 from adxl355.types import AccelXYZ, RawXYZ
 
 __all__ = [
     "__version__",
     "ADXL355",
+    "Axis",
+    "calculate_offset",
     "Register",
     "Range",
     "PowerMode",

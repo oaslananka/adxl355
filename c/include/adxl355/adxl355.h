@@ -49,6 +49,14 @@ typedef enum {
     ADXL355_POWER_MEASUREMENT  = 0
 } adxl355_power_mode_t;
 
+
+/** Axis selection for offset calibration registers. */
+typedef enum {
+    ADXL355_AXIS_X = 0,
+    ADXL355_AXIS_Y = 1,
+    ADXL355_AXIS_Z = 2
+} adxl355_axis_t;
+
 typedef enum {
     ADXL355_ODR_4000_HZ   = 0,
     ADXL355_ODR_2000_HZ   = 1,
@@ -233,6 +241,28 @@ adxl355_status_t adxl355_set_power_mode(adxl355_t *dev, adxl355_power_mode_t mod
  */
 adxl355_status_t adxl355_set_odr(adxl355_t *dev, adxl355_odr_t odr);
 
+
+/* ---------------------------------------------------------------------------
+ * Offset calibration
+ * --------------------------------------------------------------------------- */
+
+/**
+ * Read one signed 16-bit hardware offset value.
+ *
+ * Offset bits match acceleration data bits [19:4], so one offset count equals
+ * 16 raw acceleration LSB. A successful probe is required.
+ */
+adxl355_status_t adxl355_read_offset(adxl355_t *dev, adxl355_axis_t axis, int16_t *offset);
+
+/**
+ * Write one signed 16-bit hardware offset value using one two-byte transfer.
+ *
+ * The driver temporarily enters standby when needed and restores the exact
+ * original POWER_CTL value after the write. The offset is volatile device
+ * state and is reset by power cycle or software reset.
+ */
+adxl355_status_t adxl355_write_offset(adxl355_t *dev, adxl355_axis_t axis, int16_t offset);
+
 /* ---------------------------------------------------------------------------
  * Data readout
  * --------------------------------------------------------------------------- */
@@ -332,6 +362,21 @@ float adxl355_raw_to_g(int32_t raw, adxl355_range_t range);
  * @return Acceleration in m/s².
  */
 float adxl355_raw_to_mps2(int32_t raw, adxl355_range_t range);
+
+
+/**
+ * Calculate a hardware offset from rounded raw acceleration means.
+ *
+ * Formula: current_offset +
+ * round_half_away_from_zero((measured_raw - expected_raw) / 16).
+ * Inputs must be valid signed 20-bit acceleration values. When `saturate` is
+ * false, a resulting value outside int16_t is rejected. When true, it is clamped.
+ */
+adxl355_status_t adxl355_calculate_offset(int32_t measured_raw,
+                                           int32_t expected_raw,
+                                           int16_t current_offset,
+                                           bool saturate,
+                                           int16_t *offset);
 
 /** Return a human-readable string for a status code. */
 const char *adxl355_status_string(adxl355_status_t status);

@@ -87,6 +87,24 @@ static adxl355_status_t finish_configuration(
     return operation_status;
 }
 
+
+static bool offset_register_for_axis(adxl355_axis_t axis, uint8_t *reg)
+{
+    switch (axis) {
+        case ADXL355_AXIS_X:
+            *reg = ADXL355_REG_OFFSET_X_H;
+            return true;
+        case ADXL355_AXIS_Y:
+            *reg = ADXL355_REG_OFFSET_Y_H;
+            return true;
+        case ADXL355_AXIS_Z:
+            *reg = ADXL355_REG_OFFSET_Z_H;
+            return true;
+        default:
+            return false;
+    }
+}
+
 static bool range_from_register(uint8_t reg, adxl355_range_t *range)
 {
     switch (reg & ADXL355_RANGE_SEL_MASK) {
@@ -318,6 +336,64 @@ adxl355_status_t adxl355_set_odr(adxl355_t *dev, adxl355_odr_t odr)
     return finish_configuration(dev, &guard, status);
 }
 
+
+adxl355_status_t adxl355_read_offset(adxl355_t *dev, adxl355_axis_t axis, int16_t *offset)
+{
+    if (dev == NULL || offset == NULL) {
+        return ADXL355_ERR_NULL;
+    }
+    adxl355_status_t state = require_initialized(dev);
+    if (state != ADXL355_OK) {
+        return state;
+    }
+    uint8_t reg;
+    if (!offset_register_for_axis(axis, &reg)) {
+        return ADXL355_ERR_INVALID_ARG;
+    }
+    uint8_t data[2];
+    if (read_exact(dev, reg, data, sizeof(data)) != 0) {
+        return ADXL355_ERR_BUS;
+    }
+    uint16_t encoded = (uint16_t)(((uint16_t)data[0] << 8) | (uint16_t)data[1]);
+    int32_t signed_value = (int32_t)encoded;
+    if ((encoded & UINT16_C(0x8000)) != 0U) {
+        signed_value -= INT32_C(0x10000);
+    }
+    *offset = (int16_t)signed_value;
+    return ADXL355_OK;
+}
+
+adxl355_status_t adxl355_write_offset(adxl355_t *dev, adxl355_axis_t axis, int16_t offset)
+{
+    if (dev == NULL) {
+        return ADXL355_ERR_NULL;
+    }
+    adxl355_status_t state = require_initialized(dev);
+    if (state != ADXL355_OK) {
+        return state;
+    }
+    uint8_t reg;
+    if (!offset_register_for_axis(axis, &reg)) {
+        return ADXL355_ERR_INVALID_ARG;
+    }
+
+    adxl355_config_guard_t guard;
+    adxl355_status_t status = enter_configuration_standby(dev, &guard);
+    if (status != ADXL355_OK) {
+        return status;
+    }
+
+    uint16_t encoded = (uint16_t)offset;
+    uint8_t data[2] = {
+        (uint8_t)(encoded >> 8),
+        (uint8_t)(encoded & UINT16_C(0x00FF)),
+    };
+    if (write_exact(dev, reg, data, sizeof(data)) != 0) {
+        status = ADXL355_ERR_BUS;
+    }
+    return finish_configuration(dev, &guard, status);
+}
+
 adxl355_status_t adxl355_read_raw(adxl355_t *dev, adxl355_raw_xyz_t *out)
 {
     if (dev == NULL || out == NULL) {
@@ -454,6 +530,42 @@ float adxl355_raw_to_g(int32_t raw, adxl355_range_t range)
 float adxl355_raw_to_mps2(int32_t raw, adxl355_range_t range)
 {
     return (float)raw * range_to_scale_g_per_lsb(range) * ADXL355_STANDARD_GRAVITY_M_S2;
+}
+
+
+adxl355_status_t adxl355_calculate_offset(int32_t measured_raw,
+                                           int32_t expected_raw,
+                                           int16_t current_offset,
+                                           bool saturate,
+                                           int16_t *offset)
+{
+    if (offset == NULL) {
+        return ADXL355_ERR_NULL;
+    }
+    const int32_t raw_min = -INT32_C(524288);
+    const int32_t raw_max = INT32_C(524287);
+    if (measured_raw < raw_min || measured_raw > raw_max ||
+        expected_raw < raw_min || expected_raw > raw_max) {
+        return ADXL355_ERR_INVALID_ARG;
+    }
+
+    int64_t delta = (int64_t)measured_raw - (int64_t)expected_raw;
+    int64_t adjustment = delta >= 0 ? (delta + INT64_C(8)) / INT64_C(16)
+                                    : (delta - INT64_C(8)) / INT64_C(16);
+    int64_t counts = (int64_t)current_offset + adjustment;
+    if (counts > INT16_MAX) {
+        if (!saturate) {
+            return ADXL355_ERR_INVALID_ARG;
+        }
+        counts = INT16_MAX;
+    } else if (counts < INT16_MIN) {
+        if (!saturate) {
+            return ADXL355_ERR_INVALID_ARG;
+        }
+        counts = INT16_MIN;
+    }
+    *offset = (int16_t)counts;
+    return ADXL355_OK;
 }
 
 const char *adxl355_status_string(adxl355_status_t status)

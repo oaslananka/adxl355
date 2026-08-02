@@ -18,3 +18,19 @@ print(device.read_acceleration_g())
 Install optional Linux adapters with `adxl355[spi]` or `adxl355[i2c]`.
 See the repository root documentation for lifecycle, hardware wiring, and
 cross-language behavior details.
+
+## Hardware offset calibration
+
+```python
+from adxl355 import ADXL355, Axis, calculate_offset
+
+current = device.read_offset(Axis.X)
+offset = calculate_offset(measured_raw=1200, expected_raw=0, current_offset=current)
+device.write_offset(Axis.X, offset)
+print(device.read_offset(Axis.X))
+```
+
+One offset count equals 16 raw acceleration LSB. Writes are volatile, require a
+successful probe, enter standby when necessary, and restore the prior power mode.
+See `../docs/calibration.md` for orientation, sampling, temperature, rollback,
+and accuracy limitations.

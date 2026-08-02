@@ -48,6 +48,14 @@ class Register(IntEnum):
     RESET = 0x2F
 
 
+class Axis(IntEnum):
+    """Axis selection for signed hardware offset registers."""
+
+    X = 0
+    Y = 1
+    Z = 2
+
+
 class Range(IntEnum):
     """Acceleration range selection.
 
