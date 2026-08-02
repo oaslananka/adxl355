@@ -5,10 +5,11 @@ Node.js/TypeScript, and Go.
 
 This repository is an **alpha-stage, hardware-focused driver project**. The
 shared register model, conversion behavior, lifecycle contract, automated CI,
-package dry runs, and an opt-in physical HIL framework are implemented. A
-production maturity claim remains intentionally deferred until recent successful
-physical HIL evidence exists for both SPI and I2C on the release-candidate
-commit.
+package dry runs, and an opt-in physical HIL framework are implemented. The
+published `v0.1.0-alpha.3` prerelease has paired final SPI and I2C HIL evidence
+on exact commit `71de69b8727a9f8eef254de586d9bce7bc8fa8ac`. A production maturity
+claim remains intentionally deferred because APIs and feature coverage are still
+alpha-stage and language-specific.
 
 ## Current status
 
@@ -61,6 +62,16 @@ support for boards or frameworks that are not built in CI.
 
 ## Hardware validation status
 
+The published [`v0.1.0-alpha.3`](https://github.com/oaslananka/adxl355/releases/tag/v0.1.0-alpha.3)
+prerelease records paired Raspberry Pi 5 HIL evidence on exact commit
+`71de69b8727a9f8eef254de586d9bce7bc8fa8ac`. SPI [run 30736413982](https://github.com/oaslananka/adxl355/actions/runs/30736413982)
+and I2C [run 30736668298](https://github.com/oaslananka/adxl355/actions/runs/30736668298)
+both captured 32/32 unique samples, verified identity `0xAD/0x1D/0xED` and
+revision `0x01`, measured 29.1989 °C, and restored standby, ±2 g, and the default
+ODR. Permanent sanitized release assets are `hil-spi-30736413982.json` and
+`hil-i2c-30736668298.json`; the I2C release fixture used address `0x1D` at
+100 kHz.
+
 The manual HIL workflow has a successful Raspberry Pi 5 SPI result on `main`
 ([run 30725059679](https://github.com/oaslananka/adxl355/actions/runs/30725059679)): the ADXL355 returned revision `0x01` and 32 unique samples. The Go
 `adxl355/linuxio` SPI example was independently exercised at 1 MHz from exact code
@@ -76,9 +87,9 @@ release-candidate HIL evidence. I2C feature evidence also passed on `main` in
 [run 30734635341](https://github.com/oaslananka/adxl355/actions/runs/30734635341):
 the `0x1D` fixture returned revision `0x01`, 28.6464 °C, and 32 unique samples.
 The exact-`main` Go I2C example independently captured 32 nonzero, unique samples
-and restored `POWER_CTL=0x01`. Both SPI and I2C must still be rerun against the
-same final release-candidate commit before publication. Wiring, runner setup, supported bus settings, diagnostics, and
-evidence requirements are documented in
+and restored `POWER_CTL=0x01`. These earlier runs remain feature-specific history;
+the paired final release evidence is recorded above. Wiring, runner setup,
+supported bus settings, diagnostics, and evidence requirements are documented in
 [`docs/hardware-testing.md`](docs/hardware-testing.md).
 
 ## Device lifecycle contract
@@ -191,7 +202,9 @@ go run ./examples/linux_i2c --bus 1 --address 0x1D --bus-hz 400000 --samples 8 -
 ```
 
 Both commands probe identity, read temperature, collect a finite sample count, and
-restore standby before closing the descriptor. The SPI command is physically verified on Raspberry Pi 5 at commit `08273bf`; I2C remains pending the dedicated fixture evidence in #41.
+restore standby before closing the descriptor. SPI and I2C were physically
+verified on Raspberry Pi 5, including the paired final `v0.1.0-alpha.3` HIL runs
+listed above.
 
 ## Documentation
 

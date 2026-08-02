@@ -73,7 +73,10 @@ class PublicDocumentationTests(unittest.TestCase):
         changelog = (REPO_ROOT / "CHANGELOG.md").read_text()
         self.assertIn("buildable package metadata", readme)
         self.assertIn("not published by this repository", readme)
-        self.assertIn("verification and packaging dry run", publishing)
+        self.assertIn("v0.1.0-alpha.3", publishing)
+        self.assertIn("GitHub prerelease", publishing)
+        self.assertIn("PyPI, npm, and crates.io remain unpublished", publishing)
+        self.assertNotIn("does not publish to PyPI, npm, crates.io, GitHub Releases", publishing)
         self.assertIn("[0.1.0-alpha.3] - Unreleased", changelog)
         self.assertIn("[0.1.0-alpha.1]", changelog)
 
@@ -129,22 +132,21 @@ class PublicDocumentationTests(unittest.TestCase):
         self.assertIn("Node.js 22 or >= 24", contributing)
         self.assertIn("CI covers 22, 24, and 26", contributing)
 
-    def test_hil_status_distinguishes_feature_evidence_from_final_release_pair(
-        self,
-    ) -> None:
+    def test_hil_status_records_published_alpha3_release_evidence(self) -> None:
         readme = README.read_text()
         todo = (REPO_ROOT / "TODO.md").read_text()
         hardware = (REPO_ROOT / "docs" / "hardware-testing.md").read_text()
-        releasing = (REPO_ROOT / "docs" / "releasing.md").read_text()
-        for content in (readme, hardware, releasing):
-            self.assertIn("30725059679", content)
-            self.assertIn("30734635341", content)
-        self.assertIn("Raspberry Pi 5 SPI and I2C feature passes", readme)
-        self.assertIn("final release-candidate", todo)
-        self.assertIn(
-            "run SPI and I2C against the same final release-candidate SHA", hardware
-        )
-        self.assertIn("exact release-candidate commit", releasing)
+        publishing = (REPO_ROOT / "docs" / "publishing.md").read_text()
+        for content in (readme, hardware, publishing):
+            self.assertIn("71de69b8727a9f8eef254de586d9bce7bc8fa8ac", content)
+            self.assertIn("30736413982", content)
+            self.assertIn("30736668298", content)
+            self.assertIn("v0.1.0-alpha.3", content)
+        self.assertIn("hil-spi-30736413982.json", readme)
+        self.assertIn("hil-i2c-30736668298.json", readme)
+        self.assertIn("[x] Publish the verified GitHub prerelease", todo)
+        self.assertNotIn("Both SPI and I2C must still be rerun", readme)
+        self.assertNotIn("final-candidate reruns remain required", publishing)
 
     def test_contributor_templates_exist_and_route_security_privately(self) -> None:
         issue_root = REPO_ROOT / ".github" / "ISSUE_TEMPLATE"
