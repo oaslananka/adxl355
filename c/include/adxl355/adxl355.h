@@ -24,7 +24,9 @@ typedef enum {
     ADXL355_ERR_BAD_DEVICE = -5,
     ADXL355_ERR_NOT_READY  = -6,
     ADXL355_ERR_UNSUPPORTED = -7,
-    ADXL355_ERR_STATE       = -8
+    ADXL355_ERR_STATE       = -8,
+    ADXL355_ERR_THRESHOLD   = -9,
+    ADXL355_ERR_RESTORE     = -10
 } adxl355_status_t;
 
 /* ---------------------------------------------------------------------------
@@ -88,6 +90,33 @@ typedef struct {
     float y;
     float z;
 } adxl355_float_xyz_t;
+
+/** Optional caller-owned absolute-delta acceptance policy in g. */
+typedef struct {
+    adxl355_float_xyz_t min_abs_delta_g;
+    adxl355_float_xyz_t max_abs_delta_g;
+} adxl355_self_test_thresholds_t;
+
+/** Bounded self-test acquisition configuration. */
+typedef struct {
+    uint16_t sample_count;
+    uint16_t settle_samples;
+    uint16_t max_ready_polls;
+    uint16_t poll_delay_ms;
+    bool enforce_thresholds;
+    adxl355_self_test_thresholds_t thresholds;
+} adxl355_self_test_config_t;
+
+/** Measured self-test response; threshold status is caller-policy dependent. */
+typedef struct {
+    adxl355_float_xyz_t baseline_g;
+    adxl355_float_xyz_t stimulated_g;
+    adxl355_float_xyz_t delta_g;
+    adxl355_float_xyz_t abs_delta_g;
+    uint16_t samples;
+    bool thresholds_evaluated;
+    bool thresholds_passed;
+} adxl355_self_test_result_t;
 
 /**
  * Transport abstraction – function-pointer bus interface.
@@ -262,6 +291,27 @@ adxl355_status_t adxl355_read_offset(adxl355_t *dev, adxl355_axis_t axis, int16_
  * state and is reset by power cycle or software reset.
  */
 adxl355_status_t adxl355_write_offset(adxl355_t *dev, adxl355_axis_t axis, int16_t offset);
+
+
+/* ---------------------------------------------------------------------------
+ * Electrostatic self-test
+ * --------------------------------------------------------------------------- */
+
+/** Fill a bounded acquisition configuration without normative thresholds. */
+adxl355_status_t adxl355_self_test_config_default(adxl355_self_test_config_t *config);
+
+/**
+ * Run the Rev.D ST1+ST2 electrostatic response sequence.
+ *
+ * The implementation temporarily uses ±2 g, 125 Hz, and measurement mode,
+ * collects baseline and stimulated means, then restores SELF_TEST, RANGE,
+ * FILTER, cached range, and POWER_CTL exactly. A restore failure takes
+ * precedence over the operation status. If caller thresholds are enabled and
+ * violated, the result remains populated and ADXL355_ERR_THRESHOLD is returned.
+ */
+adxl355_status_t adxl355_run_self_test(adxl355_t *dev,
+                                        const adxl355_self_test_config_t *config,
+                                        adxl355_self_test_result_t *result);
 
 /* ---------------------------------------------------------------------------
  * Data readout

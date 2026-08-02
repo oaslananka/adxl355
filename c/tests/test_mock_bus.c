@@ -6,6 +6,22 @@
  * Mock bus callbacks
  * --------------------------------------------------------------------------- */
 
+static void encode_axis(uint8_t *data, int32_t raw)
+{
+    const uint32_t value = (uint32_t)(raw & INT32_C(0xFFFFF));
+    data[0] = (uint8_t)((value >> 12) & UINT32_C(0xFF));
+    data[1] = (uint8_t)((value >> 4) & UINT32_C(0xFF));
+    data[2] = (uint8_t)((value & UINT32_C(0x0F)) << 4);
+}
+
+static void encode_xyz(uint8_t *data, const adxl355_raw_xyz_t *raw)
+{
+    encode_axis(&data[0], raw->x);
+    encode_axis(&data[3], raw->y);
+    encode_axis(&data[6], raw->z);
+}
+
+
 static int mock_read(void *ctx, uint8_t reg, uint8_t *data, size_t len)
 {
     adxl355_mock_bus_t *mock = (adxl355_mock_bus_t *)ctx;
@@ -26,8 +42,22 @@ static int mock_read(void *ctx, uint8_t reg, uint8_t *data, size_t len)
         reported_len = mock->short_read_length;
     }
     size_t copy_len = reported_len < len ? reported_len : len;
-    for (size_t i = 0; i < copy_len && (reg + i) < ADXL355_MOCK_NUM_REGS; i++) {
-        data[i] = mock->regs[reg + i];
+    if (mock->emulate_self_test && reg == ADXL355_REG_XDATA3 && copy_len == 9U) {
+        const uint8_t mode =
+            (uint8_t)(mock->regs[ADXL355_REG_SELF_TEST] & ADXL355_SELF_TEST_MASK);
+        if (mode == ADXL355_SELF_TEST_MASK) {
+            encode_xyz(data, &mock->self_test_stimulated);
+        } else if (mode == ADXL355_SELF_TEST_ST1) {
+            encode_xyz(data, &mock->self_test_baseline);
+        } else {
+            for (size_t i = 0; i < copy_len; i++) {
+                data[i] = mock->regs[reg + i];
+            }
+        }
+    } else {
+        for (size_t i = 0; i < copy_len && (reg + i) < ADXL355_MOCK_NUM_REGS; i++) {
+            data[i] = mock->regs[reg + i];
+        }
     }
     return reported_len <= (size_t)INT_MAX ? (int)reported_len : -1;
 }
@@ -96,22 +126,20 @@ void adxl355_mock_bus_set_identity_ok(adxl355_mock_bus_t *mock)
 void adxl355_mock_bus_set_xyz_raw(adxl355_mock_bus_t *mock,
                                   int32_t raw_x, int32_t raw_y, int32_t raw_z)
 {
-    /* Encode 20-bit values into the three data registers each */
-    uint32_t ux = (uint32_t)(raw_x & 0xFFFFF);
-    mock->regs[ADXL355_REG_XDATA3] = (uint8_t)((ux >> 12) & 0xFF);
-    mock->regs[ADXL355_REG_XDATA2] = (uint8_t)((ux >> 4) & 0xFF);
-    mock->regs[ADXL355_REG_XDATA1] = (uint8_t)((ux & 0x0F) << 4);
-
-    uint32_t uy = (uint32_t)(raw_y & 0xFFFFF);
-    mock->regs[ADXL355_REG_YDATA3] = (uint8_t)((uy >> 12) & 0xFF);
-    mock->regs[ADXL355_REG_YDATA2] = (uint8_t)((uy >> 4) & 0xFF);
-    mock->regs[ADXL355_REG_YDATA1] = (uint8_t)((uy & 0x0F) << 4);
-
-    uint32_t uz = (uint32_t)(raw_z & 0xFFFFF);
-    mock->regs[ADXL355_REG_ZDATA3] = (uint8_t)((uz >> 12) & 0xFF);
-    mock->regs[ADXL355_REG_ZDATA2] = (uint8_t)((uz >> 4) & 0xFF);
-    mock->regs[ADXL355_REG_ZDATA1] = (uint8_t)((uz & 0x0F) << 4);
+    adxl355_raw_xyz_t raw = {raw_x, raw_y, raw_z};
+    encode_xyz(&mock->regs[ADXL355_REG_XDATA3], &raw);
 }
+
+void adxl355_mock_bus_set_self_test_xyz(adxl355_mock_bus_t *mock,
+                                        adxl355_raw_xyz_t baseline,
+                                        adxl355_raw_xyz_t stimulated)
+{
+    mock->emulate_self_test = true;
+    mock->self_test_baseline = baseline;
+    mock->self_test_stimulated = stimulated;
+    mock->regs[ADXL355_REG_STATUS] = ADXL355_STATUS_DATA_RDY;
+}
+
 
 adxl355_bus_t adxl355_mock_bus_get_interface(adxl355_mock_bus_t *mock)
 {

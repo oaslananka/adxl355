@@ -42,6 +42,9 @@ typedef struct {
     size_t   fail_write_occurrence;              /**< 1-based matching write to fail; 0 fails all. */
     size_t   fail_write_matches;                 /**< Matching write attempts observed. */
     size_t   call_count;                         /**< Number of recorded successful bus calls. */
+    bool     emulate_self_test;                  /**< Return dynamic XYZ data from SELF_TEST bits. */
+    adxl355_raw_xyz_t self_test_baseline;        /**< Raw XYZ with ST1/ST2 disabled. */
+    adxl355_raw_xyz_t self_test_stimulated;      /**< Raw XYZ with ST1/ST2 enabled. */
     adxl355_mock_call_t calls[ADXL355_MOCK_MAX_CALLS]; /**< Call history. */
     void    *delay_ctx;                          /**< Context for delay callback (unused). */
 } adxl355_mock_bus_t;
@@ -55,6 +58,11 @@ void adxl355_mock_bus_set_identity_ok(adxl355_mock_bus_t *mock);
 /** Pre-set fake acceleration data (raw 20-bit per axis). */
 void adxl355_mock_bus_set_xyz_raw(adxl355_mock_bus_t *mock,
                                   int32_t raw_x, int32_t raw_y, int32_t raw_z);
+
+/** Configure dynamic baseline/stimulated XYZ data and mark DATA_RDY. */
+void adxl355_mock_bus_set_self_test_xyz(adxl355_mock_bus_t *mock,
+                                        adxl355_raw_xyz_t baseline,
+                                        adxl355_raw_xyz_t stimulated);
 
 /** Return the adxl355_bus_t interface wrapping this mock. */
 adxl355_bus_t adxl355_mock_bus_get_interface(adxl355_mock_bus_t *mock);

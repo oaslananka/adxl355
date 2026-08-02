@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import math
+
 from adxl355.constants import (
     DEVID_AD,
     DEVID_MST,
@@ -20,9 +22,12 @@ from adxl355.constants import (
 from adxl355.errors import (
     BusError,
     DataNotReadyError,
+    DataReadyTimeoutError,
     DeviceNotFoundError,
     DeviceStateError,
     InvalidConfigurationError,
+    RestoreError,
+    SelfTestThresholdError,
 )
 from adxl355.registers import (
     FILTER_HPF_MASK,
@@ -30,13 +35,21 @@ from adxl355.registers import (
     FILTER_ODR_SHIFT,
     ODR,
     RANGE_SEL_MASK,
+    SELF_TEST_MASK,
+    STATUS_DATA_RDY,
     Axis,
     PowerMode,
     Range,
     Register,
 )
 from adxl355.transport import Transport
-from adxl355.types import AccelXYZ, RawXYZ
+from adxl355.types import (
+    AccelXYZ,
+    RawXYZ,
+    SelfTestConfig,
+    SelfTestResult,
+    SelfTestThresholds,
+)
 
 
 class ADXL355:
@@ -64,8 +77,7 @@ class ADXL355:
             raise BusError(f"Transport read failed at register 0x{reg:02X}") from exc
         if len(data) != length:
             raise BusError(
-                f"Invalid read length at register 0x{reg:02X}: "
-                f"expected {length}, got {len(data)}"
+                f"Invalid read length at register 0x{reg:02X}: expected {length}, got {len(data)}"
             )
         return data
 
@@ -200,13 +212,10 @@ class ADXL355:
         original_power_ctl = self._enter_configuration_standby()
         try:
             reg = self._read_reg(Register.FILTER)
-            reg = (reg & FILTER_HPF_MASK) | (
-                (int(odr) << FILTER_ODR_SHIFT) & FILTER_ODR_MASK
-            )
+            reg = (reg & FILTER_HPF_MASK) | ((int(odr) << FILTER_ODR_SHIFT) & FILTER_ODR_MASK)
             self._write_reg(Register.FILTER, reg)
         finally:
             self._restore_configuration_mode(original_power_ctl)
-
 
     @staticmethod
     def _offset_register(axis: Axis) -> Register:
@@ -239,6 +248,164 @@ class ADXL355:
             self._write_exact(reg, offset.to_bytes(2, byteorder="big", signed=True))
         finally:
             self._restore_configuration_mode(original_power_ctl)
+
+    # ------------------------------------------------------------------
+    # Electrostatic self-test
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _validate_self_test_config(config: SelfTestConfig) -> None:
+        bounded = (
+            ("sample_count", config.sample_count, 1, 1024),
+            ("settle_samples", config.settle_samples, 0, 1024),
+            ("max_ready_polls", config.max_ready_polls, 1, 60000),
+            ("poll_delay_ms", config.poll_delay_ms, 1, 1000),
+        )
+        for name, value, minimum, maximum in bounded:
+            if isinstance(value, bool) or not isinstance(value, int):
+                raise InvalidConfigurationError(f"{name} must be an integer")
+            if not minimum <= value <= maximum:
+                raise InvalidConfigurationError(f"{name} must be between {minimum} and {maximum}")
+        if config.thresholds is None:
+            return
+        for axis_name in ("x", "y", "z"):
+            minimum = getattr(config.thresholds.min_abs_delta_g, axis_name)
+            maximum = getattr(config.thresholds.max_abs_delta_g, axis_name)
+            if (
+                not math.isfinite(minimum)
+                or not math.isfinite(maximum)
+                or minimum < 0.0
+                or maximum < minimum
+            ):
+                raise InvalidConfigurationError(
+                    f"Invalid self-test threshold range for axis {axis_name}"
+                )
+
+    def _wait_for_data_ready(self, config: SelfTestConfig) -> None:
+        for _ in range(config.max_ready_polls):
+            if self._read_reg(Register.STATUS) & STATUS_DATA_RDY:
+                return
+            self._delay_ms(config.poll_delay_ms)
+        raise DataReadyTimeoutError("DATA_RDY did not assert within the bounded poll budget")
+
+    def _collect_self_test_mean(self, config: SelfTestConfig) -> AccelXYZ:
+        for _ in range(config.settle_samples):
+            self._wait_for_data_ready(config)
+            self.read_raw()
+        sum_x = 0
+        sum_y = 0
+        sum_z = 0
+        for _ in range(config.sample_count):
+            self._wait_for_data_ready(config)
+            sample = self.read_raw()
+            sum_x += sample.x
+            sum_y += sample.y
+            sum_z += sample.z
+        scale = SCALE_2G_G_PER_LSB / config.sample_count
+        return AccelXYZ(sum_x * scale, sum_y * scale, sum_z * scale)
+
+    @staticmethod
+    def _thresholds_pass(thresholds: SelfTestThresholds, value: AccelXYZ) -> bool:
+        return all(
+            getattr(thresholds.min_abs_delta_g, axis)
+            <= getattr(value, axis)
+            <= getattr(thresholds.max_abs_delta_g, axis)
+            for axis in ("x", "y", "z")
+        )
+
+    def _restore_self_test_state(
+        self,
+        *,
+        range_reg: int,
+        filter_reg: int,
+        power_ctl_reg: int,
+        self_test_reg: int,
+        cached_range: Range,
+    ) -> None:
+        standby = power_ctl_reg | 0x01
+        failures: list[BaseException] = []
+        for reg, value in (
+            (Register.SELF_TEST, self_test_reg),
+            (Register.POWER_CTL, standby),
+            (Register.RANGE, range_reg),
+            (Register.FILTER, filter_reg),
+            (Register.POWER_CTL, power_ctl_reg),
+        ):
+            try:
+                self._write_reg(reg, value)
+            except BusError as exc:
+                failures.append(exc)
+        self._range = cached_range
+        if failures:
+            raise RestoreError(tuple(failures))
+
+    def run_self_test(self, config: SelfTestConfig | None = None) -> SelfTestResult:
+        """Measure Rev.D ST1+ST2 response and restore all prior state exactly.
+
+        Datasheet typical values are reported by documentation but are not used
+        as default normative thresholds. Supply ``SelfTestThresholds`` only for
+        a caller-owned, fixture-specific policy.
+        """
+        self._check_init()
+        selected = config or SelfTestConfig()
+        self._validate_self_test_config(selected)
+        range_reg = self._read_reg(Register.RANGE)
+        filter_reg = self._read_reg(Register.FILTER)
+        power_ctl_reg = self._read_reg(Register.POWER_CTL)
+        self_test_reg = self._read_reg(Register.SELF_TEST)
+        cached_range = self._range
+        if self_test_reg & SELF_TEST_MASK:
+            raise DeviceStateError("ST1/ST2 are already active")
+
+        standby = power_ctl_reg | 0x01
+        range_2g = (range_reg & ~RANGE_SEL_MASK) | int(Range.G2)
+        filter_125hz = (filter_reg & ~FILTER_ODR_MASK) | int(ODR.HZ_125)
+        self_test_off = self_test_reg & ~SELF_TEST_MASK
+        measurement = power_ctl_reg & ~0x01
+        try:
+            self._write_reg(Register.POWER_CTL, standby)
+            self._write_reg(Register.RANGE, range_2g)
+            self._write_reg(Register.FILTER, filter_125hz)
+            self._write_reg(Register.SELF_TEST, self_test_off)
+            self._write_reg(Register.POWER_CTL, measurement)
+            self._range = Range.G2
+
+            self._write_reg(Register.SELF_TEST, self_test_off | 0x01)
+            baseline = self._collect_self_test_mean(selected)
+            self._write_reg(Register.SELF_TEST, self_test_off | SELF_TEST_MASK)
+            stimulated = self._collect_self_test_mean(selected)
+            delta = AccelXYZ(
+                stimulated.x - baseline.x,
+                stimulated.y - baseline.y,
+                stimulated.z - baseline.z,
+            )
+            absolute = AccelXYZ(abs(delta.x), abs(delta.y), abs(delta.z))
+            evaluated = selected.thresholds is not None
+            passed = (
+                True
+                if selected.thresholds is None
+                else self._thresholds_pass(selected.thresholds, absolute)
+            )
+            result = SelfTestResult(
+                baseline_g=baseline,
+                stimulated_g=stimulated,
+                delta_g=delta,
+                abs_delta_g=absolute,
+                samples=selected.sample_count,
+                thresholds_evaluated=evaluated,
+                thresholds_passed=passed,
+            )
+            if not passed:
+                raise SelfTestThresholdError(result)
+            return result
+        finally:
+            self._restore_self_test_state(
+                range_reg=range_reg,
+                filter_reg=filter_reg,
+                power_ctl_reg=power_ctl_reg,
+                self_test_reg=self_test_reg,
+                cached_range=cached_range,
+            )
 
     # ------------------------------------------------------------------
     # Data readout

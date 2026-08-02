@@ -34,6 +34,7 @@ class PublicDocumentationTests(unittest.TestCase):
             "Core device API",
             "ODR configuration",
             "FIFO entry count",
+            "Self-test response",
             "Linux SPI adapter",
             "Linux I2C adapter",
             "embedded-hal SPI/I2C",
@@ -55,11 +56,14 @@ class PublicDocumentationTests(unittest.TestCase):
         self.assertIn("cargo run --manifest-path rust/Cargo.toml --example basic", text)
         self.assertIn("go test ./...", text)
 
-    def test_register_presence_is_not_described_as_public_api(self) -> None:
+    def test_register_presence_and_language_specific_apis_are_explicit(self) -> None:
         combined = "\n".join(path.read_text() for path in (README, *DOCS))
-        self.assertIn("register presence does not imply a public api", combined.lower())
+        normalized = combined.lower()
+        self.assertIn("register presence does not imply a public api", normalized)
         self.assertIn("SELF_TEST", combined)
-        self.assertIn("not implemented as a public driver method", combined)
+        self.assertIn("c and python expose", normalized)
+        self.assertIn("do not currently expose", normalized)
+        self.assertIn("do not apply undocumented factory acceptance limits", normalized)
 
     def test_package_and_release_wording_matches_repository_state(self) -> None:
         readme = README.read_text()
@@ -79,6 +83,38 @@ class PublicDocumentationTests(unittest.TestCase):
         self.assertIn("c and python expose", combined.lower())
         self.assertIn("1 offset-register count = 16 raw acceleration lsb", combined.lower())
         self.assertIn("not factory", combined.lower())
+
+    def test_self_test_docs_define_sequence_restore_and_policy_boundary(self) -> None:
+        hardware = " ".join(
+            (REPO_ROOT / "docs" / "hardware-testing.md").read_text().lower().split()
+        )
+        python_readme = " ".join(
+            (REPO_ROOT / "python" / "README.md").read_text().lower().split()
+        )
+        for phrase in (
+            "st1 only",
+            "st1+st2",
+            "restore every saved register",
+            "fixture-specific",
+            "must not be presented as an analog devices production limit",
+        ):
+            self.assertIn(phrase, hardware)
+        self.assertIn("default configuration reports the measured response", python_readme)
+
+    def test_self_test_docs_record_rev_d_limits_and_physical_evidence(self) -> None:
+        readme = " ".join(README.read_text().split())
+        hardware = " ".join(
+            (REPO_ROOT / "docs" / "hardware-testing.md").read_text().split()
+        )
+        todo = (REPO_ROOT / "TODO.md").read_text()
+        self.assertIn("12d6206393223439e14b8e36b97e567751e8f8bb", readme)
+        self.assertIn("0.34236", hardware)
+        self.assertIn("0.33908", hardware)
+        self.assertIn("1.41865", hardware)
+        self.assertIn("X/Y `0.10–0.60 g`", hardware)
+        self.assertIn("Z `0.50–3.00 g`", hardware)
+        self.assertIn("raw temporary JSON report is not stored", hardware)
+        self.assertIn("[x] Self-test API hardware testing on Raspberry Pi 5 SPI", todo)
 
     def test_support_policy_matches_package_metadata_and_ci(self) -> None:
         contributing = CONTRIBUTING.read_text()

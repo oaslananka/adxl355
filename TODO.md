@@ -22,7 +22,7 @@
 ### C
 - [ ] FIFO read API implementation
 - [ ] Interrupt configuration API
-- [ ] Self-test API hardware testing
+- [x] Self-test API hardware testing on Raspberry Pi 5 SPI
 - [ ] Continuous data acquisition example
 - [ ] Verify CMake builds on Linux/GCC, ARM GCC, MinGW
 - [ ] Add doxygen-style documentation comments to public headers
@@ -40,6 +40,7 @@
 - [x] Verify Ruff and strict mypy compliance
 - [x] Device-level lifecycle, transport, temperature, and configuration tests
 - [x] Core device API (probe, range, power, ODR, raw/converted reads, temperature, status)
+- [x] Bounded self-test response API with physical SPI validation
 - [x] I2C address constants
 
 ### Rust
@@ -86,4 +87,5 @@
 - [x] Hardware-in-the-loop test procedure
 - [x] Manual-only self-hosted HIL workflow
 - [x] Record a successful physical SPI HIL integration run on Raspberry Pi 5 (`main`, run `30725059679`)
+- [x] Record repeatable C/Python self-test response evidence with exact register restoration
 - [ ] Publish successful SPI and I2C HIL artifacts for the final release-candidate commit

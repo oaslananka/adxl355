@@ -15,7 +15,13 @@ from scripts.check_package_sizes import (
     resolve_artifact_directory,
     resolve_report_path,
 )
-from scripts.check_public_api import CompatibilityError, compare, snapshot, validate_baseline_update
+from scripts.check_public_api import (
+    CompatibilityError,
+    c_type_entries,
+    compare,
+    snapshot,
+    validate_baseline_update,
+)
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -35,7 +41,10 @@ class PublicApiCompatibilityTests(unittest.TestCase):
             any("adxl355_read_offset" in entry for entry in baseline["surfaces"]["c"])
         )
         self.assertTrue(
-            any("signature:calculate_offset" in entry for entry in baseline["surfaces"]["python"])
+            any(
+                "signature:calculate_offset" in entry
+                for entry in baseline["surfaces"]["python"]
+            )
         )
         self.assertIn(
             "member:ADXL355:async readRaw(): Promise<RawXYZ>",
@@ -44,8 +53,27 @@ class PublicApiCompatibilityTests(unittest.TestCase):
 
     def test_additive_public_api_change_is_allowed(self) -> None:
         baseline = {"surfaces": {"python": ["signature:read()"]}}
-        current = {"surfaces": {"python": ["signature:read()", "signature:write(value)"]}}
+        current = {
+            "surfaces": {"python": ["signature:read()", "signature:write(value)"]}
+        }
         self.assertEqual(compare(baseline, current), [])
+
+    def test_trailing_c_enum_member_is_additive(self) -> None:
+        old = "typedef enum { OK = 0, ERR = -1 } status_t;"
+        new = "typedef enum { OK = 0, ERR = -1, TIMEOUT = -2 } status_t;"
+        self.assertIn(f"type:{old}", c_type_entries(new))
+        self.assertEqual(
+            compare(
+                {"surfaces": {"c": [f"type:{old}"]}},
+                {"surfaces": {"c": sorted(c_type_entries(new))}},
+            ),
+            [],
+        )
+
+    def test_changed_existing_c_enum_member_is_blocked(self) -> None:
+        old = "typedef enum { OK = 0, ERR = -1 } status_t;"
+        changed = "typedef enum { OK = 0, ERR = -9, TIMEOUT = -2 } status_t;"
+        self.assertNotIn(f"type:{old}", c_type_entries(changed))
 
     def test_removed_public_api_declaration_is_blocked(self) -> None:
         baseline = {"surfaces": {"python": ["signature:read()"]}}
@@ -80,7 +108,9 @@ class PublicApiCompatibilityTests(unittest.TestCase):
 class PackageSizeBudgetTests(unittest.TestCase):
     def test_artifact_directory_resolves_inside_temporary_root(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
-            self.assertEqual(resolve_artifact_directory(Path(temp)), Path(temp).resolve())
+            self.assertEqual(
+                resolve_artifact_directory(Path(temp)), Path(temp).resolve()
+            )
 
     def test_symlink_cannot_escape_trusted_artifact_root(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
@@ -162,7 +192,9 @@ class WorkflowCompatibilityGateTests(unittest.TestCase):
             "c-cpp-package": "native",
         }
         for job_name, family in expected.items():
-            commands = "\n".join(str(step.get("run", "")) for step in jobs[job_name]["steps"])
+            commands = "\n".join(
+                str(step.get("run", "")) for step in jobs[job_name]["steps"]
+            )
             self.assertIn("check_package_sizes.py", commands, job_name)
             self.assertIn(f"--family {family}", commands, job_name)
             self.assertIn("SIZE_REPORT.json", commands, job_name)

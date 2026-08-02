@@ -94,6 +94,33 @@ hints. It never copies the process environment, host name, credentials, or raw
 secret values. Strings resembling tokens, passwords, secrets, or API keys are
 redacted.
 
+## Electrostatic self-test response
+
+The maintained C and Python drivers implement the Rev.D response sequence as a
+bounded diagnostic measurement:
+
+1. save `SELF_TEST`, `RANGE`, `FILTER`, `POWER_CTL`, and the cached range;
+2. configure ±2 g, 125 Hz, and measurement mode;
+3. enable ST1 only and collect the baseline mean;
+4. enable ST1+ST2 and collect the stimulated mean;
+5. report signed and absolute per-axis delta values;
+6. restore every saved register and cached range on success or failure.
+
+Rev.D specifies self-test output-change limits in g:
+
+| Axis | Minimum | Typical | Maximum |
+|---|---:|---:|---:|
+| X | 0.1 | 0.3 | 0.6 |
+| Y | 0.1 | 0.3 | 0.6 |
+| Z | 0.5 | 1.5 | 3.0 |
+
+Default calls still report measurements without applying pass/fail policy. A
+caller may explicitly supply the Rev.D windows or a narrower, documented fixture
+policy. A fixture-specific policy must not be presented as an Analog Devices
+production limit. Timeout, transport, threshold, and restoration failures remain
+distinct. Physical validation must also compare every saved register before and
+after the run.
+
 ## Local opt-in execution
 
 Install only the selected adapter and run the command explicitly. These commands
@@ -306,6 +333,25 @@ This result proves the integrated SPI path and runner setup. It is not the final
 release-candidate evidence because documentation and governance changes may move
 the candidate commit. A successful I2C run is still pending. Before publication,
 run both transports against the same final release-candidate SHA.
+
+A separate self-test response validation used the exact C/Python implementation
+from commit `12d6206393223439e14b8e36b97e567751e8f8bb` on the same Raspberry Pi 5
+SPI fixture at 1 MHz. Two independent 64-sample runs, each with eight discarded
+settle samples, measured absolute response values:
+
+| Run | X (g) | Y (g) | Z (g) |
+|---|---:|---:|---:|
+| 1 | 0.34236 | 0.33908 | 1.41865 |
+| 2 | 0.34256 | 0.33893 | 1.41860 |
+
+A third 64-sample run applied the Rev.D X/Y `0.10–0.60 g` and Z `0.50–3.00 g`
+windows and passed with `0.34241/0.33896/1.41859 g`. Before every call the fixture
+was configured to ±4 g, 250 Hz, and measurement mode. Each call restored the exact
+pre-call `SELF_TEST`, `RANGE`, `FILTER`, and `POWER_CTL` bytes. A defensive final
+restore also returned the original standby, ±2 g, default-filter state exactly.
+The raw temporary JSON report is not stored in the repository. This evidence
+validates the self-test feature on SPI; it does not replace final SPI/I2C
+release-candidate HIL evidence.
 
 ## Release evidence policy
 
