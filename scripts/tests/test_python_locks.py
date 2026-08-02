@@ -86,6 +86,15 @@ class PythonLockTests(unittest.TestCase):
         self.assertNotIn("piwheels", rendered.lower())
         self.assertIn("--no-deps dist/*.whl", rendered)
 
+    def test_python_310_test_lock_includes_marker_backports(self) -> None:
+        packages = parse_lock(LOCK_ROOT / "ci-test.txt")
+        for name, version in {
+            "exceptiongroup": "1.3.1",
+            "tomli": "2.4.1",
+            "typing-extensions": "4.16.0",
+        }.items():
+            self.assertEqual(packages[name][0], version)
+
     def test_lock_update_path_is_rate_limited(self) -> None:
         data = cast(dict[str, Any], yaml.safe_load(DEPENDABOT.read_text()))
         entry = next(
