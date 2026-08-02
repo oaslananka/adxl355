@@ -126,12 +126,25 @@ class CiQualityGateTests(unittest.TestCase):
             self.assertIn("ctest --test-dir", commands)
             self.assertIn("smoke_cmake_packages", commands)
 
+        windows_commands = self.commands(jobs["native-windows"])
+        self.assertIn('$ErrorActionPreference = "Stop"', windows_commands)
+        self.assertIn("$PSNativeCommandUseErrorActionPreference = $true", windows_commands)
+
+        for job_id in expected:
+            checkout = next(
+                step
+                for step in jobs[job_id]["steps"]
+                if str(step.get("uses", "")).startswith("actions/checkout@")
+            )
+            self.assertFalse(checkout["with"]["persist-credentials"])
+
         consistency_needs = set(jobs["consistency"]["needs"])
         self.assertTrue(set(expected).issubset(consistency_needs))
 
     def test_windows_smoke_script_is_bounded_and_uses_installed_consumers(self) -> None:
         script = (REPO_ROOT / "scripts" / "smoke_cmake_packages.ps1").read_text()
         self.assertIn('$ErrorActionPreference = "Stop"', script)
+        self.assertIn("$PSNativeCommandUseErrorActionPreference = $true", script)
         self.assertIn("cmake --install", script)
         self.assertIn("adxl355_c_consumer.exe", script)
         self.assertIn("adxl355_cpp_consumer.exe", script)

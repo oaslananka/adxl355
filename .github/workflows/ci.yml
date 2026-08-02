@@ -94,6 +94,8 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: Install Clang and CMake
         run: sudo apt-get update && sudo apt-get install -y clang cmake
       - name: Build and test C with Clang
@@ -137,6 +139,8 @@ jobs:
     runs-on: macos-15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: Build and test C with AppleClang
         run: |
           cmake -S c -B build/macos/c \
@@ -164,9 +168,13 @@ jobs:
     runs-on: windows-2025
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: Build and test C with MSVC
         shell: pwsh
         run: |
+          $ErrorActionPreference = "Stop"
+          $PSNativeCommandUseErrorActionPreference = $true
           cmake -S c -B build/windows/c -A x64 `
             -DADXL355_BUILD_TESTS=ON `
             -DADXL355_BUILD_EXAMPLES=ON `
@@ -176,6 +184,8 @@ jobs:
       - name: Build and test C++ with MSVC
         shell: pwsh
         run: |
+          $ErrorActionPreference = "Stop"
+          $PSNativeCommandUseErrorActionPreference = $true
           cmake -S cpp -B build/windows/cpp -A x64 `
             -DADXL355_BUILD_TESTS=ON `
             -DADXL355_BUILD_EXAMPLES=ON `
@@ -192,6 +202,8 @@ jobs:
     runs-on: ubuntu-24.04-arm
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: Install CMake and compilers
         run: sudo apt-get update && sudo apt-get install -y cmake gcc g++
       - name: Build and test C on ARM64
