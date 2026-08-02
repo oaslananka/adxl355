@@ -21,7 +21,7 @@
 - [x] Fix copyright holder name in LICENSE
 
 ### C
-- [ ] FIFO read API implementation
+- [x] FIFO count, decode, and bounded read API implementation
 - [ ] Interrupt configuration API
 - [x] Self-test API hardware testing on Raspberry Pi 5 SPI
 - [ ] Continuous data acquisition example
@@ -36,7 +36,7 @@
 - [x] smbus2 adapter implementation
 - [x] Calibration helper utilities and signed offset-register APIs
 - [x] FIFO entry-count helper
-- [ ] FIFO sample-data decode/read API
+- [x] FIFO sample-data decode/read API
 - [x] Hardware-in-the-loop runner and failure-path tests
 - [x] Verify Ruff and strict mypy compliance
 - [x] Device-level lifecycle, transport, temperature, and configuration tests
@@ -74,7 +74,8 @@
 - [x] Hardware wiring tables and voltage/bus assumptions
 - [x] Linux self-hosted SPI/I2C runner setup guide
 - [x] Hardware test plan with identity/reset/configuration/data steps
-- [ ] Interrupt and FIFO detailed documentation
+- [ ] Interrupt detailed documentation
+- [x] FIFO contract, ownership, partial-read, and hardware-validation documentation
 - [x] Source-derived API reference docs for each maintained language
 - [x] Accessible, license-safe wiring diagram for the verified Raspberry Pi 5 SPI fixture
 - [x] Add accessible I2C setup media matching the physically verified `0x1D` fixture

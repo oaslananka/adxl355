@@ -471,6 +471,35 @@ The raw temporary JSON report is not stored in the repository. This evidence
 validates the self-test feature on SPI; it does not replace final SPI/I2C
 release-candidate HIL evidence.
 
+## FIFO physical validation plan
+
+The C/Python FIFO API is currently supported by shared protocol vectors, mock
+transports, sanitizer tests, and exact-length contract tests. Physical FIFO
+validation is intentionally a later bounded run and is not claimed by this
+change. Use a dedicated fixture run with all of the following controls:
+
+1. Pin one exact commit, transport settings, range, and ODR; record identity and
+   revision before configuration.
+2. Configure a small FIFO watermark, enter measurement mode, and wait for a
+   bounded number of expected sample periods without background threads.
+3. Read `FIFO_ENTRIES` as axis locations and require a multiple of three no
+   greater than 96; capture the raw count before every bounded read.
+4. Read complete X/Y/Z samples from `FIFO_DATA`, confirm the x marker occurs only
+   on the first location, virtual bits remain zero, and the reported count drops
+   by exactly three locations per sample.
+5. Repeat at signed orientations and compare FIFO samples with direct register
+   samples within a fixture-owned timing tolerance.
+6. Intentionally reach FIFO full/overrun in a bounded test, verify the documented
+   error, then reset/flush the device rather than treating data after overrun as
+   lossless.
+7. Inject a transport failure after at least one complete sample and confirm the
+   API reports the valid prefix and exact consumed-location count.
+8. Restore standby, range, filter/ODR, FIFO watermark, and interrupt-map state;
+   independently read back the final registers and store only sanitized evidence.
+
+The run must never claim rollback of FIFO_DATA reads: successfully transferred
+locations have already been popped by hardware.
+
 ## Release evidence policy
 
 A production-ready claim requires recent successful HIL evidence for both a Linux

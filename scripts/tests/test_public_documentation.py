@@ -33,7 +33,7 @@ class PublicDocumentationTests(unittest.TestCase):
         for heading in (
             "Core device API",
             "ODR configuration",
-            "FIFO entry count",
+            "FIFO support",
             "Self-test response",
             "Linux SPI adapter",
             "Linux I2C adapter",
@@ -58,6 +58,32 @@ class PublicDocumentationTests(unittest.TestCase):
         self.assertIn("cargo run --manifest-path rust/Cargo.toml --example basic", text)
         self.assertIn("go test ./...", text)
 
+    def test_fifo_contract_is_scoped_bounded_and_nonblocking(self) -> None:
+        readme = README.read_text()
+        architecture = (REPO_ROOT / "docs" / "architecture.md").read_text()
+        testing = (REPO_ROOT / "docs" / "testing.md").read_text()
+        hardware = (REPO_ROOT / "docs" / "hardware-testing.md").read_text()
+        python_readme = (REPO_ROOT / "python" / "README.md").read_text()
+        todo = (REPO_ROOT / "TODO.md").read_text()
+        combined = " ".join(
+            (readme + architecture + testing + hardware + python_readme).split()
+        ).lower()
+        for phrase in (
+            "96 axis locations",
+            "three locations",
+            "x/y/z",
+            "caller-bounded",
+            "cannot be restored",
+            "partial_samples",
+            "consumed_locations",
+            "physical fifo validation",
+        ):
+            self.assertIn(phrase, combined)
+        self.assertIn("Bounded count/decode/read, caller storage", readme)
+        self.assertIn("typed partial results", readme)
+        self.assertIn("C++, Rust, Node.js, and Go do not expose", readme)
+        self.assertIn("[x] FIFO sample-data decode/read API", todo)
+
     def test_register_presence_and_language_specific_apis_are_explicit(self) -> None:
         combined = "\n".join(path.read_text() for path in (README, *DOCS))
         normalized = combined.lower()
@@ -76,7 +102,9 @@ class PublicDocumentationTests(unittest.TestCase):
         self.assertIn("v0.1.0-alpha.3", publishing)
         self.assertIn("GitHub prerelease", publishing)
         self.assertIn("PyPI, npm, and crates.io remain unpublished", publishing)
-        self.assertNotIn("does not publish to PyPI, npm, crates.io, GitHub Releases", publishing)
+        self.assertNotIn(
+            "does not publish to PyPI, npm, crates.io, GitHub Releases", publishing
+        )
         self.assertIn("[0.1.0-alpha.3] - Unreleased", changelog)
         self.assertIn("[0.1.0-alpha.1]", changelog)
 

@@ -50,3 +50,29 @@ restores `SELF_TEST`, `RANGE`, `FILTER`, `POWER_CTL`, and the cached range.
 Default configuration reports the measured response without inventing normative
 pass/fail limits. Applications may provide fixture-specific thresholds when they
 own and document that policy.
+
+
+## Bounded FIFO sample reads
+
+```python
+from adxl355 import FifoReadError
+
+try:
+    result = device.read_fifo_samples(max_samples=8)
+    for sample in result.samples:
+        print(sample)
+except FifoReadError as exc:
+    print("valid prefix:", exc.partial_samples)
+    print("exactly consumed locations:", exc.consumed_locations)
+```
+
+`FIFO_ENTRIES` counts axis locations, not XYZ samples: three locations form one
+complete X/Y/Z sample and the hardware FIFO holds at most 96 locations (32
+samples). One or two trailing locations are valid but remain unread until a
+complete sample exists. The call is non-blocking and reads at most the
+caller-provided bound.
+Empty, overrun, marker-order, virtual-bit, truncated, and overlong conditions use
+typed errors. When a later sample fails, already popped locations cannot be
+restored; decode errors carry the valid prefix and exact consumed count. A bus
+failure during FIFO_DATA sets `consumption_indeterminate=True`, requiring reset or
+flush before the caller trusts FIFO alignment again.

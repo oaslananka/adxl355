@@ -187,14 +187,33 @@ reads detectable instead of relying on an ambiguous `0 == success` convention.
 language suites cover its `TR-1-*`, `TR-2-*`, and `TR-9-*` scenarios and verify that
 failed reads do not modify caller-provided output values or fabricate measurements.
 
+### FIFO ownership and partial progress
+
+The ADXL355 FIFO stores 96 axis locations, not 96 complete samples. One complete
+X/Y/Z sample consumes three 24-bit locations. Each location contains signed
+20-bit acceleration in bits 23:4, virtual zero bits 3:2, an empty/invalid marker
+in bit 1, and the x-axis marker in bit 0. C and Python require the marker sequence
+X/Y/Z and reject empty, malformed, truncated, and overlong payloads.
+
+FIFO reads are non-blocking and caller-bounded to 1..32 complete samples. A
+FIFO_ENTRIES remainder of one or two is valid but remains unread until a complete
+XYZ sample exists. C uses a fixed nine-byte stack buffer and caller-owned output
+storage; Python returns an immutable tuple. A successful FIFO_DATA transaction
+physically pops three locations. If a later decode fails, earlier samples remain
+valid and exact consumption is reported. If the transport fails during FIFO_DATA,
+consumption is conservatively marked indeterminate because hardware may have
+popped bytes before the backend failed; reset or flush before trusting alignment.
+C reports this through `adxl355_fifo_read_result_t`; Python errors carry
+`partial_samples`, `consumed_locations`, and `consumption_indeterminate`.
+
 ## Register definitions versus public API
 
 The shared register model documents the device even when a high-level method is
 not present. Register presence does not imply a public API. For example,
 `FIFO_DATA`, offset registers, and `SELF_TEST` are defined for consistency, but
-full FIFO APIs are not available and offset/self-test APIs are not uniform across
-languages. C and Python expose signed offset programming and bounded
-self-test-response measurement; C++, Rust, Node.js, and Go do not currently expose
+high-level support remains language-specific. C and Python expose signed offset
+programming, bounded self-test-response measurement, and bounded FIFO
+count/decode/read methods. C++, Rust, Node.js, and Go do not currently expose
 those high-level methods.
 
 ## Register Specification as Single Source of Truth
@@ -210,6 +229,7 @@ Register addresses, bit fields, and expected ID values are defined in `spec/adxl
 - 20-bit raw data decoding (5 vectors: zero, positive one, positive max, negative min, negative one)
 - Acceleration conversion (raw to g, raw to m/s²)
 - Temperature decoding and conversion, including reserved TEMP2 bits and raw boundaries
+- FIFO signed boundaries, X/Y/Z marker order, empty markers, virtual bits, and exact payload lengths
 
 Every language must pass the same test vectors. Floating-point tolerance:
 - g conversion: ±1e-6
