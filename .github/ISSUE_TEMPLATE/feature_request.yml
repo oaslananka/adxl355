@@ -1,0 +1,44 @@
+name: Feature request
+description: Propose a scoped, testable driver or tooling capability.
+title: "feat: "
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Security-sensitive proposals belong in [private vulnerability reporting](https://github.com/oaslananka/adxl355/security/advisories/new), not a public issue.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem and user impact
+      description: Describe the concrete use case or limitation this should address.
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Proposed scope
+      description: Define the public behavior, affected languages/transports, and important non-goals.
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: List observable results and the tests or hardware evidence that should prove completion.
+    validations:
+      required: true
+  - type: textarea
+    id: compatibility
+    attributes:
+      label: Compatibility, security, and rollback
+      description: Note API compatibility, release impact, security considerations, and a rollback or deprecation path.
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Submission checks
+      options:
+        - label: I searched existing issues, milestones, and pull requests for duplicates.
+          required: true
+        - label: The request does not include secrets or public vulnerability details.
+          required: true

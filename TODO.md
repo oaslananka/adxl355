@@ -84,4 +84,5 @@
 - [x] Required clean-checkout vector gate (`scripts/verify_vectors.py --ci`) for C, C++, Python, Rust, Node.js, and Go with zero permitted skips
 - [x] Hardware-in-the-loop test procedure
 - [x] Manual-only self-hosted HIL workflow
-- [ ] Publish a successful physical SPI and I2C HIL artifact for the release candidate
+- [x] Record a successful physical SPI HIL integration run on Raspberry Pi 5 (`main`, run `30725059679`)
+- [ ] Publish successful SPI and I2C HIL artifacts for the final release-candidate commit

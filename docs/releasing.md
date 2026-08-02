@@ -29,6 +29,14 @@ the release-candidate commit, include the device revision, and be no more than 3
 days old. See [`hardware-testing.md`](hardware-testing.md) for fixture and address
 coverage requirements.
 
+## Current evidence status
+
+The Raspberry Pi 5 SPI fixture has passed on `main` in workflow run
+[30725059679](https://github.com/oaslananka/adxl355/actions/runs/30725059679).
+I2C evidence remains pending. Because release evidence must reference the exact
+release-candidate commit, both SPI and I2C runs are repeated after the final
+candidate SHA is selected.
+
 ## Enforced gates
 
 The workflow calls the repository CI workflow on the release commit. Package

@@ -3,7 +3,9 @@
 > **Current state:** The repository provides a verification and packaging dry run.
 > It does not publish to PyPI, npm, crates.io, GitHub Releases, or a Go proxy.
 > Registry publication requires an explicit maintainer decision after version,
-> physical HIL, security, and release-evidence gates are satisfied.
+> physical HIL, security, and release-evidence gates are satisfied. A Raspberry
+> Pi 5 SPI integration run has passed; I2C and final-candidate reruns remain
+> required before publication.
 
 ## Automated release verification
 

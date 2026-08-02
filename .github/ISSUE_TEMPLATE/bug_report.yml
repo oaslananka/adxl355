@@ -1,0 +1,50 @@
+name: Bug report
+description: Report a reproducible defect in a supported driver, package, or workflow.
+title: "bug: "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not disclose vulnerabilities or secrets here. Use [private vulnerability reporting](https://github.com/oaslananka/adxl355/security/advisories/new) for security-sensitive findings.
+  - type: textarea
+    id: impact
+    attributes:
+      label: Impact
+      description: What user-visible behavior is incorrect, and which language/package is affected?
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction
+      description: Provide the smallest safe reproduction, including version/commit, platform, transport, and commands. Redact credentials and private data.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Verification evidence
+      description: Include bounded logs, test output, or hardware observations that demonstrate the defect.
+    validations:
+      required: true
+  - type: textarea
+    id: regression
+    attributes:
+      label: Regression and rollback context
+      description: State whether this worked before and any known safe workaround or rollback.
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Submission checks
+      options:
+        - label: I searched existing issues and pull requests for duplicates.
+          required: true
+        - label: This report contains no secret, credential, personal data, or public vulnerability details.
+          required: true

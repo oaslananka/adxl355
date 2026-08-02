@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Private security report
+    url: https://github.com/oaslananka/adxl355/security/advisories/new
+    about: Report suspected vulnerabilities privately. Do not open a public issue.
+  - name: Usage question or design discussion
+    url: https://github.com/oaslananka/adxl355/discussions
+    about: Ask questions that are not confirmed defects or scoped feature requests.
