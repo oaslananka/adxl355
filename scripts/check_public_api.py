@@ -519,9 +519,9 @@ def go_named_declaration(
         )
     if line.startswith("func "):
         header, end = declaration_header(lines, index)
-        paren = header.find(")") if header.startswith("func (") else len("func ")
+        offset = header.find(")") + 1 if header.startswith("func (") else len("func ")
         return (
-            f"declaration:{header}" if go_exported_name(header, paren + 1) else None,
+            f"declaration:{header}" if go_exported_name(header, offset) else None,
             end,
         )
     if line.startswith(("const ", "var ")) and "(" not in line:
@@ -547,20 +547,21 @@ def go_group_entries(
     return entries, cursor
 
 
-def go_file_surface(path: Path) -> set[str]:
+def go_file_surface(path: Path, source_name: str | None = None) -> set[str]:
     entries: set[str] = set()
+    label = source_name or path.name
     lines = strip_comments(path.read_text()).splitlines()
     index = 0
     while index < len(lines):
         line = lines[index].strip()
         if line in {"const (", "var ("}:
-            group, index = go_group_entries(line.split()[0], lines, index, path.name)
+            group, index = go_group_entries(line.split()[0], lines, index, label)
             entries.update(group)
         else:
             declaration, index = go_named_declaration(line, lines, index)
             if declaration:
                 entries.add(
-                    f"{declaration.split(':', 1)[0]}:{path.name}:{declaration.split(':', 1)[1]}"
+                    f"{declaration.split(':', 1)[0]}:{label}:{declaration.split(':', 1)[1]}"
                 )
         index += 1
     return entries
@@ -568,9 +569,13 @@ def go_file_surface(path: Path) -> set[str]:
 
 def go_surface(root: Path) -> set[str]:
     entries: set[str] = set()
-    for path in sorted((root / "go/adxl355").glob("*.go")):
-        if not path.name.endswith("_test.go"):
-            entries.update(go_file_surface(path))
+    package_root = root / "go/adxl355"
+    for path in sorted(package_root.rglob("*.go")):
+        if path.name.endswith("_test.go"):
+            continue
+        relative = path.relative_to(package_root)
+        source_name = path.name if len(relative.parts) == 1 else relative.as_posix()
+        entries.update(go_file_surface(path, source_name))
     return entries
 
 

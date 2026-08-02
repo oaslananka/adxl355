@@ -24,7 +24,7 @@ outside that core is intentionally language-specific.
 | Python | Yes | Yes | Yes, count only | Yes, bounded measured response | Yes, `spidev` | Yes, `smbus2` | No | Yes, sdist/wheel | SPI pass on Raspberry Pi 5; I2C pending |
 | Rust | Yes | No | No public method | No public method | No Linux-specific adapter | No Linux-specific adapter | Yes | Yes, `cargo package` | No language-specific physical pass |
 | Node.js | Yes | No | No public method | No public method | User `Transport` | User `Transport` | No | Yes, `npm pack` | No language-specific physical pass |
-| Go | Yes | No | No public method | No public method | User `Transport` | User `Transport` | No | Module/build checks | No language-specific physical pass |
+| Go | Yes | No | No public method | No public method | Yes, `adxl355/linuxio` on Linux amd64/arm64 | Yes, `adxl355/linuxio` on Linux amd64/arm64 | No | Module/build and cross-build checks | SPI bounded example verification pending; I2C pending |
 
 “User transport” means the driver exposes a bus contract but does not ship a
 Linux device adapter for that language. The repository contains buildable package metadata and verification artifacts, but packages are not published by this repository to PyPI, crates.io, npm, or a Go proxy. Intended distribution names are `adxl355` (PyPI), `adxl355-driver` (crates.io, imported as `adxl355`), and `@oaslananka/adxl355` (npm).
@@ -45,6 +45,7 @@ Linux device adapter for that language. The repository contains buildable packag
 - Grouped dependency updates, immutable workflow action pins, release SBOM and
   high-severity vulnerability gates, and OIDC-backed artifact attestations.
 - Manual-only Linux SPI/I2C HIL workflow with sanitized diagnostic evidence.
+- Go `adxl355/linuxio` transports for 64-bit Linux spidev and i2c-dev, with explicit descriptor ownership, inspectable operation errors, exact transfer validation, and bounded SPI/I2C examples.
 
 ## Explicitly not claimed
 
@@ -163,8 +164,28 @@ npm test
 
 ```bash
 cd go
+go mod verify
 go test ./...
+go test -race ./...
+go build ./...
 ```
+
+The maintained `adxl355/linuxio` package supports Linux amd64 and arm64. Each
+transport owns its opened device descriptor until `Close`; repeated `Close` calls
+are safe. The I2C `BusHz` field records and validates the externally configured
+adapter rate but does not reprogram the kernel adapter clock.
+
+Bounded hardware examples require a connected sensor and never run indefinitely:
+
+```bash
+cd go
+go run ./examples/linux_spi --bus 0 --device 0 --speed-hz 1000000 --samples 8 --timeout 10s
+go run ./examples/linux_i2c --bus 1 --address 0x1D --bus-hz 400000 --samples 8 --timeout 10s
+```
+
+Both commands probe identity, read temperature, collect a finite sample count, and
+restore standby before closing the descriptor. The SPI command is physically
+verified separately; I2C remains pending the dedicated fixture evidence in #41.
 
 ## Documentation
 

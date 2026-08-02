@@ -58,7 +58,7 @@
 - [x] Core device API with transport-contract tests
 
 ### Go
-- [ ] spidev/Linux implementation
+- [x] spidev/Linux implementation
 - [ ] Example with real hardware
 - [x] Core device API with race-tested transport-contract coverage
 

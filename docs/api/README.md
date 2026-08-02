@@ -11,7 +11,7 @@ These compact references are generated from repository public declarations. They
 | Python | [python.md](python.md) | 121 | Core lifecycle, range, ODR, FIFO entry count, raw/converted reads, temperature, status, signed offsets, calibration helpers, bounded self-test response, and Linux SPI/I2C adapters. |
 | Rust | [rust.md](rust.md) | 107 | Core lifecycle, range, power mode, raw/converted reads, temperature, status, stateless conversions, and optional embedded-hal SPI/I2C adapters. |
 | Node.js / TypeScript | [node.md](node.md) | 54 | Typed transport-agnostic core lifecycle, range, power mode, raw/converted reads, temperature, status, and stateless conversions. |
-| Go | [go.md](go.md) | 78 | Transport-agnostic core lifecycle, range, power mode, raw/converted reads, temperature, status, and stateless conversions. |
+| Go | [go.md](go.md) | 123 | Core lifecycle, range, power mode, raw/converted reads, temperature, status, and stateless conversions, plus maintained 64-bit Linux amd64/arm64 spidev and i2c-dev transports with explicit descriptor ownership and bounded examples. |
 
 ## Regeneration and verification
 

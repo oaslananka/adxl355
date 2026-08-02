@@ -2,24 +2,29 @@
 
 # Go API
 
-**Package:** Module `github.com/oaslananka/adxl355/go`
+**Package:** Module `github.com/oaslananka/adxl355/go`; Linux adapters in `adxl355/linuxio`
 
 ## Capability boundary
 
-Transport-agnostic core lifecycle, range, power mode, raw/converted reads, temperature, status, and stateless conversions.
+Core lifecycle, range, power mode, raw/converted reads, temperature, status, and stateless conversions, plus maintained 64-bit Linux amd64/arm64 spidev and i2c-dev transports with explicit descriptor ownership and bounded examples.
 
-**Not exposed:** No maintained Linux SPI/I2C adapter and no public ODR, offset, calibration, self-test, FIFO, or interrupt methods.
+**Not exposed:** No public ODR, offset, calibration, self-test, FIFO, or interrupt methods. I2C adapter speed is externally configured and physical I2C evidence remains pending.
 
 ## Authoritative sources
 
 - [`$go/adxl355/device.go`](../../go/adxl355/device.go)
 - [`$go/adxl355/transport.go`](../../go/adxl355/transport.go)
 - [`$go/adxl355/types.go`](../../go/adxl355/types.go)
+- [`$go/adxl355/linuxio/types.go`](../../go/adxl355/linuxio/types.go)
+- [`$go/adxl355/linuxio/transport_linux.go`](../../go/adxl355/linuxio/transport_linux.go)
+- [`$go/adxl355/linuxio/transport_other.go`](../../go/adxl355/linuxio/transport_other.go)
+- [`$go/examples/linux_spi/main.go`](../../go/examples/linux_spi/main.go)
+- [`$go/examples/linux_i2c/main.go`](../../go/examples/linux_i2c/main.go)
 
 ## Native documentation command
 
 ```bash
-cd go && go doc ./adxl355
+cd go && go doc ./adxl355 ./adxl355/linuxio
 ```
 
 ## Public declarations
@@ -29,6 +34,10 @@ The declarations below are generated from the same normalized public API surface
 ### Const
 
 ```text
+linuxio/types.go:MaximumRegisterAddress byte = 0x2F
+linuxio/types.go:MaximumSPISpeedHz uint32 = 10_000_000
+linuxio/types.go:MaximumTransferLength = 4095
+linuxio/types.go:MinimumSPISpeedHz uint32 = 100_000
 registers.go:DEVID_AD_VALUE = 0xAD
 registers.go:DEVID_MST_VALUE = 0x1D
 registers.go:FilterHPF_MASK = 0x70
@@ -98,7 +107,44 @@ device.go:func (d *Device) ReadTemperatureRaw() (int16, error)
 device.go:func (d *Device) Reset() error
 device.go:func (d *Device) SetPowerMode(mode PowerMode) error
 device.go:func (d *Device) SetRange(r Range) error
+device.go:func DecodeRaw20(b0, b1, b2 byte) int32
+device.go:func New(transport Transport) *Device
+device.go:func RawToG(raw int32, r Range) float32
+device.go:func RawToMps2(raw int32, r Range) float32
 device.go:type Device struct
+linuxio/transport_linux.go:func (t *I2CTransport) Close() error
+linuxio/transport_linux.go:func (t *I2CTransport) DeclaredBusHz() uint32
+linuxio/transport_linux.go:func (t *I2CTransport) DelayMs(milliseconds uint32)
+linuxio/transport_linux.go:func (t *I2CTransport) ReadRegister(reg byte, length int) ([]byte, error)
+linuxio/transport_linux.go:func (t *I2CTransport) WriteRegister(reg byte, data []byte) error
+linuxio/transport_linux.go:func (t *SPITransport) Close() error
+linuxio/transport_linux.go:func (t *SPITransport) DelayMs(milliseconds uint32)
+linuxio/transport_linux.go:func (t *SPITransport) ReadRegister(reg byte, length int) ([]byte, error)
+linuxio/transport_linux.go:func (t *SPITransport) WriteRegister(reg byte, data []byte) error
+linuxio/transport_linux.go:func OpenI2C(config I2CConfig) (*I2CTransport, error)
+linuxio/transport_linux.go:func OpenSPI(config SPIConfig) (*SPITransport, error)
+linuxio/transport_linux.go:type I2CTransport struct
+linuxio/transport_linux.go:type SPITransport struct
+linuxio/transport_other.go:func (*I2CTransport) Close() error
+linuxio/transport_other.go:func (*I2CTransport) DeclaredBusHz() uint32
+linuxio/transport_other.go:func (*I2CTransport) DelayMs(uint32)
+linuxio/transport_other.go:func (*I2CTransport) ReadRegister(_ byte, _ int) ([]byte, error)
+linuxio/transport_other.go:func (*I2CTransport) WriteRegister(_ byte, _ []byte) error
+linuxio/transport_other.go:func (*SPITransport) Close() error
+linuxio/transport_other.go:func (*SPITransport) DelayMs(uint32)
+linuxio/transport_other.go:func (*SPITransport) ReadRegister(_ byte, _ int) ([]byte, error)
+linuxio/transport_other.go:func (*SPITransport) WriteRegister(_ byte, _ []byte) error
+linuxio/transport_other.go:func OpenI2C(config I2CConfig) (*I2CTransport, error)
+linuxio/transport_other.go:func OpenSPI(config SPIConfig) (*SPITransport, error)
+linuxio/transport_other.go:type I2CTransport struct
+linuxio/transport_other.go:type SPITransport struct
+linuxio/types.go:func (e *OpError) Error() string
+linuxio/types.go:func (e *OpError) Unwrap() error
+linuxio/types.go:func DefaultI2CConfig() I2CConfig
+linuxio/types.go:func DefaultSPIConfig() SPIConfig
+linuxio/types.go:type I2CConfig struct
+linuxio/types.go:type OpError struct
+linuxio/types.go:type SPIConfig struct
 registers.go:const RESET_CODE
 registers.go:const RangeSEL_MASK
 registers.go:func SPIReadCmd(reg uint8) uint8
@@ -117,4 +163,8 @@ errors.go:ErrInvalidState = errors.New("invalid device state (call Probe first)"
 errors.go:ErrNotReady = errors.New("data not ready")
 errors.go:ErrTimeout = errors.New("timeout")
 errors.go:ErrUnsupported = errors.New("unsupported operation")
+linuxio/types.go:ErrClosed = errors.New("linux transport is closed")
+linuxio/types.go:ErrInvalidConfig = errors.New("invalid linux transport configuration")
+linuxio/types.go:ErrShortTransfer = errors.New("non-exact linux device transfer")
+linuxio/types.go:ErrUnsupported = errors.New("linux device transport is unsupported on this platform")
 ```
