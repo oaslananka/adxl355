@@ -132,6 +132,17 @@ class PublicDocumentationTests(unittest.TestCase):
             self.assertIn(phrase, text)
 
 
+    def test_calibration_docs_record_repeatable_physical_evidence(self) -> None:
+        text = (REPO_ROOT / "docs" / "calibration.md").read_text()
+        normalized = " ".join(text.split())
+        self.assertIn("commit `c4e774f`", normalized)
+        self.assertIn("two independent runs", normalized)
+        self.assertIn("2051.23 raw LSB", normalized)
+        self.assertIn("42.37 raw LSB", normalized)
+        self.assertIn("restored X/Y/Z offsets to zero", normalized)
+        self.assertIn("it does not establish factory accuracy", normalized.lower())
+
+
 
 if __name__ == "__main__":
     unittest.main()

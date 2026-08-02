@@ -34,8 +34,10 @@ the driver does not write files, flash, or cloud state.
 ## C API
 
 ```c
+int16_t current;
 int16_t offset;
-adxl355_calculate_offset(measured_raw, expected_raw, false, &offset);
+adxl355_read_offset(&device, ADXL355_AXIS_X, &current);
+adxl355_calculate_offset(measured_raw, expected_raw, current, false, &offset);
 adxl355_write_offset(&device, ADXL355_AXIS_X, offset);
 adxl355_read_offset(&device, ADXL355_AXIS_X, &offset);
 ```
@@ -86,16 +88,29 @@ Python use the same half-away-from-zero rounding and signed range checks.
    cross-axis response, mounting strain, vibration, or temperature dependence.
 
 
-## Physical sign and rollback validation
+## Physical sign, repeatability, and rollback validation
 
-A Raspberry Pi 5 SPI fixture test against commit `24cb2c5` programmed trial
-offsets and collected 256 samples before and after. The first formula candidate
-used the opposite sign; `+116` counts on X shifted the mean by approximately
-`-1870` raw LSB, matching `-116 × 16`, and increased the bias norm. The test
-rejected that result and restored all three offsets to zero and `POWER_CTL` to
-its original standby value. This failure-path evidence is why the public helper
-uses `(measured_raw - expected_raw) / 16`. A corrected pre/post run is required
-before claiming repeatable calibration improvement.
+Raspberry Pi 5 SPI fixture testing used 256 samples before and after each trial
+at 1 MHz on `/dev/spidev0.0`, ±2 g, with the sensor stationary and Z aligned to
+`+1 g`.
+
+An initial sign-candidate run against commit `24cb2c5` programmed `+116` counts
+on X and shifted the reported mean by approximately `-1870` raw LSB, matching
+`-116 × 16`. The bias norm increased, the test rejected the result, and all
+three offsets and `POWER_CTL` were restored exactly. This failure-path evidence
+established the register correction sign used by the public helper.
+
+The corrected implementation at commit `c4e774f` passed two independent runs:
+
+| Run | Applied X/Y/Z offsets | Pre bias norm | Post bias norm | Remaining ratio | Temperature change |
+|---|---|---:|---:|---:|---:|
+| 1 | `-116 / +36 / +40` | 2051.23 raw LSB | 37.90 raw LSB | 1.85% | +0.22 °C |
+| 2 | `-116 / +36 / +39` | 2048.17 raw LSB | 42.37 raw LSB | 2.07% | -0.11 °C |
+
+Both runs restored X/Y/Z offsets to zero and restored the original standby
+`POWER_CTL=0x01`. The evidence validates sign, quantization, two-byte writes,
+repeatability, and rollback on this fixture. It does not establish factory
+accuracy, long-term persistence, or temperature compensation for other boards.
 
 ## Temperature and residual error
 
@@ -116,5 +131,5 @@ machine data.
 - Python: signed offset read/write and deterministic calculation helper.
 - C++, Rust, Node.js, and Go: register constants may exist, but no maintained
   public offset-calibration method is claimed yet.
-- Physical repeatability evidence is required before describing these helpers as
-  validated for a particular board or mounting configuration.
+- Repeatable physical evidence exists for the maintained Raspberry Pi 5 SPI
+  fixture only; other boards and mounting configurations require their own validation.

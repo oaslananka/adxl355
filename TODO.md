@@ -78,7 +78,7 @@
 - [x] Register map documentation
 - [x] Testing guide
 - [x] Calibration procedure with C/Python public helper and offset APIs
-- [ ] Record repeatable physical pre/post calibration evidence
+- [x] Record repeatable physical pre/post calibration evidence on the Raspberry Pi 5 SPI fixture
 - [x] Publishing guide
 
 ### Testing
