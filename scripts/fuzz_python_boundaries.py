@@ -5,11 +5,11 @@ from __future__ import annotations
 
 import argparse
 import json
-import random
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Final
+from collections.abc import Sequence
+from typing import Final, TypeVar
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT / "python" / "src"))
@@ -22,6 +22,38 @@ from adxl355.device import _decode_raw20  # noqa: E402
 from scripts.prepare_sbom_input import SbomInputError, _archive_kind, _safe_member  # noqa: E402
 
 MAX_INPUT: Final = 1024
+ARTIFACT_DIR: Final = (REPO_ROOT / "artifacts" / "fuzz").resolve()
+T = TypeVar("T")
+
+
+class DeterministicRng:
+    """Small non-cryptographic generator used only for reproducible test mutations."""
+
+    def __init__(self, seed: int) -> None:
+        self._state = seed & ((1 << 64) - 1) or 0xAD1_355
+
+    def _next(self) -> int:
+        value = self._state
+        value ^= value >> 12
+        value ^= (value << 25) & ((1 << 64) - 1)
+        value ^= value >> 27
+        self._state = value
+        return (value * 0x2545F4914F6CDD1D) & ((1 << 64) - 1)
+
+    def randbelow(self, stop: int) -> int:
+        if stop <= 0:
+            raise ValueError("stop must be positive")
+        return self._next() % stop
+
+    def randint(self, start: int, stop: int) -> int:
+        if stop < start:
+            raise ValueError("stop must be greater than or equal to start")
+        return start + self.randbelow(stop - start + 1)
+
+    def choice(self, values: Sequence[T]) -> T:
+        if not values:
+            raise ValueError("cannot choose from an empty sequence")
+        return values[self.randbelow(len(values))]
 
 
 @dataclass
@@ -58,13 +90,13 @@ class MutationTransport:
         del ms
 
 
-def mutated_path(rng: random.Random) -> str:
+def mutated_path(rng: DeterministicRng) -> str:
     atoms = [
         "..",
         ".",
         "pkg",
         "METADATA",
-        "C:\\temp",
+        "drive-relative",
         "",
         "α",
         "//server",
@@ -73,16 +105,16 @@ def mutated_path(rng: random.Random) -> str:
     count = rng.randint(0, 8)
     separator = rng.choice(("/", "//", "\\"))
     value = separator.join(rng.choice(atoms) for _ in range(count))
-    if rng.randrange(4) == 0:
+    if rng.randbelow(4) == 0:
         value = "/" + value
-    if rng.randrange(3) == 0:
+    if rng.randbelow(3) == 0:
         value += rng.choice((".whl", ".crate", ".tgz", ".tar.gz", ".zip", ""))
     return value[:MAX_INPUT]
 
 
-def mutate_bytes(rng: random.Random) -> bytes:
+def mutate_bytes(rng: DeterministicRng) -> bytes:
     length = rng.randint(0, 64)
-    return bytes(rng.randrange(256) for _ in range(length))
+    return bytes(rng.randbelow(256) for _ in range(length))
 
 
 def exercise_decode(payload: bytes) -> None:
@@ -116,18 +148,18 @@ def exercise_archive_path(value: str) -> str:
     return "safe-accepted"
 
 
-def write_reproducer(artifact_dir: Path, details: dict[str, object]) -> None:
-    artifact_dir.mkdir(parents=True, exist_ok=True)
-    (artifact_dir / "python-reproducer.json").write_text(
+def write_reproducer(details: dict[str, object]) -> None:
+    ARTIFACT_DIR.mkdir(mode=0o700, parents=True, exist_ok=True)
+    (ARTIFACT_DIR / "python-reproducer.json").write_text(
         json.dumps(details, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
 
 
-def run(iterations: int, seed: int, artifact_dir: Path) -> dict[str, object]:
+def run(iterations: int, seed: int) -> dict[str, object]:
     if not 1 <= iterations <= 100_000:
         raise ValueError("iterations must be between 1 and 100000")
-    rng = random.Random(seed)
+    rng = DeterministicRng(seed)
     counters = {
         "decode": 0,
         "probe-rejected": 0,
@@ -148,7 +180,6 @@ def run(iterations: int, seed: int, artifact_dir: Path) -> dict[str, object]:
             counters[exercise_archive_path(path)] += 1
         except Exception as error:
             write_reproducer(
-                artifact_dir,
                 {
                     "seed": seed,
                     "iteration": index,
@@ -184,10 +215,9 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--iterations", type=int, default=10_000)
     parser.add_argument("--seed", type=int, default=355)
-    parser.add_argument("--artifact-dir", type=Path, default=Path("artifacts/fuzz"))
     args = parser.parse_args(argv)
     try:
-        report = run(args.iterations, args.seed, args.artifact_dir)
+        report = run(args.iterations, args.seed)
     except (AssertionError, ValueError) as error:
         print(f"Python fuzz smoke failed: {error}", file=sys.stderr)
         return 1

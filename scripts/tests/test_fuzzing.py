@@ -22,7 +22,7 @@ class FuzzingTests(unittest.TestCase):
 
     def test_python_mutation_smoke_exercises_accept_and_reject_paths(self) -> None:
         module = self.load_fuzz_module()
-        report = module.run(300, 355, REPO_ROOT / "artifacts" / "fuzz-test")
+        report = module.run(300, 355)
         counters = report["counters"]
         for name in (
             "decode",
@@ -38,7 +38,7 @@ class FuzzingTests(unittest.TestCase):
         module = self.load_fuzz_module()
         for value in (0, 100_001):
             with self.assertRaisesRegex(ValueError, "iterations"):
-                module.run(value, 355, REPO_ROOT / "artifacts" / "fuzz-test")
+                module.run(value, 355)
 
     def test_c_target_uses_libfuzzer_and_transport_boundaries(self) -> None:
         cmake = (REPO_ROOT / "c" / "fuzz" / "CMakeLists.txt").read_text()
