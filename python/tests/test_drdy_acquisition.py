@@ -23,7 +23,12 @@ from examples.drdy_acquisition import (
     ReadyTimeoutError,
     acquire_continuous,
 )
-from examples.linux_drdy import GpiodReadyEventSource, parse_args, run_session
+from examples.linux_drdy import (
+    GpiodReadyEventSource,
+    parse_args,
+    run_session,
+    summarize_result,
+)
 
 
 class IncrementingClock:
@@ -95,6 +100,24 @@ def test_success_preserves_kernel_timestamps_and_sequence() -> None:
     assert result.missed_events == 0
     assert result.fifo_overruns == 0
     assert all(timeout > 0 for timeout in source.timeouts)
+
+
+def test_evidence_summary_reports_uniqueness_sequence_and_timing() -> None:
+    result = acquire_continuous(
+        FakeSampleDevice(raws=[RawXYZ(1, 2, 3), RawXYZ(4, 5, 6)]),
+        FakeEventSource([ReadyEvent(10_000, 7), ReadyEvent(20_000, 8)]),
+        ContinuousAcquisitionConfig(sample_count=2, timeout_s=1.0),
+        clock_ns=IncrementingClock(start=10_100, step=100),
+    )
+    summary = summarize_result(result, "i2c")
+    assert summary["transport"] == "i2c"
+    assert summary["sampleCount"] == 2
+    assert summary["uniqueRawSamples"] == 2
+    assert summary["firstSequence"] == 7
+    assert summary["lastSequence"] == 8
+    assert summary["minEventIntervalNs"] == 10_000
+    assert summary["maxEventIntervalNs"] == 10_000
+    assert isinstance(summary["maxCaptureLatencyNs"], int)
 
 
 def test_sequence_gap_is_counted_within_budget() -> None:

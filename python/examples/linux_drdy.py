@@ -189,6 +189,38 @@ def run_session(
     return result
 
 
+def summarize_result(result: ContinuousAcquisitionResult, transport_name: str) -> dict[str, object]:
+    """Build a bounded, non-identifying acquisition evidence summary."""
+
+    event_timestamps = [sample.event_timestamp_ns for sample in result.samples]
+    capture_latencies = [
+        sample.captured_timestamp_ns - sample.event_timestamp_ns for sample in result.samples
+    ]
+    intervals = [
+        current - previous for previous, current in zip(event_timestamps, event_timestamps[1:])
+    ]
+    unique_raw_samples = len(
+        {(sample.raw.x, sample.raw.y, sample.raw.z) for sample in result.samples}
+    )
+    return {
+        "transport": transport_name,
+        "sampleCount": len(result.samples),
+        "uniqueRawSamples": unique_raw_samples,
+        "missedEvents": result.missed_events,
+        "fifoOverruns": result.fifo_overruns,
+        "durationNs": result.completed_ns - result.started_ns,
+        "firstSequence": result.samples[0].line_sequence if result.samples else None,
+        "lastSequence": result.samples[-1].line_sequence if result.samples else None,
+        "firstEventTimestampNs": event_timestamps[0] if event_timestamps else None,
+        "lastEventTimestampNs": event_timestamps[-1] if event_timestamps else None,
+        "minEventIntervalNs": min(intervals) if intervals else None,
+        "maxEventIntervalNs": max(intervals) if intervals else None,
+        "maxCaptureLatencyNs": max(capture_latencies) if capture_latencies else None,
+        "first": asdict(result.samples[0]) if result.samples else None,
+        "last": asdict(result.samples[-1]) if result.samples else None,
+    }
+
+
 def _int_auto(value: str) -> int:
     return int(value, 0)
 
@@ -245,16 +277,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             max_missed_events=args.max_missed_events,
         ),
     )
-    payload = {
-        "transport": args.transport,
-        "sampleCount": len(result.samples),
-        "missedEvents": result.missed_events,
-        "fifoOverruns": result.fifo_overruns,
-        "durationNs": result.completed_ns - result.started_ns,
-        "first": asdict(result.samples[0]) if result.samples else None,
-        "last": asdict(result.samples[-1]) if result.samples else None,
-    }
-    print(json.dumps(payload, indent=2))
+    print(json.dumps(summarize_result(result, args.transport), indent=2))
     return 0
 
 
