@@ -109,6 +109,13 @@ class PublicDocumentationTests(unittest.TestCase):
         self.assertIn("security/advisories/new", combined)
         self.assertNotIn("paste your secret", combined.lower())
 
+    def test_testing_guide_documents_required_check_lifecycle(self) -> None:
+        text = (REPO_ROOT / "docs" / "testing.md").read_text()
+        self.assertIn("Required status-check lifecycle", text)
+        self.assertIn("must never be renamed or removed in one step", text)
+        self.assertIn("export the current ruleset JSON", text)
+        self.assertIn("without bypassing CI", text)
+
 
 if __name__ == "__main__":
     unittest.main()

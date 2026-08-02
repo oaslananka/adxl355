@@ -194,6 +194,28 @@ Run the native package smoke locally with:
 ./scripts/smoke_cmake_packages.sh
 ```
 
+### Required status-check lifecycle
+
+The active `main` ruleset requires the repository-owned C, C++, Python, Rust,
+Node.js, Go, cross-language consistency, dependency-review, and primary CodeQL
+job contexts. Physical HIL and optional third-party SaaS checks are intentionally
+not required on every pull request.
+
+A required job must never be renamed or removed in one step. Use this sequence:
+
+1. add the replacement job/context while the old context still exists;
+2. verify both contexts complete on a pull request;
+3. update the live ruleset to require the replacement context while retaining
+   the old context until the workflow change is merged;
+4. merge the workflow rename/removal and verify the replacement on both a pull
+   request and `main`;
+5. remove the retired context from the ruleset and re-read the ruleset through
+   the GitHub API.
+
+Before every ruleset mutation, export the current ruleset JSON. If a valid pull
+request cannot satisfy the new gate, restore that captured required-check set
+and investigate the workflow/context mismatch without bypassing CI.
+
 ## Hardware-in-the-Loop Tests
 
 Physical validation is implemented as the explicit CLI
