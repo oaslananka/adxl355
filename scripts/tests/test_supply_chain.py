@@ -13,6 +13,7 @@ WORKFLOWS = REPO_ROOT / ".github/workflows"
 DEPENDABOT = REPO_ROOT / ".github/dependabot.yml"
 CODEQL = WORKFLOWS / "codeql.yml"
 RELEASE = WORKFLOWS / "release.yml"
+SCORECARD = WORKFLOWS / "scorecard.yml"
 SECURITY_POLICY = REPO_ROOT / "SECURITY.md"
 SUPPLY_CHAIN_DOC = REPO_ROOT / "docs/security/supply-chain.md"
 SHA_PIN = re.compile(r"^[^@]+@[0-9a-f]{40}$")
@@ -244,6 +245,42 @@ class SupplyChainTests(unittest.TestCase):
         self.assertIn("npm", text)
         self.assertIn("crates.io", text)
         self.assertIn("Go", text)
+
+
+    def test_scorecard_is_bounded_pinned_and_least_privilege(self) -> None:
+        workflow = load_yaml(SCORECARD)
+        triggers = workflow.get("on", workflow.get(True, {}))
+        self.assertIn("push", triggers)
+        self.assertIn("schedule", triggers)
+        self.assertIn("workflow_dispatch", triggers)
+        self.assertIn("branch_protection_rule", triggers)
+        self.assertEqual(workflow["permissions"], "read-all")
+
+        job = workflow["jobs"]["analysis"]
+        self.assertEqual(
+            job["permissions"],
+            {"contents": "read", "security-events": "write", "id-token": "write"},
+        )
+        steps = job["steps"]
+        scorecard = next(
+            step for step in steps if str(step.get("uses", "")).startswith("ossf/scorecard-action@")
+        )
+        self.assertEqual(
+            scorecard["uses"],
+            "ossf/scorecard-action@2d1146689b8cda280b9bc96326124645441f03bc",
+        )
+        self.assertEqual(scorecard["with"]["results_format"], "sarif")
+        self.assertTrue(scorecard["with"]["publish_results"])
+        artifact = next(
+            step for step in steps if str(step.get("uses", "")).startswith("actions/upload-artifact@")
+        )
+        self.assertEqual(artifact["with"]["retention-days"], 5)
+        upload = next(
+            step
+            for step in steps
+            if str(step.get("uses", "")).startswith("github/codeql-action/upload-sarif@")
+        )
+        self.assertEqual(upload["with"]["category"], "openssf-scorecard")
 
     def test_publishing_guide_does_not_require_long_lived_tokens(self) -> None:
         text = (REPO_ROOT / "docs/publishing.md").read_text(encoding="utf-8")
