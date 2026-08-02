@@ -4,17 +4,19 @@ use adxl355::registers::reg;
 ///
 /// Run: cargo run --example basic
 use adxl355::{Adxl355, Error, PowerMode, Range};
+use core::convert::Infallible;
 
 struct MockBus {
     regs: [u8; 128],
 }
 
 impl adxl355::Transport for MockBus {
-    fn read_register(&mut self, reg: u8, len: u8) -> Result<Vec<u8>, Error> {
+    type Error = Infallible;
+    fn read_register(&mut self, reg: u8, len: u8) -> Result<Vec<u8>, Self::Error> {
         Ok(self.regs[reg as usize..(reg + len) as usize].to_vec())
     }
 
-    fn write_register(&mut self, reg: u8, data: &[u8]) -> Result<(), Error> {
+    fn write_register(&mut self, reg: u8, data: &[u8]) -> Result<(), Self::Error> {
         for (i, &b) in data.iter().enumerate() {
             self.regs[(reg as usize) + i] = b;
         }
@@ -24,7 +26,7 @@ impl adxl355::Transport for MockBus {
     fn delay_ms(&mut self, _ms: u32) {}
 }
 
-fn main() -> Result<(), Error> {
+fn main() -> Result<(), Error<Infallible>> {
     let mut bus = MockBus { regs: [0u8; 128] };
     // Set expected ID values for probe to pass
     bus.regs[reg::DEVID_AD as usize] = id::DEVID_AD;

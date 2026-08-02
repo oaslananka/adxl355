@@ -2,7 +2,12 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use adxl355::registers;
-use adxl355::{Adxl355, Error, Range, Transport};
+use adxl355::{Adxl355, Error, Range, StateRequirement, Transport};
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum BusError {
+    Injected,
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct Call {
@@ -41,21 +46,22 @@ struct StateBus {
 }
 
 impl Transport for StateBus {
-    fn read_register(&mut self, reg: u8, len: u8) -> Result<Vec<u8>, Error> {
+    type Error = BusError;
+    fn read_register(&mut self, reg: u8, len: u8) -> Result<Vec<u8>, Self::Error> {
         let mut state = self.state.borrow_mut();
         state.calls.push(Call { write: false, reg });
         let start = reg as usize;
         Ok(state.regs[start..start + len as usize].to_vec())
     }
 
-    fn write_register(&mut self, reg: u8, data: &[u8]) -> Result<(), Error> {
+    fn write_register(&mut self, reg: u8, data: &[u8]) -> Result<(), Self::Error> {
         let mut state = self.state.borrow_mut();
         if state.fail_write_reg == Some(reg) {
             state.matching_writes += 1;
             if state.fail_write_occurrence == 0
                 || state.matching_writes == state.fail_write_occurrence
             {
-                return Err(Error::Bus);
+                return Err(BusError::Injected);
             }
         }
         state.calls.push(Call { write: true, reg });
@@ -84,9 +90,24 @@ fn pre_probe_operations_fail_without_bus_access() {
         state: Rc::clone(&state),
     });
 
-    assert_eq!(device.set_range(Range::G4), Err(Error::InvalidState));
-    assert_eq!(device.read_status(), Err(Error::InvalidState));
-    assert_eq!(device.reset(), Err(Error::InvalidState));
+    assert_eq!(
+        device.set_range(Range::G4),
+        Err(Error::InvalidState {
+            required: StateRequirement::Probed
+        })
+    );
+    assert_eq!(
+        device.read_status(),
+        Err(Error::InvalidState {
+            required: StateRequirement::Probed
+        })
+    );
+    assert_eq!(
+        device.reset(),
+        Err(Error::InvalidState {
+            required: StateRequirement::Probed
+        })
+    );
     assert!(state.borrow().calls.is_empty());
 }
 
@@ -132,7 +153,10 @@ fn target_failure_restores_measurement_and_preserves_cached_range() {
         state.fail_write_reg = Some(registers::reg::RANGE);
     }
 
-    assert_eq!(device.set_range(Range::G4), Err(Error::Bus));
+    assert_eq!(
+        device.set_range(Range::G4),
+        Err(Error::Transport(BusError::Injected))
+    );
     assert_eq!(state.borrow().regs[registers::reg::POWER_CTL as usize], 0);
 
     state.borrow_mut().fail_write_reg = None;
@@ -153,7 +177,10 @@ fn restore_failure_keeps_successful_range_cache_consistent() {
         state.fail_write_occurrence = 2;
     }
 
-    assert_eq!(device.set_range(Range::G4), Err(Error::Bus));
+    assert_eq!(
+        device.set_range(Range::G4),
+        Err(Error::Restore(BusError::Injected))
+    );
     assert_eq!(state.borrow().regs[registers::reg::POWER_CTL as usize], 1);
     assert_eq!(
         state.borrow().regs[registers::reg::RANGE as usize],

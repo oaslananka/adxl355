@@ -2,6 +2,7 @@
 
 use adxl355::registers;
 use adxl355::{Adxl355, Error, PowerMode};
+use core::convert::Infallible;
 
 struct MockBus {
     regs: [u8; 128],
@@ -19,13 +20,14 @@ impl MockBus {
 }
 
 impl adxl355::device::Transport for MockBus {
-    fn read_register(&mut self, reg: u8, len: u8) -> Result<Vec<u8>, Error> {
+    type Error = Infallible;
+    fn read_register(&mut self, reg: u8, len: u8) -> Result<Vec<u8>, Self::Error> {
         let start = reg as usize;
         let end = start + len as usize;
         Ok(self.regs[start..end].to_vec())
     }
 
-    fn write_register(&mut self, reg: u8, data: &[u8]) -> Result<(), Error> {
+    fn write_register(&mut self, reg: u8, data: &[u8]) -> Result<(), Self::Error> {
         let start = reg as usize;
         for (i, &b) in data.iter().enumerate() {
             if start + i < self.regs.len() {
@@ -85,7 +87,8 @@ impl TemperatureSequenceBus {
 }
 
 impl adxl355::device::Transport for TemperatureSequenceBus {
-    fn read_register(&mut self, reg: u8, len: u8) -> Result<Vec<u8>, Error> {
+    type Error = Infallible;
+    fn read_register(&mut self, reg: u8, len: u8) -> Result<Vec<u8>, Self::Error> {
         if reg == registers::reg::TEMP2 && !self.responses.is_empty() {
             return Ok(self.responses.remove(0));
         }
@@ -94,7 +97,7 @@ impl adxl355::device::Transport for TemperatureSequenceBus {
         Ok(self.regs[start..end].to_vec())
     }
 
-    fn write_register(&mut self, reg: u8, data: &[u8]) -> Result<(), Error> {
+    fn write_register(&mut self, reg: u8, data: &[u8]) -> Result<(), Self::Error> {
         let start = reg as usize;
         self.regs[start..start + data.len()].copy_from_slice(data);
         Ok(())
@@ -115,10 +118,17 @@ fn test_temperature_reserved_nibble_ignored() {
 }
 
 #[test]
-fn test_temperature_short_read_returns_bus_error() {
+fn test_temperature_short_read_returns_length_error() {
     let mut dev = Adxl355::new(TemperatureSequenceBus::new(vec![vec![0x07]]));
     dev.probe().unwrap();
-    assert_eq!(dev.read_temperature_raw(), Err(Error::Bus));
+    assert_eq!(
+        dev.read_temperature_raw(),
+        Err(Error::InvalidResponseLength {
+            register: registers::reg::TEMP2,
+            expected: 2,
+            actual: 1,
+        })
+    );
 }
 
 #[test]

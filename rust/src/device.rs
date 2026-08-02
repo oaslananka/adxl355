@@ -2,18 +2,20 @@
 
 use alloc::vec::Vec;
 
-use crate::error::Error;
+use crate::error::{Error, StateRequirement};
 use crate::registers::{self, PowerMode, Range};
 use crate::types::{AccelXyz, RawXyz};
 
 /// Transport abstraction for ADXL355 communication.
 pub trait Transport {
+    /// Backend-specific cause preserved by the driver error.
+    type Error;
     /// Return exactly `len` bytes starting at `reg` or an error.
     ///
     /// Zero-length, truncated, and overlong payloads violate the contract.
-    fn read_register(&mut self, reg: u8, len: u8) -> Result<Vec<u8>, Error>;
+    fn read_register(&mut self, reg: u8, len: u8) -> Result<Vec<u8>, Self::Error>;
     /// Write the complete payload or return an error; partial success is invalid.
-    fn write_register(&mut self, reg: u8, data: &[u8]) -> Result<(), Error>;
+    fn write_register(&mut self, reg: u8, data: &[u8]) -> Result<(), Self::Error>;
     /// Blocking delay in milliseconds.
     fn delay_ms(&mut self, ms: u32);
 }
@@ -45,36 +47,42 @@ impl<T: Transport> Adxl355<T> {
     // Internal helpers
     // ------------------------------------------------------------------
 
-    fn read_exact(&mut self, reg: u8, len: u8) -> Result<Vec<u8>, Error> {
+    fn read_exact(&mut self, reg: u8, len: u8) -> Result<Vec<u8>, Error<T::Error>> {
         let data = self
             .transport
             .read_register(reg, len)
-            .map_err(|_| Error::Bus)?;
+            .map_err(Error::Transport)?;
         if data.len() != len as usize {
-            return Err(Error::Bus);
+            return Err(Error::InvalidResponseLength {
+                register: reg,
+                expected: len as usize,
+                actual: data.len(),
+            });
         }
         Ok(data)
     }
 
-    fn read_u8(&mut self, reg: u8) -> Result<u8, Error> {
+    fn read_u8(&mut self, reg: u8) -> Result<u8, Error<T::Error>> {
         Ok(self.read_exact(reg, 1)?[0])
     }
 
-    fn write_u8(&mut self, reg: u8, val: u8) -> Result<(), Error> {
+    fn write_u8(&mut self, reg: u8, val: u8) -> Result<(), Error<T::Error>> {
         self.transport
             .write_register(reg, &[val])
-            .map_err(|_| Error::Bus)
+            .map_err(Error::Transport)
     }
 
-    fn ensure_initialized(&self) -> Result<(), Error> {
+    fn ensure_initialized(&self) -> Result<(), Error<T::Error>> {
         if self.initialized {
             Ok(())
         } else {
-            Err(Error::InvalidState)
+            Err(Error::InvalidState {
+                required: StateRequirement::Probed,
+            })
         }
     }
 
-    fn enter_configuration_standby(&mut self) -> Result<Option<u8>, Error> {
+    fn enter_configuration_standby(&mut self) -> Result<Option<u8>, Error<T::Error>> {
         let original = self.read_u8(registers::reg::POWER_CTL)?;
         if original & 0x01 != 0 {
             return Ok(None);
@@ -86,10 +94,12 @@ impl<T: Transport> Adxl355<T> {
     fn finish_configuration(
         &mut self,
         original_power_ctl: Option<u8>,
-        operation: Result<(), Error>,
-    ) -> Result<(), Error> {
+        operation: Result<(), Error<T::Error>>,
+    ) -> Result<(), Error<T::Error>> {
         if let Some(original) = original_power_ctl {
-            self.write_u8(registers::reg::POWER_CTL, original)?;
+            self.transport
+                .write_register(registers::reg::POWER_CTL, &[original])
+                .map_err(Error::Restore)?;
         }
         operation
     }
@@ -99,7 +109,7 @@ impl<T: Transport> Adxl355<T> {
     // ------------------------------------------------------------------
 
     /// Probe for the ADXL355 and synchronize the cached hardware range.
-    pub fn probe(&mut self) -> Result<bool, Error> {
+    pub fn probe(&mut self) -> Result<bool, Error<T::Error>> {
         self.initialized = false;
         let id_ad = self.read_u8(registers::reg::DEVID_AD)?;
         let id_mst = self.read_u8(registers::reg::DEVID_MST)?;
@@ -109,11 +119,19 @@ impl<T: Transport> Adxl355<T> {
             || id_mst != registers::id::DEVID_MST
             || part_id != registers::id::PARTID
         {
-            return Err(Error::BadDevice);
+            return Err(Error::InvalidIdentity {
+                devid_ad: id_ad,
+                devid_mst: id_mst,
+                partid: part_id,
+            });
         }
 
         let range_value = self.read_u8(registers::reg::RANGE)?;
-        let detected_range = Range::from_register(range_value).ok_or(Error::InvalidArgument)?;
+        let detected_range =
+            Range::from_register(range_value).ok_or(Error::InvalidConfiguration {
+                register: registers::reg::RANGE,
+                value: range_value,
+            })?;
 
         let power_ctl = self.read_u8(registers::reg::POWER_CTL)?;
         if power_ctl & 0x01 == 0 {
@@ -125,7 +143,7 @@ impl<T: Transport> Adxl355<T> {
     }
 
     /// Perform a software reset.
-    pub fn reset(&mut self) -> Result<(), Error> {
+    pub fn reset(&mut self) -> Result<(), Error<T::Error>> {
         self.ensure_initialized()?;
         self.write_u8(registers::reg::RESET, registers::RESET_CODE)?;
         self.transport.delay_ms(10);
@@ -134,7 +152,7 @@ impl<T: Transport> Adxl355<T> {
     }
 
     /// Set the acceleration range.
-    pub fn set_range(&mut self, range: Range) -> Result<(), Error> {
+    pub fn set_range(&mut self, range: Range) -> Result<(), Error<T::Error>> {
         self.ensure_initialized()?;
         let original_power_ctl = self.enter_configuration_standby()?;
         let operation = (|| {
@@ -149,14 +167,17 @@ impl<T: Transport> Adxl355<T> {
     }
 
     /// Read the currently configured range.
-    pub fn get_range(&mut self) -> Result<Range, Error> {
+    pub fn get_range(&mut self) -> Result<Range, Error<T::Error>> {
         self.ensure_initialized()?;
         let val = self.read_u8(registers::reg::RANGE)?;
-        Range::from_register(val).ok_or(Error::InvalidArgument)
+        Range::from_register(val).ok_or(Error::InvalidConfiguration {
+            register: registers::reg::RANGE,
+            value: val,
+        })
     }
 
     /// Set the power mode.
-    pub fn set_power_mode(&mut self, mode: PowerMode) -> Result<(), Error> {
+    pub fn set_power_mode(&mut self, mode: PowerMode) -> Result<(), Error<T::Error>> {
         self.ensure_initialized()?;
         let mut reg = self.read_u8(registers::reg::POWER_CTL)?;
         /* Datasheet Rev.D, Table 43: bit 0 = 1 => standby, bit 0 = 0 => measurement */
@@ -173,7 +194,7 @@ impl<T: Transport> Adxl355<T> {
     // ------------------------------------------------------------------
 
     /// Read raw 20-bit acceleration for all three axes.
-    pub fn read_raw(&mut self) -> Result<RawXyz, Error> {
+    pub fn read_raw(&mut self) -> Result<RawXyz, Error<T::Error>> {
         self.ensure_initialized()?;
         let data = self.read_exact(registers::reg::XDATA3, 9)?;
         Ok(RawXyz {
@@ -184,7 +205,7 @@ impl<T: Transport> Adxl355<T> {
     }
 
     /// Read acceleration in g.
-    pub fn read_g(&mut self) -> Result<AccelXyz, Error> {
+    pub fn read_g(&mut self) -> Result<AccelXyz, Error<T::Error>> {
         let raw = self.read_raw()?;
         let scale = self.range.scale_g_per_lsb();
         Ok(AccelXyz {
@@ -195,7 +216,7 @@ impl<T: Transport> Adxl355<T> {
     }
 
     /// Read acceleration in m/s².
-    pub fn read_mps2(&mut self) -> Result<AccelXyz, Error> {
+    pub fn read_mps2(&mut self) -> Result<AccelXyz, Error<T::Error>> {
         let accel = self.read_g()?;
         Ok(AccelXyz {
             x: accel.x * registers::STANDARD_GRAVITY_M_S2,
@@ -208,7 +229,7 @@ impl<T: Transport> Adxl355<T> {
     ///
     /// TEMP2/TEMP1 are not double-buffered. Both bytes are read together,
     /// then TEMP2 is re-read; the operation retries if its data nibble changed.
-    pub fn read_temperature_raw(&mut self) -> Result<i16, Error> {
+    pub fn read_temperature_raw(&mut self) -> Result<i16, Error<T::Error>> {
         self.ensure_initialized()?;
         for _ in 0..registers::temperature::READ_ATTEMPTS {
             let data = self.read_exact(registers::reg::TEMP2, 2)?;
@@ -226,7 +247,7 @@ impl<T: Transport> Adxl355<T> {
     ///
     /// Datasheet Rev.D: 12-bit unsigned, nominal intercept 1885 LSB at 25°C,
     /// slope -9.05 LSB/°C. Formula: T(°C) = 25.0 + (raw - 1885.0) / -9.05
-    pub fn read_temperature_c(&mut self) -> Result<f32, Error> {
+    pub fn read_temperature_c(&mut self) -> Result<f32, Error<T::Error>> {
         let raw = self.read_temperature_raw()?;
         Ok(registers::temperature::INTERCEPT_C
             + (raw as f32 - registers::temperature::INTERCEPT_LSB)
@@ -234,7 +255,7 @@ impl<T: Transport> Adxl355<T> {
     }
 
     /// Read the status register.
-    pub fn read_status(&mut self) -> Result<u8, Error> {
+    pub fn read_status(&mut self) -> Result<u8, Error<T::Error>> {
         self.ensure_initialized()?;
         self.read_u8(registers::reg::STATUS)
     }
@@ -302,13 +323,14 @@ mod tests {
     }
 
     impl Transport for MockTransport {
-        fn read_register(&mut self, reg: u8, len: u8) -> Result<Vec<u8>, Error> {
+        type Error = core::convert::Infallible;
+        fn read_register(&mut self, reg: u8, len: u8) -> Result<Vec<u8>, Self::Error> {
             let reg = reg as usize;
             let len = len as usize;
             Ok(self.regs[reg..reg + len].to_vec())
         }
 
-        fn write_register(&mut self, reg: u8, data: &[u8]) -> Result<(), Error> {
+        fn write_register(&mut self, reg: u8, data: &[u8]) -> Result<(), Self::Error> {
             let reg = reg as usize;
             for (i, &b) in data.iter().enumerate() {
                 if reg + i < self.regs.len() {
@@ -396,7 +418,13 @@ mod tests {
         mock.regs[registers::reg::RANGE as usize] = 0;
         let mut dev = Adxl355::new(mock);
 
-        assert_eq!(dev.probe(), Err(Error::InvalidArgument));
+        assert_eq!(
+            dev.probe(),
+            Err(Error::InvalidConfiguration {
+                register: registers::reg::RANGE,
+                value: 0
+            })
+        );
         assert!(!dev.initialized);
         assert_eq!(dev.range, Range::G2);
     }
