@@ -993,6 +993,141 @@ static void test_transport_contract_xyz_exact_length(void)
     TEST_END();
 }
 
+
+static void test_calculate_offset_rounding_and_saturation(void)
+{
+    TEST_START("calculate_offset_rounding_and_saturation");
+    int16_t offset = 123;
+    TEST_ASSERT(adxl355_calculate_offset(1000, 1007, 0, false, &offset) == ADXL355_OK,
+                "positive value below half count should succeed");
+    TEST_ASSERT(offset == 0, "+7 raw LSB should round to zero");
+    TEST_ASSERT(adxl355_calculate_offset(1000, 1008, 0, false, &offset) == ADXL355_OK,
+                "positive half count should succeed");
+    TEST_ASSERT(offset == -1, "+8 expected-minus-measured should program -1");
+    TEST_ASSERT(adxl355_calculate_offset(1000, 993, 0, false, &offset) == ADXL355_OK,
+                "negative value above half count should succeed");
+    TEST_ASSERT(offset == 0, "-7 raw LSB should round to zero");
+    TEST_ASSERT(adxl355_calculate_offset(1000, 992, 0, false, &offset) == ADXL355_OK,
+                "negative half count should succeed");
+    TEST_ASSERT(offset == 1, "-8 expected-minus-measured should program +1");
+    TEST_ASSERT(adxl355_calculate_offset(1000, 1008, 100, false, &offset) == ADXL355_OK,
+                "existing offset should be included");
+    TEST_ASSERT(offset == 99, "helper should return the new absolute offset");
+
+    offset = 77;
+    TEST_ASSERT(adxl355_calculate_offset(-524288, 524287, 0, false, &offset) ==
+                    ADXL355_ERR_INVALID_ARG,
+                "strict overflow should be rejected");
+    TEST_ASSERT(offset == 77, "rejected calculation must not modify output");
+    TEST_ASSERT(adxl355_calculate_offset(-524288, 524287, 0, true, &offset) == ADXL355_OK,
+                "negative overflow should saturate when requested");
+    TEST_ASSERT(offset == INT16_MIN, "negative saturation should clamp to INT16_MIN");
+    TEST_ASSERT(adxl355_calculate_offset(524287, -524288, 0, true, &offset) == ADXL355_OK,
+                "positive overflow should saturate when requested");
+    TEST_ASSERT(offset == INT16_MAX, "positive saturation should clamp to INT16_MAX");
+    TEST_ASSERT(adxl355_calculate_offset(524288, 0, 0, false, &offset) ==
+                    ADXL355_ERR_INVALID_ARG,
+                "out-of-range raw input should be rejected");
+    TEST_END();
+}
+
+static void test_offset_read_write_and_state_restore(void)
+{
+    TEST_START("offset_read_write_and_state_restore");
+    adxl355_mock_bus_t mock;
+    adxl355_mock_bus_init(&mock);
+    adxl355_mock_bus_set_identity_ok(&mock);
+    adxl355_bus_t bus = adxl355_mock_bus_get_interface(&mock);
+    adxl355_t dev;
+    adxl355_init(&dev, &bus);
+    TEST_ASSERT(adxl355_probe(&dev) == ADXL355_OK, "probe should succeed");
+
+    mock.regs[ADXL355_REG_OFFSET_Y_H] = 0xFE;
+    mock.regs[ADXL355_REG_OFFSET_Y_L] = 0xDC;
+    int16_t offset = 0;
+    TEST_ASSERT(adxl355_read_offset(&dev, ADXL355_AXIS_Y, &offset) == ADXL355_OK,
+                "signed offset read should succeed");
+    TEST_ASSERT(offset == -292, "0xFEDC should decode as -292");
+
+    mock.regs[ADXL355_REG_POWER_CTL] = ADXL355_POWER_MEASUREMENT;
+    mock.call_count = 0U;
+    TEST_ASSERT(adxl355_write_offset(&dev, ADXL355_AXIS_X, -1234) == ADXL355_OK,
+                "signed offset write should succeed");
+    TEST_ASSERT(mock.regs[ADXL355_REG_OFFSET_X_H] == 0xFB &&
+                    mock.regs[ADXL355_REG_OFFSET_X_L] == 0x2E,
+                "offset should be written big-endian in one register burst");
+    TEST_ASSERT(mock.regs[ADXL355_REG_POWER_CTL] == ADXL355_POWER_MEASUREMENT,
+                "measurement mode should be restored");
+    TEST_ASSERT(mock.call_count == 4U, "write should read power, enter standby, write offset, restore");
+    TEST_ASSERT(mock.calls[2].is_write && mock.calls[2].reg == ADXL355_REG_OFFSET_X_H &&
+                    mock.calls[2].len == 2U,
+                "offset write should use one two-byte transaction");
+    TEST_END();
+}
+
+static void test_offset_failures_are_state_safe(void)
+{
+    TEST_START("offset_failures_are_state_safe");
+    adxl355_mock_bus_t mock;
+    adxl355_mock_bus_init(&mock);
+    adxl355_mock_bus_set_identity_ok(&mock);
+    adxl355_bus_t bus = adxl355_mock_bus_get_interface(&mock);
+    adxl355_t dev;
+    adxl355_init(&dev, &bus);
+    TEST_ASSERT(adxl355_probe(&dev) == ADXL355_OK, "probe should succeed");
+    mock.regs[ADXL355_REG_POWER_CTL] = ADXL355_POWER_MEASUREMENT;
+    mock.fail_write_reg = ADXL355_REG_OFFSET_Z_H;
+    TEST_ASSERT(adxl355_write_offset(&dev, ADXL355_AXIS_Z, 100) == ADXL355_ERR_BUS,
+                "target write failure should be reported");
+    TEST_ASSERT(mock.regs[ADXL355_REG_POWER_CTL] == ADXL355_POWER_MEASUREMENT,
+                "target failure should restore measurement mode");
+    TEST_ASSERT(mock.regs[ADXL355_REG_OFFSET_Z_H] == 0U &&
+                    mock.regs[ADXL355_REG_OFFSET_Z_L] == 0U,
+                "target failure must not modify offset registers");
+
+    adxl355_mock_bus_init(&mock);
+    adxl355_mock_bus_set_identity_ok(&mock);
+    bus = adxl355_mock_bus_get_interface(&mock);
+    adxl355_init(&dev, &bus);
+    TEST_ASSERT(adxl355_probe(&dev) == ADXL355_OK, "second probe should succeed");
+    mock.regs[ADXL355_REG_POWER_CTL] = ADXL355_POWER_MEASUREMENT;
+    mock.fail_write_reg = ADXL355_REG_POWER_CTL;
+    mock.fail_write_occurrence = 2U;
+    TEST_ASSERT(adxl355_write_offset(&dev, ADXL355_AXIS_Z, 100) == ADXL355_ERR_BUS,
+                "restore failure should be reported");
+    TEST_ASSERT(mock.regs[ADXL355_REG_POWER_CTL] == ADXL355_POWER_STANDBY,
+                "restore failure should leave hardware in safe standby");
+    TEST_ASSERT(mock.regs[ADXL355_REG_OFFSET_Z_H] == 0x00U &&
+                    mock.regs[ADXL355_REG_OFFSET_Z_L] == 0x64U,
+                "successful target write remains applied when restore fails");
+    TEST_END();
+}
+
+static void test_offset_argument_and_lifecycle_validation(void)
+{
+    TEST_START("offset_argument_and_lifecycle_validation");
+    adxl355_mock_bus_t mock;
+    adxl355_mock_bus_init(&mock);
+    adxl355_bus_t bus = adxl355_mock_bus_get_interface(&mock);
+    adxl355_t dev;
+    adxl355_init(&dev, &bus);
+    int16_t offset = 44;
+    TEST_ASSERT(adxl355_read_offset(&dev, ADXL355_AXIS_X, &offset) == ADXL355_ERR_STATE,
+                "pre-probe read should fail without bus access");
+    TEST_ASSERT(adxl355_write_offset(&dev, ADXL355_AXIS_X, 0) == ADXL355_ERR_STATE,
+                "pre-probe write should fail without bus access");
+    TEST_ASSERT(mock.call_count == 0U, "pre-probe offset operations must not touch bus");
+
+    adxl355_mock_bus_set_identity_ok(&mock);
+    TEST_ASSERT(adxl355_probe(&dev) == ADXL355_OK, "probe should succeed");
+    TEST_ASSERT(adxl355_read_offset(&dev, (adxl355_axis_t)99, &offset) ==
+                    ADXL355_ERR_INVALID_ARG,
+                "invalid axis should be rejected");
+    TEST_ASSERT(adxl355_read_offset(&dev, ADXL355_AXIS_X, NULL) == ADXL355_ERR_NULL,
+                "null output should be rejected");
+    TEST_END();
+}
+
 int main(void)
 {
     printf("ADXL355 C Test Suite\n");
@@ -1049,6 +1184,10 @@ int main(void)
     test_transport_contract_single_register_exact_length();
     test_transport_contract_temperature_exact_length();
     test_transport_contract_xyz_exact_length();
+    test_calculate_offset_rounding_and_saturation();
+    test_offset_read_write_and_state_restore();
+    test_offset_failures_are_state_safe();
+    test_offset_argument_and_lifecycle_validation();
 
     printf("\n====================\n");
     printf("Results: %d/%d passed, %d failed\n",

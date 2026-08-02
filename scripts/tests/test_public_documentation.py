@@ -76,7 +76,9 @@ class PublicDocumentationTests(unittest.TestCase):
         self.assertNotIn("Not yet implemented", combined)
         self.assertIn("manual-only", combined)
         self.assertIn("calibration procedure", combined.lower())
-        self.assertIn("no public calibration helper", combined.lower())
+        self.assertIn("c and python expose", combined.lower())
+        self.assertIn("1 offset-register count = 16 raw acceleration lsb", combined.lower())
+        self.assertIn("not factory", combined.lower())
 
     def test_support_policy_matches_package_metadata_and_ci(self) -> None:
         contributing = CONTRIBUTING.read_text()
@@ -115,6 +117,20 @@ class PublicDocumentationTests(unittest.TestCase):
         self.assertIn("must never be renamed or removed in one step", text)
         self.assertIn("export the current ruleset JSON", text)
         self.assertIn("without bypassing CI", text)
+
+    def test_calibration_docs_define_units_rollback_and_limitations(self) -> None:
+        text = (REPO_ROOT / "docs" / "calibration.md").read_text().lower()
+        for phrase in (
+            "signed 16-bit two's-complement",
+            "measured_raw - expected_raw",
+            "half-away-from-zero",
+            "restore the saved offsets",
+            "temperature",
+            "residual error",
+            "do not record secrets",
+        ):
+            self.assertIn(phrase, text)
+
 
 
 if __name__ == "__main__":

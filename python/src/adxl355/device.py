@@ -30,6 +30,7 @@ from adxl355.registers import (
     FILTER_ODR_SHIFT,
     ODR,
     RANGE_SEL_MASK,
+    Axis,
     PowerMode,
     Range,
     Register,
@@ -71,13 +72,16 @@ class ADXL355:
     def _read_reg(self, reg: int) -> int:
         return self._read_exact(reg, 1)[0]
 
-    def _write_reg(self, reg: int, value: int) -> None:
+    def _write_exact(self, reg: int, data: bytes) -> None:
         try:
-            self._transport.write_register(reg, bytes([value]))
+            self._transport.write_register(reg, data)
         except Exception as exc:
             if isinstance(exc, BusError):
                 raise
             raise BusError(f"Transport write failed at register 0x{reg:02X}") from exc
+
+    def _write_reg(self, reg: int, value: int) -> None:
+        self._write_exact(reg, bytes([value]))
 
     def _delay_ms(self, ms: int) -> None:
         try:
@@ -200,6 +204,39 @@ class ADXL355:
                 (int(odr) << FILTER_ODR_SHIFT) & FILTER_ODR_MASK
             )
             self._write_reg(Register.FILTER, reg)
+        finally:
+            self._restore_configuration_mode(original_power_ctl)
+
+
+    @staticmethod
+    def _offset_register(axis: Axis) -> Register:
+        try:
+            return {
+                Axis.X: Register.OFFSET_X_H,
+                Axis.Y: Register.OFFSET_Y_H,
+                Axis.Z: Register.OFFSET_Z_H,
+            }[Axis(axis)]
+        except (ValueError, KeyError) as exc:
+            raise InvalidConfigurationError(f"Invalid axis: {axis}") from exc
+
+    def read_offset(self, axis: Axis) -> int:
+        """Read a signed 16-bit hardware offset; one count equals 16 raw LSB."""
+        self._check_init()
+        reg = self._offset_register(axis)
+        return int.from_bytes(self._read_exact(reg, 2), byteorder="big", signed=True)
+
+    def write_offset(self, axis: Axis, offset: int) -> None:
+        """Write a volatile signed 16-bit offset in standby and restore mode."""
+        self._check_init()
+        reg = self._offset_register(axis)
+        if isinstance(offset, bool) or not isinstance(offset, int):
+            raise InvalidConfigurationError("offset must be an integer")
+        if not -(1 << 15) <= offset <= (1 << 15) - 1:
+            raise InvalidConfigurationError("offset is outside the signed 16-bit range")
+
+        original_power_ctl = self._enter_configuration_standby()
+        try:
+            self._write_exact(reg, offset.to_bytes(2, byteorder="big", signed=True))
         finally:
             self._restore_configuration_mode(original_power_ctl)
 

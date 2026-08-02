@@ -33,7 +33,7 @@
 ### Python
 - [x] spidev adapter implementation
 - [x] smbus2 adapter implementation
-- [ ] Calibration helper utilities
+- [x] Calibration helper utilities and signed offset-register APIs
 - [x] FIFO entry-count helper
 - [ ] FIFO sample-data decode/read API
 - [x] Hardware-in-the-loop runner and failure-path tests
@@ -77,7 +77,8 @@
 - [x] Architecture documentation
 - [x] Register map documentation
 - [x] Testing guide
-- [x] Calibration procedure (no public calibration helper yet)
+- [x] Calibration procedure with C/Python public helper and offset APIs
+- [ ] Record repeatable physical pre/post calibration evidence
 - [x] Publishing guide
 
 ### Testing

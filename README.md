@@ -35,6 +35,7 @@ Linux device adapter for that language. The repository contains buildable packag
 - Exact-length transport validation and stable driver-level bus errors.
 - Probe-before-use lifecycle and standby-safe range/configuration behavior.
 - Raw 20-bit decode, g and m/s² conversion, temperature, and status reads.
+- C/Python signed hardware-offset APIs and deterministic raw-LSB calibration helpers.
 - Mock-based tests in all six languages and a required zero-skip vector gate.
 - CI quality gates for sanitizers, lint/type analysis, package smoke tests,
   dependency auditing, CodeQL, race detection, and coverage reporting.
@@ -45,10 +46,10 @@ Linux device adapter for that language. The repository contains buildable packag
 ## Explicitly not claimed
 
 Register constants document the chip, but **Register presence does not imply a public API**. `FIFO_DATA`, offset registers, and `SELF_TEST` are represented in
-the register map; full FIFO sample decoding, hardware offset programming,
-self-test control, interrupt configuration, and public calibration helpers are
-not implemented consistently as public driver methods. The calibration document
-is a procedure, not a callable calibration API.
+the register map. Full FIFO sample decoding, self-test control, and interrupt
+configuration are not implemented consistently as public driver methods. Signed
+offset programming and calibration helpers are implemented only in C and Python;
+that coverage does not imply factory accuracy or parity in the other languages.
 
 ## Hardware validation status
 
