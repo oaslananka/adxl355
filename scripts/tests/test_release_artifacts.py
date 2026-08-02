@@ -45,7 +45,9 @@ class ReleaseArtifactTests(unittest.TestCase):
                 "Name: adxl355\n"
                 "Version: 0.1.0a2\n"
                 "Project-URL: Repository, https://github.com/oaslananka/adxl355\n"
-                "Project-URL: Documentation, https://github.com/oaslananka/adxl355/tree/main/docs\n",
+                "Project-URL: Documentation, https://github.com/oaslananka/adxl355/tree/main/docs\n"
+                "Project-URL: Changelog, https://github.com/oaslananka/adxl355/blob/main/CHANGELOG.md\n"
+                "Project-URL: Security, https://github.com/oaslananka/adxl355/security/policy\n",
             )
             if include_tests:
                 handle.writestr("tests/test_bad.py", "")
@@ -77,7 +79,7 @@ class ReleaseArtifactTests(unittest.TestCase):
                 'version = "0.1.0-alpha.2"\n'
                 f'\n[lib]\nname = "{import_name}"\npath = "src/lib.rs"\n',
             )
-            self.add_tar_text(handle, f"{prefix}/README.md", "readme")
+            self.add_tar_text(handle, f"{prefix}/README.md", "[Changelog](https://github.com/oaslananka/adxl355/blob/main/CHANGELOG.md)\n[Security](https://github.com/oaslananka/adxl355/security/policy)\n[License](https://github.com/oaslananka/adxl355/blob/main/LICENSE)\n")
             self.add_tar_text(handle, f"{prefix}/LICENSE", "license")
             self.add_tar_text(handle, f"{prefix}/src/lib.rs", "")
             if add_link:
@@ -115,7 +117,7 @@ class ReleaseArtifactTests(unittest.TestCase):
                 },
             }
             self.add_tar_text(handle, "package/package.json", json.dumps(package))
-            self.add_tar_text(handle, "package/README.md", "readme")
+            self.add_tar_text(handle, "package/README.md", "[Changelog](https://github.com/oaslananka/adxl355/blob/main/CHANGELOG.md)\n[Security](https://github.com/oaslananka/adxl355/security/policy)\n[License](https://github.com/oaslananka/adxl355/blob/main/LICENSE)\n")
             self.add_tar_text(handle, "package/LICENSE", "license")
             self.add_tar_text(handle, "package/dist/index.js", "")
             if extra_file is not None:

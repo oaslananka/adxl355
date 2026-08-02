@@ -135,6 +135,27 @@ class PublicDocumentationTests(unittest.TestCase):
         self.assertIn("do not currently expose", normalized)
         self.assertIn("do not apply undocumented factory acceptance limits", normalized)
 
+    def test_trusted_publishing_docs_define_exact_bindings_and_recovery(self) -> None:
+        publishing = (REPO_ROOT / "docs" / "publishing.md").read_text()
+        supply_chain = (REPO_ROOT / "docs" / "security" / "supply-chain.md").read_text()
+        combined = publishing + "\n" + supply_chain
+        for phrase in (
+            "REGISTRY_PUBLISHING_ENABLED",
+            "release.yml",
+            "environment `release`",
+            "@oaslananka/adxl355",
+            "adxl355-driver",
+            "scripts/registry_release.py",
+            "partial or changed",
+            "idempotent",
+            "short-lived",
+        ):
+            self.assertIn(phrase, combined)
+        self.assertIn("v[0-9]*", publishing)
+        self.assertIn("pending Trusted Publisher", publishing)
+        self.assertIn("first package reservation/publication", publishing)
+        self.assertIn("initial crate release", publishing)
+
     def test_package_and_release_wording_matches_repository_state(self) -> None:
         readme = README.read_text()
         publishing = (REPO_ROOT / "docs" / "publishing.md").read_text()

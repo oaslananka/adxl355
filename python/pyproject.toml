@@ -31,6 +31,8 @@ Homepage = "https://github.com/oaslananka/adxl355"
 Repository = "https://github.com/oaslananka/adxl355"
 Documentation = "https://github.com/oaslananka/adxl355/tree/main/docs"
 Issues = "https://github.com/oaslananka/adxl355/issues"
+Changelog = "https://github.com/oaslananka/adxl355/blob/main/CHANGELOG.md"
+Security = "https://github.com/oaslananka/adxl355/security/policy"
 
 [project.optional-dependencies]
 spi = ["spidev"]

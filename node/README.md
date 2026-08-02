@@ -81,3 +81,10 @@ The bounded I2C example is physically verified on Raspberry Pi 5 at address `0x1
 with Node.js 24 ARM64. Eight samples were captured and all were unique; independent
 readback confirmed standby, ±2 g, and default ODR after exit. Physical Node SPI
 validation remains pending and is not implied by the I2C result.
+
+## Project links
+
+- [Repository](https://github.com/oaslananka/adxl355)
+- [Changelog](https://github.com/oaslananka/adxl355/blob/main/CHANGELOG.md)
+- [Security policy](https://github.com/oaslananka/adxl355/security/policy)
+- [MIT license](https://github.com/oaslananka/adxl355/blob/main/LICENSE)

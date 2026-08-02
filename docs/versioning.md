@@ -40,7 +40,7 @@ required by Go module version discovery.
 
 ## Registry package names
 
-Availability was checked on **2026-07-23** without reserving or publishing any
+Availability was re-checked on **2026-08-02** without reserving or publishing any
 name:
 
 - PyPI: `adxl355` returned not found.

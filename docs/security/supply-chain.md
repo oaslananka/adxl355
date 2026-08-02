@@ -213,23 +213,34 @@ sha256sum --check RELEASE_BUNDLE_SHA256SUMS
 
 ## Trusted publishing design
 
-Registry publishing remains disabled by default. When publication is explicitly
-enabled, it must use a protected GitHub environment and **trusted publishing**
-or an equivalent short-lived credential flow. The default design requires no long-lived registry token.
+The default registry authentication model is **trusted publishing** with no long-lived registry token.
 
-- **PyPI:** configure this repository and the dedicated release workflow as a
-  PyPI Trusted Publisher. Publishing uses GitHub OIDC and a short-lived token.
-- **npm:** configure `@oaslananka/adxl355` with npm trusted publishing on a
-  GitHub-hosted runner. npm trusted publishing provides package provenance
-  automatically for a public package from a public repository.
-- **crates.io:** configure trusted publishing for `adxl355-driver` and enable
-  trusted-publishing-only mode after the first verified release. Do not fall
-  back to a stored `CARGO_REGISTRY_TOKEN` in the default workflow.
+Registry publishing is disabled unless the repository variable
+`REGISTRY_PUBLISHING_ENABLED` equals `true`. When enabled, each registry job runs
+after aggregate scanning, on `ubuntu-24.04`, through the protected `release`
+environment, with only `contents: read` and `id-token: write`. The workflow does
+not reference a PyPI, npm, or Cargo token secret.
+
+Every trusted publisher is bound to owner `oaslananka`, repository `adxl355`,
+workflow `release.yml`, and environment `release`:
+
+- **PyPI:** package `adxl355` uses the pinned PyPI publish action and GitHub OIDC.
+  A pending publisher may establish the first project release.
+- **npm:** package `@oaslananka/adxl355` uses npm CLI 11.5.1 or newer on a
+  GitHub-hosted runner. Because npm requires an existing package before the
+  publisher binding can be added, the first release is a one-time, short-lived
+  bootstrap followed immediately by binding and credential revocation.
+- **crates.io:** package `adxl355-driver` uses the pinned crates.io auth action.
+  The first crate release is bootstrapped once, then trusted-publishing-only mode
+  is enabled and the bootstrap credential is revoked.
 - **Go:** publication uses the immutable `go/v...` Git tag and the public module
   proxy; it does not require a registry credential.
 
-Registry trust must be bound to the exact repository, workflow filename, and
-protected environment. A change to the release workflow or environment is a
+`scripts/registry_release.py` verifies public registry digests against the exact
+artifacts produced earlier in the same workflow. An exact existing version is an
+idempotent success; an absent version may be published; a partial or changed
+version is a hard failure. Release concurrency never cancels an in-progress run.
+A workflow filename, environment, tag policy, or publisher-binding change is a
 security-sensitive change and requires maintainer review.
 
 ## Verification commands

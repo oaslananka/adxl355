@@ -35,3 +35,10 @@ match device.read_raw() {
 This associated-error API is an alpha-stage breaking change from the earlier
 string-like/coarse `Error::Bus` model. Custom transports implement
 `type Error = MyBackendError` and return that cause directly.
+
+## Project links
+
+- [Repository](https://github.com/oaslananka/adxl355)
+- [Changelog](https://github.com/oaslananka/adxl355/blob/main/CHANGELOG.md)
+- [Security policy](https://github.com/oaslananka/adxl355/security/policy)
+- [MIT license](https://github.com/oaslananka/adxl355/blob/main/LICENSE)
