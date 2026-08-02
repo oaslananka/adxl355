@@ -47,6 +47,11 @@ typedef struct {
     bool restore_measurement;
 } adxl355_config_guard_t;
 
+static uint8_t clear_u8_bits(uint8_t value, uint8_t mask)
+{
+    return (uint8_t)(value & (uint8_t)(UINT8_MAX ^ mask));
+}
+
 static adxl355_status_t require_initialized(const adxl355_t *dev)
 {
     return dev->initialized ? ADXL355_OK : ADXL355_ERR_STATE;
@@ -223,7 +228,7 @@ adxl355_status_t adxl355_set_range(adxl355_t *dev, adxl355_range_t range)
     if (read_reg(dev, ADXL355_REG_RANGE, &reg) != 0) {
         status = ADXL355_ERR_BUS;
     } else {
-        reg = (uint8_t)((reg & (uint8_t)(~ADXL355_RANGE_SEL_MASK)) |
+        reg = (uint8_t)(clear_u8_bits(reg, ADXL355_RANGE_SEL_MASK) |
                         ((uint8_t)range & ADXL355_RANGE_SEL_MASK));
         if (write_reg(dev, ADXL355_REG_RANGE, reg) != 0) {
             status = ADXL355_ERR_BUS;
@@ -273,7 +278,7 @@ adxl355_status_t adxl355_set_power_mode(adxl355_t *dev, adxl355_power_mode_t mod
     if (mode == ADXL355_POWER_STANDBY) {
         reg |= (uint8_t)(1U << ADXL355_POWER_MODE_BIT);
     } else {
-        reg &= (uint8_t)~(1U << ADXL355_POWER_MODE_BIT);
+        reg = clear_u8_bits(reg, (uint8_t)(1U << ADXL355_POWER_MODE_BIT));
     }
     if (write_reg(dev, ADXL355_REG_POWER_CTL, reg) != 0) {
         return ADXL355_ERR_BUS;

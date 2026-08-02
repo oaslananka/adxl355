@@ -88,6 +88,146 @@ jobs:
         working-directory: ${{ github.workspace }}
         run: ./scripts/smoke_cmake_packages.sh "${{ runner.temp }}/cmake-package-smoke"
 
+  # ── Native platform coverage ───────────────────────────────────────────
+  native-clang:
+    name: Native (Clang/Linux)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install Clang and CMake
+        run: sudo apt-get update && sudo apt-get install -y clang cmake
+      - name: Build and test C with Clang
+        env:
+          CC: clang
+        run: |
+          cmake -S c -B build/clang/c \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DADXL355_BUILD_TESTS=ON \
+            -DADXL355_BUILD_EXAMPLES=ON \
+            -DADXL355_WARNINGS_AS_ERRORS=ON \
+            -DADXL355_ENABLE_SANITIZERS=ON
+          cmake --build build/clang/c --parallel
+          ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 \
+            UBSAN_OPTIONS=print_stacktrace=1:halt_on_error=1 \
+            ctest --test-dir build/clang/c --output-on-failure
+      - name: Build and test C++ with Clang
+        env:
+          CC: clang
+          CXX: clang++
+        run: |
+          cmake -S cpp -B build/clang/cpp \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DADXL355_BUILD_TESTS=ON \
+            -DADXL355_BUILD_EXAMPLES=ON \
+            -DADXL355_WARNINGS_AS_ERRORS=ON \
+            -DADXL355_ENABLE_SANITIZERS=ON \
+            -DCMAKE_PREFIX_PATH="${{ github.workspace }}/build/clang/c"
+          cmake --build build/clang/cpp --parallel
+          ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 \
+            UBSAN_OPTIONS=print_stacktrace=1:halt_on_error=1 \
+            ctest --test-dir build/clang/cpp --output-on-failure
+      - name: Verify installed packages with Clang
+        env:
+          CC: clang
+          CXX: clang++
+        run: ./scripts/smoke_cmake_packages.sh "${{ runner.temp }}/cmake-clang-smoke"
+
+  native-macos:
+    name: Native (macOS/arm64)
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Build and test C with AppleClang
+        run: |
+          cmake -S c -B build/macos/c \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DADXL355_BUILD_TESTS=ON \
+            -DADXL355_BUILD_EXAMPLES=ON \
+            -DADXL355_WARNINGS_AS_ERRORS=ON
+          cmake --build build/macos/c --parallel
+          ctest --test-dir build/macos/c --output-on-failure
+      - name: Build and test C++ with AppleClang
+        run: |
+          cmake -S cpp -B build/macos/cpp \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DADXL355_BUILD_TESTS=ON \
+            -DADXL355_BUILD_EXAMPLES=ON \
+            -DADXL355_WARNINGS_AS_ERRORS=ON \
+            -DCMAKE_PREFIX_PATH="${{ github.workspace }}/build/macos/c"
+          cmake --build build/macos/cpp --parallel
+          ctest --test-dir build/macos/cpp --output-on-failure
+      - name: Verify installed packages
+        run: ./scripts/smoke_cmake_packages.sh "${{ runner.temp }}/cmake-macos-smoke"
+
+  native-windows:
+    name: Native (Windows/MSVC)
+    runs-on: windows-2025
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Build and test C with MSVC
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $PSNativeCommandUseErrorActionPreference = $true
+          cmake -S c -B build/windows/c -A x64 `
+            -DADXL355_BUILD_TESTS=ON `
+            -DADXL355_BUILD_EXAMPLES=ON `
+            -DADXL355_WARNINGS_AS_ERRORS=ON
+          cmake --build build/windows/c --config Debug --parallel
+          ctest --test-dir build/windows/c -C Debug --output-on-failure
+      - name: Build and test C++ with MSVC
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $PSNativeCommandUseErrorActionPreference = $true
+          cmake -S cpp -B build/windows/cpp -A x64 `
+            -DADXL355_BUILD_TESTS=ON `
+            -DADXL355_BUILD_EXAMPLES=ON `
+            -DADXL355_WARNINGS_AS_ERRORS=ON `
+            "-DCMAKE_PREFIX_PATH=${{ github.workspace }}/build/windows/c"
+          cmake --build build/windows/cpp --config Debug --parallel
+          ctest --test-dir build/windows/cpp -C Debug --output-on-failure
+      - name: Verify installed packages
+        shell: pwsh
+        run: ./scripts/smoke_cmake_packages.ps1 "${{ runner.temp }}/cmake-windows-smoke"
+
+  native-arm:
+    name: Native (Linux/arm64)
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install CMake and compilers
+        run: sudo apt-get update && sudo apt-get install -y cmake gcc g++
+      - name: Build and test C on ARM64
+        run: |
+          cmake -S c -B build/arm64/c \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DADXL355_BUILD_TESTS=ON \
+            -DADXL355_BUILD_EXAMPLES=ON \
+            -DADXL355_WARNINGS_AS_ERRORS=ON
+          cmake --build build/arm64/c --parallel
+          ctest --test-dir build/arm64/c --output-on-failure
+      - name: Build and test C++ on ARM64
+        run: |
+          cmake -S cpp -B build/arm64/cpp \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DADXL355_BUILD_TESTS=ON \
+            -DADXL355_BUILD_EXAMPLES=ON \
+            -DADXL355_WARNINGS_AS_ERRORS=ON \
+            -DCMAKE_PREFIX_PATH="${{ github.workspace }}/build/arm64/c"
+          cmake --build build/arm64/cpp --parallel
+          ctest --test-dir build/arm64/cpp --output-on-failure
+      - name: Verify installed packages
+        run: ./scripts/smoke_cmake_packages.sh "${{ runner.temp }}/cmake-arm64-smoke"
+
   # ── Python ────────────────────────────────────────────────────────────
   python:
     name: Python
@@ -232,7 +372,7 @@ jobs:
   consistency:
     name: Cross-language Consistency
     runs-on: ubuntu-latest
-    needs: [c, cpp, python, rust, node, go]
+    needs: [c, cpp, native-clang, native-macos, native-windows, native-arm, python, rust, node, go]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Install native build tools
