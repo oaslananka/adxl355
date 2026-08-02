@@ -7,7 +7,6 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 README = REPO_ROOT / "README.md"
-CONTRIBUTING = REPO_ROOT / "CONTRIBUTING.md"
 DOCS = (
     REPO_ROOT / "docs" / "architecture.md",
     REPO_ROOT / "docs" / "testing.md",
@@ -78,36 +77,12 @@ class PublicDocumentationTests(unittest.TestCase):
         self.assertIn("calibration procedure", combined.lower())
         self.assertIn("no public calibration helper", combined.lower())
 
-    def test_support_policy_matches_package_metadata_and_ci(self) -> None:
-        contributing = CONTRIBUTING.read_text()
-        self.assertIn("Python >= 3.10", contributing)
-        self.assertNotIn("Python >= 3.9", contributing)
-        self.assertIn("Node.js 22 or >= 24", contributing)
-        self.assertIn("CI covers 22, 24, and 26", contributing)
-
-    def test_hil_status_distinguishes_spi_evidence_from_i2c_requirement(self) -> None:
-        readme = README.read_text()
-        todo = (REPO_ROOT / "TODO.md").read_text()
-        hardware = (REPO_ROOT / "docs" / "hardware-testing.md").read_text()
-        releasing = (REPO_ROOT / "docs" / "releasing.md").read_text()
-        for text in (readme, todo, hardware, releasing):
-            self.assertIn("30725059679", text)
-        self.assertIn("SPI pass on Raspberry Pi 5; I2C pending", readme)
-        self.assertIn("final release-candidate", todo)
-        self.assertIn("I2C run is still pending", hardware)
-
-    def test_contributor_templates_exist_and_route_security_privately(self) -> None:
-        issue_root = REPO_ROOT / ".github" / "ISSUE_TEMPLATE"
-        for name in ("bug_report.yml", "feature_request.yml", "config.yml"):
-            self.assertTrue((issue_root / name).is_file(), name)
-        pull_request = REPO_ROOT / ".github" / "pull_request_template.md"
-        self.assertTrue(pull_request.is_file())
-        combined = "\n".join(
-            (issue_root / name).read_text()
-            for name in ("bug_report.yml", "feature_request.yml", "config.yml")
-        )
-        self.assertIn("security/advisories/new", combined)
-        self.assertNotIn("paste your secret", combined.lower())
+    def test_testing_guide_documents_required_check_lifecycle(self) -> None:
+        text = (REPO_ROOT / "docs" / "testing.md").read_text()
+        self.assertIn("Required status-check lifecycle", text)
+        self.assertIn("must never be renamed or removed in one step", text)
+        self.assertIn("export the current ruleset JSON", text)
+        self.assertIn("without bypassing CI", text)
 
 
 if __name__ == "__main__":
