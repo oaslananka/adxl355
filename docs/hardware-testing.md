@@ -151,6 +151,104 @@ Hardware-in-the-Loop → Run workflow**, choose SPI or I2C, enter the bounded bu
 settings, and download the 30-day `artifacts/` evidence bundle after completion.
 The bundle includes `runner-context.txt` and `hil-report.json`.
 
+### Runner scope and threat model
+
+The maintained fixture is repository-scoped to `oaslananka/adxl355`, uses the
+public runner name `adxl355-hil`, and exposes only the labels `self-hosted`,
+`Linux`, `ARM64`, and `adxl355-hil`. Only the manual, `main`-restricted HIL
+workflow may target that label. Pull-request, fork, and general CI workflows must
+remain on GitHub-hosted runners and must never receive HIL host credentials.
+
+The service runs as the unprivileged `pi` account through
+`actions.runner.oaslananka-adxl355.adxl355-hil.service`. Bus access comes from the
+narrow `spi` and `i2c` groups; the runner service is not run as root. Registry,
+production, Doppler, cloud, and package-publishing credentials are prohibited on
+this host.
+
+### Monthly health and update check
+
+Run bounded checks without printing the process environment or credential files:
+
+```bash
+systemctl is-enabled actions.runner.oaslananka-adxl355.adxl355-hil.service
+systemctl is-active actions.runner.oaslananka-adxl355.adxl355-hil.service
+cd ~/actions-runner && ./bin/Runner.Listener --version
+python3 --version
+gcc --version | head -1
+id
+test -r /dev/spidev0.0 && test -w /dev/spidev0.0
+find /dev -maxdepth 1 -name 'i2c-*' -printf '%f\n'
+df -h /home
+stat -c '%a %U:%G %n' ~/.ssh/authorized_keys \
+  ~/actions-runner/.credentials ~/actions-runner/.credentials_rsaparams \
+  ~/actions-runner/.runner ~/actions-runner/.env ~/actions-runner/.path
+```
+
+Compare the installed runner with the latest official `actions/runner` release.
+Apply Debian security updates during a planned window, restart the service, and
+confirm it returns to `online`/`idle`. Credential-bearing runner files and
+runner-captured environment/path files must be owned by the runner account and
+mode `0600`. Do not display their contents in logs or issues.
+
+After maintenance, dispatch a bounded SPI or I2C HIL smoke run, verify the JSON
+report, and confirm the fixture is restored to standby, ±2 g, and the default
+ODR. A maintenance smoke result does not replace release-candidate evidence.
+
+### Quarterly access review
+
+Record the completed review in the tracking issue or private operations inventory,
+not as a raw repository audit file. Verify all of the following:
+
+- the GitHub runner remains repository-scoped, online, and labeled only for HIL;
+- no non-HIL workflow references `self-hosted` or `adxl355-hil`;
+- Tailscale device ownership, ACL/tag scope, and SSH access still match the named
+  maintainers and operations hosts;
+- `authorized_keys` fingerprints and local `sudo`, `spi`, and `i2c` group
+  membership contain only expected principals;
+- GitHub Apps/OAuth grants and repository runner registrations are still needed;
+- no `.npmrc`, `.pypirc`, Cargo credential file, Docker registry config, Doppler
+  project config, production secret, or long-lived registry token exists;
+- the physical fixture identifier is non-secret and still maps to one known
+  sensor/wiring configuration.
+
+Unexpected access is removed before another HIL or release run. Rotate or revoke
+credentials through their source system; never paste replacement values into the
+repository, an issue, or a workflow input.
+
+### Workspace, log, and evidence cleanup
+
+GitHub HIL artifacts are retained for 30 days. Preserve artifacts referenced by
+an active release candidate until the release record is complete. On the runner,
+clean only inactive `_work` job directories, temporary virtual environments, and
+old diagnostic logs after confirming no job is running. Keep enough recent
+`_diag` and systemd journal entries to diagnose the last failure, but do not use
+the runner as a release artifact archive. Disk cleanup must not remove source
+inputs, the runner installation, current release evidence, or the configured
+service.
+
+### Rebuild, revocation, and retirement
+
+A rebuild records only non-secret configuration: repository URL, runner name,
+labels, service account, required packages, and bus permissions. Install a clean
+OS/runner release and register it with a new short-lived GitHub registration
+token. Do not copy `.credentials`, `.credentials_rsaparams`, registry files, or
+SSH private keys from the previous host.
+
+For retirement:
+
+1. stop and uninstall the systemd runner service;
+2. remove the runner registration from the repository and verify it no longer
+   appears online or offline in GitHub settings;
+3. delete local runner credential files and revoke the device's Tailscale/SSH
+   access;
+4. disconnect or power down the fixture;
+5. confirm the old runner cannot accept a job, then remove the machine from the
+   private operations inventory.
+
+If an update fails, stop the new service, restore the previously verified runner
+installation only when its credentials have not been revoked, and repeat the
+service/connectivity/HIL health checks.
+
 ## Troubleshooting
 
 ### Device node missing

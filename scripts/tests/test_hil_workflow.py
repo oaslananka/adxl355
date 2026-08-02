@@ -111,6 +111,28 @@ class HilWorkflowTests(unittest.TestCase):
         unsafe = re.findall(r"run:.*\$\{\{\s*inputs\.", text)
         self.assertEqual(unsafe, [])
 
+    def test_runner_lifecycle_guidance_is_scoped_and_recoverable(self) -> None:
+        guide = HARDWARE_GUIDE.read_text()
+        for text in (
+            "Runner scope and threat model",
+            "Monthly health and update check",
+            "Quarterly access review",
+            "Workspace, log, and evidence cleanup",
+            "Rebuild, revocation, and retirement",
+            "mode `0600`",
+            "must never receive HIL host credentials",
+            "Do not copy `.credentials`",
+        ):
+            self.assertIn(text, guide)
+
+        for path in (REPO_ROOT / ".github/workflows").glob("*.yml"):
+            if path.name == "hil.yml":
+                continue
+            text = path.read_text()
+            self.assertNotIn("runs-on: [self-hosted", text, path.name)
+            self.assertNotIn("adxl355-hil", text, path.name)
+
+
 
 if __name__ == "__main__":
     unittest.main()
