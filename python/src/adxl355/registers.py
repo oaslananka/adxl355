@@ -67,6 +67,13 @@ class Range(IntEnum):
     G8 = 0x03
 
 
+class InterruptPolarity(IntEnum):
+    """Shared INT1/INT2 polarity; dedicated DRDY is always active high."""
+
+    ACTIVE_LOW = 0
+    ACTIVE_HIGH = 1
+
+
 class PowerMode(IntEnum):
     """Power mode control.
 
@@ -114,6 +121,16 @@ SELF_TEST_MASK = SELF_TEST_ST1 | SELF_TEST_ST2
 
 # Range register mask (datasheet Rev.D, Table 42)
 RANGE_SEL_MASK = 0x03
+RANGE_INT_POL = 1 << 6
+
+# DATA_RDY routing and internal timing masks (Rev.D Tables 46-49)
+INT_MAP_RDY_EN1 = 1 << 0
+INT_MAP_RDY_EN2 = 1 << 4
+INT_MAP_DATA_READY_MASK = INT_MAP_RDY_EN1 | INT_MAP_RDY_EN2
+SYNC_EXT_SYNC_MASK = 0x03
+SYNC_EXT_CLK = 1 << 2
+SYNC_TIMING_MASK = SYNC_EXT_SYNC_MASK | SYNC_EXT_CLK
+POWER_DRDY_OFF = 1 << 2
 
 
 # SPI command byte helpers (datasheet Rev.D, SPI protocol)

@@ -206,6 +206,34 @@ popped bytes before the backend failed; reset or flush before trusting alignment
 C reports this through `adxl355_fifo_read_result_t`; Python errors carry
 `partial_samples`, `consumed_locations`, and `consumption_indeterminate`.
 
+## Data-ready signal and acquisition boundary
+
+Rev.D exposes two related but distinct mechanisms. The dedicated `DRDY` pin is
+always active high and is disabled only by `POWER_CTL.DRDY_OFF`. Separately, the
+`DATA_RDY` status condition can be routed to `INT1`, `INT2`, or both through
+`INT_MAP`; those interrupt pins share `RANGE.INT_POL`. Reading `STATUS` clears the
+mapped status condition, while reading acceleration or FIFO data clears the
+dedicated DRDY indication. The C/Python configuration types keep these choices
+separate so `INT_POL` is never described as changing dedicated DRDY polarity.
+
+The maintained configuration contract supports internal synchronization only.
+`SYNC.EXT_SYNC` or `SYNC.EXT_CLK` changes DRDY/INT2 pin multiplexing and is
+rejected as unsupported rather than guessed. Configuration reads complete
+`SYNC`, `INT_MAP`, `RANGE`, and `POWER_CTL` bytes before writing, preserves every
+unrelated bit, enters standby, applies the change, and restores the prior power
+mode. A failed target write triggers exact best-effort rollback; rollback failure
+is distinct from the original bus error. Configuration never reads `STATUS`.
+
+GPIO ownership is intentionally outside the portable core. The Python Linux
+reference requests one libgpiod v2 rising-edge line with a monotonic event clock,
+then supplies timestamp/sequence events to a finite acquisition loop. The loop
+uses one overall deadline and a caller-owned sample count, reads no GPIO level in
+a spin loop, reports line-sequence gaps and `FIFO_OVR`, and preserves completed
+samples in typed failures. The example resets and owns the device lifecycle, then
+restores standby, ±2 g, default ODR, and default dedicated-DRDY routing before
+releasing GPIO and bus resources. It does not create a thread, callback registry,
+or daemon API.
+
 ## Register definitions versus public API
 
 The shared register model documents the device even when a high-level method is

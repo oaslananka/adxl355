@@ -33,6 +33,7 @@ class CommandSpec:
 
     argv: tuple[str, ...]
     cwd: Path
+    env: Mapping[str, str] | None = None
 
 
 @dataclass(frozen=True)
@@ -159,6 +160,7 @@ def build_language_checks(
                         f"cache_dir={pytest_cache}",
                     ),
                     repo_root / "python",
+                    {"PYTHONPATH": str(repo_root / "python" / "src")},
                 ),
             ),
         ),
@@ -360,6 +362,7 @@ def run_language_check(
                 text=True,
                 timeout=timeout,
                 check=False,
+                env={**os.environ, **(command.env or {})},
             )
         except subprocess.TimeoutExpired:
             detail = f"command timed out after {timeout}s"

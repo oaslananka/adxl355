@@ -72,6 +72,7 @@ For I2C, tie **`SCLK/VSSIO` to ground** and use pull-ups from `MOSI/SDA` and
 | `MOSI/SDA` | SDA | Pull up to `VDDIO` |
 | `CS/SCL` | SCL | Pull up to `VDDIO` |
 | `MISO/ASEL` | ground or `VDDIO` | Selects `0x1D` or `0x53` |
+| `DRDY` | GPIO17 / physical pin 11 | Optional dedicated active-high rising-edge input for the bounded libgpiod example |
 
 ![Verified Raspberry Pi 5 I2C wiring: physical pin 1 to 3.3 V, pin 6 to GND,
 pin 3 GPIO2/SDA1 to MOSI/SDA, pin 5 GPIO3/SCL1 to CS/SCL, pin 9 GND to
@@ -93,6 +94,69 @@ Linux adapters do not provide a portable API for changing the controller clock,
 so configure the bus speed in the host platform and pass the matching declared
 value to the workflow. Test both `0x1D` and `0x53` when the product fixture
 supports changing the strap.
+
+## Dedicated DRDY GPIO fixture
+
+The dedicated `DRDY` output is separate from routing the `DATA_RDY` condition to
+`INT1` or `INT2`. Rev.D defines dedicated DRDY as active high; `RANGE.INT_POL`
+controls only INT1/INT2. `POWER_CTL.DRDY_OFF=1` forces dedicated DRDY low. The
+maintained C/Python configuration API supports internal synchronization only,
+because external clock/synchronization modes multiplex DRDY or INT2 differently.
+
+The optional Raspberry Pi fixture maps ADXL355 `DRDY` to GPIO17 (physical pin
+11). Request it as a normal input with rising-edge detection, disabled bias, and
+a monotonic event clock. Do not set `active_low`, do not poll the line in a busy
+loop, and do not use INT1/INT2 polarity settings to describe the dedicated pin.
+Power down before adding or moving the wire.
+
+The repository reference command is finite and Linux-only:
+
+```bash
+python -m pip install -e 'python[i2c,gpio]'
+cd python
+PYTHONPATH=src python -m examples.linux_drdy \
+  --transport i2c --bus 1 --address 0x1D \
+  --gpio-chip /dev/gpiochip0 --gpio-line 17 \
+  --samples 32 --timeout-s 5 --max-missed-events 0
+```
+
+For a reproducible fixture run, record the exact commit, Python and libgpiod
+versions, bus settings, GPIO chip/offset, requested sample count, actual sample
+count, first/last kernel timestamps, line-sequence gaps, FIFO overrun count, and
+independent post-run readback of standby, ±2 g, default ODR, `INT_MAP`, and
+`DRDY_OFF`. Use a separate `/tmp` checkout and an outer process timeout. Do not
+record the host name, private address, environment, credentials, or raw device
+paths beyond the public fixture mapping.
+
+Unit tests prove the bounded event/lifecycle contract with fake GPIO requests;
+they do not prove the wire.
+
+### Recorded dedicated DRDY result
+
+A bounded physical run succeeded on **2026-08-02** against exact implementation
+commit `002173d0c8dae8b15261b6d00cf011011cf8db7c` on the dedicated Raspberry Pi 5
+I2C fixture:
+
+- runtime: Linux ARM64, Python `3.13.5`, libgpiod Python binding `2.2.0`, and
+  `smbus2 0.4.3`;
+- sensor bus: I2C bus 1 at address `0x1D`; event input: `/dev/gpiochip0` line 17;
+- bounds: 32 requested samples, a 5-second acquisition deadline, zero allowed
+  missed events, and a 20-second outer process timeout;
+- result: 32 samples, 32 unique raw XYZ tuples, GPIO line sequence 1 through 32,
+  zero missed events, and zero FIFO overruns;
+- timing: 250,573,771 ns total duration, event intervals from 8,028,153 ns to
+  8,034,245 ns, and maximum event-to-capture latency of 1,630,712 ns; and
+- independent post-run register readback: `POWER_CTL=0x01`, `RANGE=0x81`,
+  `FILTER=0x00`, `INT_MAP=0x00`, and `SYNC=0x00`, confirming standby, enabled
+  dedicated DRDY, ±2 g, default ODR, no DATA_RDY mapping to INT1/INT2, and
+  internal synchronization. GPIO17 was released and returned to an unclaimed
+  input state.
+
+The command ran as the non-root fixture account from a separate `/tmp` checkout
+and exited normally. No host name, private address, environment dump, credential,
+or raw report was committed. This evidence is intentionally scoped to I2C plus
+the dedicated active-high DRDY output on GPIO17. It does **not** prove SPI DRDY,
+INT1/INT2-routed DATA_RDY, external synchronization, or other GPIO offsets.
 
 ## What the runner verifies
 

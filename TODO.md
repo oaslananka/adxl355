@@ -22,9 +22,9 @@
 
 ### C
 - [x] FIFO count, decode, and bounded read API implementation
-- [ ] Interrupt configuration API
+- [x] Internal-clock DRDY and DATA_RDY-to-INT1/INT2 configuration API
 - [x] Self-test API hardware testing on Raspberry Pi 5 SPI
-- [ ] Continuous data acquisition example
+- [x] Bounded Linux libgpiod continuous-acquisition reference (Python)
 - [ ] Verify CMake builds on Linux/GCC, ARM GCC, MinGW
 - [x] Add Doxygen-style documentation comments and error contracts to the public C header
 - [x] Core MVP (probe, read_raw, set_range, power modes, temperature, reset)
@@ -43,6 +43,8 @@
 - [x] Core device API (probe, range, power, ODR, raw/converted reads, temperature, status)
 - [x] Bounded self-test response API with physical SPI validation
 - [x] I2C address constants
+- [x] Internal-clock DRDY/INT1/INT2 configuration and bounded libgpiod reference
+- [x] Physical GPIO17/DRDY event and restoration evidence on Raspberry Pi 5 (I2C fixture, commit `002173d`)
 
 ### Rust
 - [x] embedded-hal trait integration
@@ -76,7 +78,7 @@
 - [x] Hardware wiring tables and voltage/bus assumptions
 - [x] Linux self-hosted SPI/I2C runner setup guide
 - [x] Hardware test plan with identity/reset/configuration/data steps
-- [ ] Interrupt detailed documentation
+- [x] Interrupt and dedicated DRDY detailed documentation
 - [x] FIFO contract, ownership, partial-read, and hardware-validation documentation
 - [x] Source-derived API reference docs for each maintained language
 - [x] Accessible, license-safe wiring diagram for the verified Raspberry Pi 5 SPI fixture
@@ -94,4 +96,5 @@
 - [x] Manual-only self-hosted HIL workflow
 - [x] Record a successful physical SPI HIL integration run on Raspberry Pi 5 (`main`, run `30725059679`)
 - [x] Record repeatable C/Python self-test response evidence with exact register restoration
+- [x] Record bounded physical GPIO17/DRDY acquisition evidence with timestamps, zero overruns, and safe restoration
 - [ ] Publish successful SPI and I2C HIL artifacts for the final release-candidate commit

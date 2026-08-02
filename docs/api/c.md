@@ -6,9 +6,9 @@
 
 ## Capability boundary
 
-Core lifecycle, range, ODR, bounded FIFO count/decode/read, raw/converted reads, temperature, status, signed offsets, calibration helpers, and bounded self-test response.
+Core lifecycle, range, ODR, bounded FIFO count/decode/read, raw/converted reads, temperature, status, signed offsets, calibration helpers, bounded self-test response, and internal-clock dedicated-DRDY/INT1/INT2 configuration.
 
-**Not exposed:** No public interrupt configuration API or maintained Linux bus adapter.
+**Not exposed:** No maintained Linux bus/GPIO adapter or background acquisition API; GPIO ownership remains outside the portable C core.
 
 ## Authoritative sources
 
@@ -30,8 +30,11 @@ The declarations below are generated from the same normalized public API surface
 
 ```text
 adxl355_status_t adxl355_calculate_offset(int32_t measured_raw, int32_t expected_raw, int16_t current_offset, bool saturate, int16_t *offset);
+adxl355_status_t adxl355_configure_data_ready( adxl355_t *dev, const adxl355_data_ready_config_t *config);
+adxl355_status_t adxl355_data_ready_config_default(adxl355_data_ready_config_t *config);
 adxl355_status_t adxl355_decode_fifo_location(const uint8_t *payload, size_t length, adxl355_fifo_location_t *location);
 adxl355_status_t adxl355_decode_fifo_sample(const uint8_t *payload, size_t length, adxl355_raw_xyz_t *sample);
+adxl355_status_t adxl355_get_data_ready_config( adxl355_t *dev, adxl355_data_ready_config_t *config);
 adxl355_status_t adxl355_get_range(adxl355_t *dev, adxl355_range_t *range);
 adxl355_status_t adxl355_init(adxl355_t *dev, const adxl355_bus_t *bus);
 adxl355_status_t adxl355_probe(adxl355_t *dev);
@@ -63,6 +66,8 @@ int32_t adxl355_decode_raw20(uint8_t b0, uint8_t b1, uint8_t b2);
 typedef enum { ADXL355_AXIS_X = 0 } adxl355_axis_t;
 typedef enum { ADXL355_AXIS_X = 0, ADXL355_AXIS_Y = 1 } adxl355_axis_t;
 typedef enum { ADXL355_AXIS_X = 0, ADXL355_AXIS_Y = 1, ADXL355_AXIS_Z = 2 } adxl355_axis_t;
+typedef enum { ADXL355_INTERRUPT_ACTIVE_LOW = 0 } adxl355_interrupt_polarity_t;
+typedef enum { ADXL355_INTERRUPT_ACTIVE_LOW = 0, ADXL355_INTERRUPT_ACTIVE_HIGH = 1 } adxl355_interrupt_polarity_t;
 typedef enum { ADXL355_ODR_4000_HZ = 0 } adxl355_odr_t;
 typedef enum { ADXL355_ODR_4000_HZ = 0, ADXL355_ODR_2000_HZ = 1 } adxl355_odr_t;
 typedef enum { ADXL355_ODR_4000_HZ = 0, ADXL355_ODR_2000_HZ = 1, ADXL355_ODR_1000_HZ = 2 } adxl355_odr_t;
@@ -96,6 +101,7 @@ typedef enum { ADXL355_RANGE_2G = 0x01, ADXL355_RANGE_4G = 0x02, ADXL355_RANGE_8
 typedef struct { adxl355_bus_t bus;
 typedef struct { adxl355_float_xyz_t baseline_g;
 typedef struct { adxl355_float_xyz_t min_abs_delta_g;
+typedef struct { bool dedicated_drdy_enabled;
 typedef struct { float x;
 typedef struct { int (*read)(void *ctx, uint8_t reg, uint8_t *data, size_t len);
 typedef struct { int32_t raw;

@@ -6,9 +6,9 @@
 
 ## Capability boundary
 
-Core lifecycle, range, ODR, bounded FIFO count/decode/read with typed partial-progress errors, raw/converted reads, temperature, status, signed offsets, calibration helpers, bounded self-test response, and Linux SPI/I2C adapters.
+Core lifecycle, range, ODR, bounded FIFO count/decode/read with typed partial-progress errors, raw/converted reads, temperature, status, signed offsets, calibration helpers, bounded self-test response, internal-clock dedicated-DRDY/INT1/INT2 configuration, and Linux SPI/I2C adapters.
 
-**Not exposed:** No public interrupt configuration or background continuous-acquisition API.
+**Not exposed:** No background daemon API. The repository provides a finite Linux libgpiod reference example; external synchronization pin-multiplexing modes are intentionally unsupported.
 
 ## Authoritative sources
 
@@ -33,6 +33,8 @@ The declarations below are generated from the same normalized public API surface
 Axis.X=0
 Axis.Y=1
 Axis.Z=2
+InterruptPolarity.ACTIVE_HIGH=1
+InterruptPolarity.ACTIVE_LOW=0
 ODR.HZ_1000=2
 ODR.HZ_125=5
 ODR.HZ_15_625=8
@@ -96,6 +98,7 @@ AccelXYZ:type
 Axis:EnumType
 BusError:type
 DataNotReadyError:type
+DataReadyConfig:type
 DataReadyTimeoutError:type
 DeviceNotFoundError:type
 DeviceStateError:type
@@ -106,6 +109,7 @@ FifoLocation:type
 FifoOverrunError:type
 FifoReadError:type
 FifoReadResult:type
+InterruptPolarity:EnumType
 InvalidConfigurationError:type
 ODR:EnumType
 PowerMode:EnumType
@@ -122,6 +126,7 @@ SelfTestResult:type
 SelfTestThresholdError:type
 SelfTestThresholds:type
 Transport:_ProtocolMeta
+UnsupportedConfigurationError:type
 __version__:str
 calculate_offset:function
 decode_fifo_location:function
@@ -131,6 +136,8 @@ decode_fifo_sample:function
 ### Method
 
 ```text
+ADXL355.configure_data_ready(self, config: 'DataReadyConfig') -> 'None'
+ADXL355.get_data_ready_config(self) -> 'DataReadyConfig'
 ADXL355.get_range(self) -> 'Range'
 ADXL355.probe(self) -> 'bool'
 ADXL355.read_acceleration_g(self) -> 'AccelXYZ'
@@ -159,6 +166,7 @@ Transport.write_register(self, reg: int, data: bytes) -> None
 ADXL355(transport: 'Transport') -> 'None'
 AccelXYZ(x: float, y: float, z: float) -> None
 Axis(*values)
+DataReadyConfig(dedicated_drdy_enabled: bool = True, route_to_int1: bool = False, route_to_int2: bool = False, interrupt_polarity: adxl355.registers.InterruptPolarity = <InterruptPolarity.ACTIVE_LOW: 0>) -> None
 FifoBusError(message: str, partial_samples: tuple[object, ...] = (), consumed_locations: int = 0, consumption_indeterminate: bool = True) -> None
 FifoEmptyError(message: str, partial_samples: tuple[object, ...] = (), consumed_locations: int = 0, consumption_indeterminate: bool = False) -> None
 FifoFormatError(message: str, partial_samples: tuple[object, ...] = (), consumed_locations: int = 0, consumption_indeterminate: bool = False) -> None
@@ -166,6 +174,7 @@ FifoLocation(raw: int, is_x_axis: bool, empty: bool = False) -> None
 FifoOverrunError(message: str, partial_samples: tuple[object, ...] = (), consumed_locations: int = 0, consumption_indeterminate: bool = False) -> None
 FifoReadError(message: str, partial_samples: tuple[object, ...] = (), consumed_locations: int = 0, consumption_indeterminate: bool = False) -> None
 FifoReadResult(samples: tuple[adxl355.types.RawXYZ, ...], available_locations: int, consumed_locations: int, remaining_locations: int, consumption_indeterminate: bool = False) -> None
+InterruptPolarity(*values)
 ODR(*values)
 PowerMode(*values)
 Range(*values)

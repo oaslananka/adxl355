@@ -35,6 +35,7 @@ class PublicDocumentationTests(unittest.TestCase):
             "ODR configuration",
             "FIFO support",
             "Self-test response",
+            "DRDY / event flow",
             "Linux SPI adapter",
             "Linux I2C adapter",
             "embedded-hal SPI/I2C",
@@ -57,6 +58,47 @@ class PublicDocumentationTests(unittest.TestCase):
         self.assertIn("cmake -S cpp -B build/cpp", text)
         self.assertIn("cargo run --manifest-path rust/Cargo.toml --example basic", text)
         self.assertIn("go test ./...", text)
+
+    def test_data_ready_docs_separate_signals_and_bound_acquisition(self) -> None:
+        readme = README.read_text()
+        architecture = (REPO_ROOT / "docs" / "architecture.md").read_text()
+        testing = (REPO_ROOT / "docs" / "testing.md").read_text()
+        hardware = (REPO_ROOT / "docs" / "hardware-testing.md").read_text()
+        python_readme = (REPO_ROOT / "python" / "README.md").read_text()
+        todo = (REPO_ROOT / "TODO.md").read_text()
+        combined = " ".join(
+            (readme + architecture + testing + hardware + python_readme).split()
+        )
+        for phrase in (
+            "dedicated DRDY",
+            "always active high",
+            "INT1/INT2",
+            "internal synchronization",
+            "blocking rising-edge",
+            "kernel monotonic",
+            "line sequence",
+            "FIFO overrun",
+            "not a background service",
+            "Recorded dedicated DRDY result",
+        ):
+            self.assertIn(phrase, combined)
+        self.assertIn("Internal-clock DRDY/INT1/INT2 configuration", readme)
+        self.assertIn("bounded libgpiod reference", readme)
+        for phrase in (
+            "002173d0c8dae8b15261b6d00cf011011cf8db7c",
+            "32 samples, 32 unique raw XYZ tuples",
+            "zero missed events",
+            "zero FIFO overruns",
+            "POWER_CTL=0x01",
+            "GPIO17 was released",
+            "does **not** prove SPI DRDY",
+        ):
+            self.assertIn(phrase, hardware)
+        self.assertIn(
+            "[x] Internal-clock DRDY and DATA_RDY-to-INT1/INT2 configuration API",
+            todo,
+        )
+        self.assertIn("[x] Physical GPIO17/DRDY event and restoration evidence", todo)
 
     def test_fifo_contract_is_scoped_bounded_and_nonblocking(self) -> None:
         readme = README.read_text()

@@ -21,6 +21,10 @@ class InvalidConfigurationError(ADXL355Error):
     """Invalid configuration argument."""
 
 
+class UnsupportedConfigurationError(ADXL355Error):
+    """Configuration is valid in hardware but outside the maintained contract."""
+
+
 class DataNotReadyError(ADXL355Error):
     """Data not yet available."""
 
@@ -41,7 +45,7 @@ class RestoreError(ADXL355Error):
     """Raised when one or more saved hardware registers cannot be restored."""
 
     def __init__(self, failures: tuple[BaseException, ...]) -> None:
-        super().__init__(f"Failed to restore {len(failures)} self-test state write(s)")
+        super().__init__(f"Failed to restore {len(failures)} hardware state write(s)")
         self.failures = failures
 
 

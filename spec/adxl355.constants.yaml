@@ -52,6 +52,21 @@ status_register:
   NVM_BUSY: 4
   description: "STATUS register bit assignments. See datasheet Table 27."
 
+data_ready_interrupts:
+  INT_MAP_RDY_EN1: 0
+  INT_MAP_RDY_EN2: 4
+  RANGE_INT_POL: 6
+  POWER_CTL_DRDY_OFF: 2
+  SYNC_TIMING_MASK: 0x07
+  dedicated_drdy_active_high: true
+  description: |
+    DATA_RDY can be routed independently to INT1 and INT2 through INT_MAP.
+    INT1/INT2 share RANGE.INT_POL; 0 is active low and 1 is active high.
+    The dedicated DRDY pin is separate, always active high, and is disabled by
+    POWER_CTL.DRDY_OFF. The maintained configuration API supports only internal
+    synchronization (SYNC bits 2:0 equal zero) to avoid pin multiplexing modes.
+    See Rev.D Interrupts, Table 46, Table 47, Table 48, and Table 49.
+
 filter_register:
   ODR_LPF_MASK: 0x0F
   HPF_CORNER_MASK: 0x70

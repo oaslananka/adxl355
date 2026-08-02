@@ -123,6 +123,27 @@ static bool range_from_register(uint8_t reg, adxl355_range_t *range)
     }
 }
 
+static adxl355_status_t restore_data_ready_registers(
+    adxl355_t *dev, uint8_t power_ctl, uint8_t range_reg, uint8_t int_map)
+{
+    bool restore_failed = false;
+    const uint8_t standby = (uint8_t)(
+        power_ctl | (uint8_t)(1U << ADXL355_POWER_MODE_BIT));
+    if (write_reg(dev, ADXL355_REG_POWER_CTL, standby) != 0) {
+        restore_failed = true;
+    }
+    if (write_reg(dev, ADXL355_REG_RANGE, range_reg) != 0) {
+        restore_failed = true;
+    }
+    if (write_reg(dev, ADXL355_REG_INT_MAP, int_map) != 0) {
+        restore_failed = true;
+    }
+    if (write_reg(dev, ADXL355_REG_POWER_CTL, power_ctl) != 0) {
+        restore_failed = true;
+    }
+    return restore_failed ? ADXL355_ERR_RESTORE : ADXL355_ERR_BUS;
+}
+
 /* ---------------------------------------------------------------------------
  * Scale factor lookup
  * --------------------------------------------------------------------------- */
@@ -335,6 +356,121 @@ adxl355_status_t adxl355_set_odr(adxl355_t *dev, adxl355_odr_t odr)
         }
     }
     return finish_configuration(dev, &guard, status);
+}
+
+
+adxl355_status_t adxl355_data_ready_config_default(adxl355_data_ready_config_t *config)
+{
+    if (config == NULL) {
+        return ADXL355_ERR_NULL;
+    }
+    config->dedicated_drdy_enabled = true;
+    config->route_to_int1 = false;
+    config->route_to_int2 = false;
+    config->interrupt_polarity = ADXL355_INTERRUPT_ACTIVE_LOW;
+    return ADXL355_OK;
+}
+
+adxl355_status_t adxl355_get_data_ready_config(
+    adxl355_t *dev, adxl355_data_ready_config_t *config)
+{
+    if (dev == NULL || config == NULL) {
+        return ADXL355_ERR_NULL;
+    }
+    adxl355_status_t state = require_initialized(dev);
+    if (state != ADXL355_OK) {
+        return state;
+    }
+
+    uint8_t sync_reg;
+    uint8_t int_map;
+    uint8_t range_reg;
+    uint8_t power_ctl;
+    if (read_reg(dev, ADXL355_REG_SYNC, &sync_reg) != 0 ||
+        read_reg(dev, ADXL355_REG_INT_MAP, &int_map) != 0 ||
+        read_reg(dev, ADXL355_REG_RANGE, &range_reg) != 0 ||
+        read_reg(dev, ADXL355_REG_POWER_CTL, &power_ctl) != 0) {
+        return ADXL355_ERR_BUS;
+    }
+    if ((sync_reg & ADXL355_SYNC_TIMING_MASK) != 0U) {
+        return ADXL355_ERR_UNSUPPORTED;
+    }
+
+    adxl355_data_ready_config_t decoded;
+    decoded.dedicated_drdy_enabled =
+        (power_ctl & ADXL355_POWER_DRDY_OFF) == 0U;
+    decoded.route_to_int1 =
+        (int_map & ADXL355_INT_MAP_RDY_EN1) != 0U;
+    decoded.route_to_int2 =
+        (int_map & ADXL355_INT_MAP_RDY_EN2) != 0U;
+    decoded.interrupt_polarity =
+        (range_reg & ADXL355_RANGE_INT_POL) != 0U
+            ? ADXL355_INTERRUPT_ACTIVE_HIGH
+            : ADXL355_INTERRUPT_ACTIVE_LOW;
+    *config = decoded;
+    return ADXL355_OK;
+}
+
+adxl355_status_t adxl355_configure_data_ready(
+    adxl355_t *dev, const adxl355_data_ready_config_t *config)
+{
+    if (dev == NULL || config == NULL) {
+        return ADXL355_ERR_NULL;
+    }
+    adxl355_status_t state = require_initialized(dev);
+    if (state != ADXL355_OK) {
+        return state;
+    }
+    if (config->interrupt_polarity != ADXL355_INTERRUPT_ACTIVE_LOW &&
+        config->interrupt_polarity != ADXL355_INTERRUPT_ACTIVE_HIGH) {
+        return ADXL355_ERR_INVALID_ARG;
+    }
+
+    uint8_t sync_reg;
+    uint8_t original_int_map;
+    uint8_t original_range;
+    uint8_t original_power;
+    if (read_reg(dev, ADXL355_REG_SYNC, &sync_reg) != 0 ||
+        read_reg(dev, ADXL355_REG_INT_MAP, &original_int_map) != 0 ||
+        read_reg(dev, ADXL355_REG_RANGE, &original_range) != 0 ||
+        read_reg(dev, ADXL355_REG_POWER_CTL, &original_power) != 0) {
+        return ADXL355_ERR_BUS;
+    }
+    if ((sync_reg & ADXL355_SYNC_TIMING_MASK) != 0U) {
+        return ADXL355_ERR_UNSUPPORTED;
+    }
+
+    uint8_t target_int_map = clear_u8_bits(
+        original_int_map, ADXL355_INT_MAP_DATA_RDY_MASK);
+    if (config->route_to_int1) {
+        target_int_map |= ADXL355_INT_MAP_RDY_EN1;
+    }
+    if (config->route_to_int2) {
+        target_int_map |= ADXL355_INT_MAP_RDY_EN2;
+    }
+
+    uint8_t target_range = clear_u8_bits(
+        original_range, ADXL355_RANGE_INT_POL);
+    if (config->interrupt_polarity == ADXL355_INTERRUPT_ACTIVE_HIGH) {
+        target_range |= ADXL355_RANGE_INT_POL;
+    }
+
+    uint8_t target_power = clear_u8_bits(
+        original_power, ADXL355_POWER_DRDY_OFF);
+    if (!config->dedicated_drdy_enabled) {
+        target_power |= ADXL355_POWER_DRDY_OFF;
+    }
+    const uint8_t standby = (uint8_t)(
+        original_power | (uint8_t)(1U << ADXL355_POWER_MODE_BIT));
+
+    if (write_reg(dev, ADXL355_REG_POWER_CTL, standby) != 0 ||
+        write_reg(dev, ADXL355_REG_RANGE, target_range) != 0 ||
+        write_reg(dev, ADXL355_REG_INT_MAP, target_int_map) != 0 ||
+        write_reg(dev, ADXL355_REG_POWER_CTL, target_power) != 0) {
+        return restore_data_ready_registers(
+            dev, original_power, original_range, original_int_map);
+    }
+    return ADXL355_OK;
 }
 
 

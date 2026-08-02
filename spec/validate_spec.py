@@ -274,6 +274,25 @@ class SpecValidator:
                 if sr.get(name) != expected_bit:
                     self.error(f"constants.yaml: status_register.{name} should be {expected_bit}")
 
+        # data_ready_interrupts
+        drdy = data.get("data_ready_interrupts", {})
+        if not isinstance(drdy, dict):
+            self.error("constants.yaml: 'data_ready_interrupts' must be a dictionary")
+        else:
+            expected_drdy = {
+                "INT_MAP_RDY_EN1": 0,
+                "INT_MAP_RDY_EN2": 4,
+                "RANGE_INT_POL": 6,
+                "POWER_CTL_DRDY_OFF": 2,
+                "SYNC_TIMING_MASK": 0x07,
+                "dedicated_drdy_active_high": True,
+            }
+            for name, expected in expected_drdy.items():
+                if drdy.get(name) != expected:
+                    self.error(
+                        f"constants.yaml: data_ready_interrupts.{name} should be {expected}"
+                    )
+
         # filter_register
         fr = data.get("filter_register", {})
         if not isinstance(fr, dict):
@@ -559,6 +578,34 @@ class SpecValidator:
 
         if "STATUS" not in regs:
             self.warn("constants.yaml references STATUS register but it's not in registers.yaml")
+
+        expected_fields = {
+            "INT_MAP": {
+                "RDY_EN1": "0",
+                "RDY_EN2": "4",
+            },
+            "SYNC": {
+                "EXT_SYNC": "1..0",
+                "EXT_CLK": "2",
+            },
+            "RANGE": {"INT_POL": "6"},
+            "POWER_CTL": {"DRDY_OFF": "2"},
+        }
+        for register_name, fields in expected_fields.items():
+            register = regs.get(register_name)
+            if not isinstance(register, dict):
+                self.error(f"registers.yaml: missing {register_name} register")
+                continue
+            actual = {
+                field.get("name"): str(field.get("bit"))
+                for field in register.get("fields", [])
+                if isinstance(field, dict)
+            }
+            for field_name, expected_bit in fields.items():
+                if actual.get(field_name) != expected_bit:
+                    self.error(
+                        f"registers.yaml: {register_name}.{field_name} should use bit {expected_bit}"
+                    )
 
     # ------------------------------------------------------------------
     # Reporting

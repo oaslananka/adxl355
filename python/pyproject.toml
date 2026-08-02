@@ -35,6 +35,7 @@ Issues = "https://github.com/oaslananka/adxl355/issues"
 [project.optional-dependencies]
 spi = ["spidev"]
 i2c = ["smbus2"]
+gpio = ["gpiod>=2.2,<3; platform_system == 'Linux'"]
 dev = ["pytest>=7", "ruff>=0.1", "mypy>=1.0"]
 
 [tool.setuptools.packages.find]
