@@ -204,7 +204,8 @@ def inspect_node(directory: Path, version: str, *, smoke: bool) -> dict[str, obj
         raise ArtifactError("npm package name mismatch")
     if package.get("version") != version:
         raise ArtifactError("npm package version mismatch")
-    if set(package.get("exports", {})) != {"."}:
+    expected_exports = {".", "./linux/spi", "./linux/i2c"}
+    if set(package.get("exports", {})) != expected_exports:
         raise ArtifactError("npm package exposes unsupported entry points")
     allowed_roots = {"package/LICENSE", "package/README.md", "package/package.json"}
     for name in names:

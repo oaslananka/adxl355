@@ -19,6 +19,10 @@ const required = [
   "README.md",
   "dist/index.d.ts",
   "dist/index.js",
+  "dist/linux/i2c.d.ts",
+  "dist/linux/i2c.js",
+  "dist/linux/spi.d.ts",
+  "dist/linux/spi.js",
   "package.json",
 ];
 const forbiddenPrefixes = ["src/", "test/", "scripts/"];
@@ -43,3 +47,11 @@ for (const path of files) {
 }
 
 console.log(`validated npm package contents (${files.length} files)`);
+
+
+for (const path of files.filter((entry) => entry.endsWith(".d.ts"))) {
+  const declaration = readFileSync(resolve(path), "utf8");
+  if (declaration.includes('from "spi-device"') || declaration.includes('from "i2c-bus"')) {
+    throw new Error(`public declaration leaks optional backend types: ${path}`);
+  }
+}
