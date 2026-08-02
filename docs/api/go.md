@@ -8,7 +8,7 @@
 
 Core lifecycle, range, power mode, raw/converted reads, temperature, status, and stateless conversions, plus maintained 64-bit Linux amd64/arm64 spidev and i2c-dev transports with explicit descriptor ownership and bounded examples.
 
-**Not exposed:** No public ODR, offset, calibration, self-test, FIFO, or interrupt methods. I2C adapter speed is externally configured and physical I2C evidence remains pending.
+**Not exposed:** No public ODR, offset, calibration, self-test, FIFO, or interrupt methods. I2C adapter speed is externally configured; physical evidence covers address 0x1D at 100 kHz, not the alternate 0x53 strap.
 
 ## Authoritative sources
 

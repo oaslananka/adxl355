@@ -21,10 +21,10 @@ outside that core is intentionally language-specific.
 |---|---|---|---|---|---|---|---|---|---|
 | C | Yes | Yes | No public method | Yes, bounded measured response | Example only | No | No | Yes, CMake install/export | Raspberry Pi 5 SPI response pass |
 | C++ | Yes, C wrapper | Yes | No public method | No public wrapper | User `BusInterface` | User `BusInterface` | Arduino SPI compile fixture | Yes, CMake install/export plus PlatformIO pack | No language-specific physical pass |
-| Python | Yes | Yes | Yes, count only | Yes, bounded measured response | Yes, `spidev` | Yes, `smbus2` | No | Yes, sdist/wheel | SPI pass on Raspberry Pi 5; I2C pending |
+| Python | Yes | Yes | Yes, count only | Yes, bounded measured response | Yes, `spidev` | Yes, `smbus2` | No | Yes, sdist/wheel | Raspberry Pi 5 SPI and I2C feature passes |
 | Rust | Yes | No | No public method | No public method | No Linux-specific adapter | No Linux-specific adapter | Yes | Yes, `cargo package` | No language-specific physical pass |
 | Node.js | Yes | No | No public method | No public method | User `Transport` | User `Transport` | No | Yes, `npm pack` | No language-specific physical pass |
-| Go | Yes | No | No public method | No public method | Yes, `adxl355/linuxio` on Linux amd64/arm64 | Yes, `adxl355/linuxio` on Linux amd64/arm64 | No | Module/build and cross-build checks | Raspberry Pi 5 SPI bounded example pass; I2C pending |
+| Go | Yes | No | No public method | No public method | Yes, `adxl355/linuxio` on Linux amd64/arm64 | Yes, `adxl355/linuxio` on Linux amd64/arm64 | No | Module/build and cross-build checks | Raspberry Pi 5 SPI and I2C bounded example passes |
 
 “User transport” means the driver exposes a bus contract but does not ship a
 Linux device adapter for that language. The repository contains buildable package metadata and verification artifacts, but packages are not published by this repository to PyPI, crates.io, npm, or a Go proxy. Intended distribution names are `adxl355` (PyPI), `adxl355-driver` (crates.io, imported as `adxl355`), and `@oaslananka/adxl355` (npm).
@@ -72,9 +72,12 @@ C/Python self-test implementation was also exercised over SPI on code commit
 measured approximately 0.342 g X, 0.339 g Y, and 1.419 g Z response, and a third
 run passed the Rev.D min/max windows. Every run restored `SELF_TEST`, `RANGE`,
 `FILTER`, and `POWER_CTL` exactly. This is feature evidence, not final
-release-candidate HIL evidence. I2C physical evidence is still pending. Both SPI
-and I2C must be rerun against the final release-candidate commit before
-publication. Wiring, runner setup, supported bus settings, diagnostics, and
+release-candidate HIL evidence. I2C feature evidence also passed on `main` in
+[run 30734635341](https://github.com/oaslananka/adxl355/actions/runs/30734635341):
+the `0x1D` fixture returned revision `0x01`, 28.6464 °C, and 32 unique samples.
+The exact-`main` Go I2C example independently captured 32 nonzero, unique samples
+and restored `POWER_CTL=0x01`. Both SPI and I2C must still be rerun against the
+same final release-candidate commit before publication. Wiring, runner setup, supported bus settings, diagnostics, and
 evidence requirements are documented in
 [`docs/hardware-testing.md`](docs/hardware-testing.md).
 

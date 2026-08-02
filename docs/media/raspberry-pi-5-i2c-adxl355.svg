@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="780" viewBox="0 0 1200 780" role="img" aria-labelledby="title desc">
+  <title id="title">Raspberry Pi 5 to ADXL355 verified I2C wiring at address 0x1D</title>
+  <desc id="desc">A wiring diagram showing Raspberry Pi 5 physical pin 1 3.3 volts to the ADXL355 3.3 volt supply and logic rail, pin 6 ground to sensor ground, pin 3 GPIO2 SDA1 to ADXL355 MOSI SDA, pin 5 GPIO3 SCL1 to ADXL355 CS SCL, pin 9 ground to ADXL355 SCLK VSSIO to select I2C mode, pin 14 ground to ADXL355 MISO ASEL to select address 0x1D, and optional pin 11 GPIO17 to data ready. The physical fixture was verified on I2C bus 1 at 100 kilohertz.</desc>
+  <rect width="1200" height="780" fill="#ffffff"/>
+  <text x="600" y="50" text-anchor="middle" font-family="sans-serif" font-size="30" font-weight="700">Raspberry Pi 5 ↔ ADXL355 — verified I²C fixture</text>
+  <text x="600" y="84" text-anchor="middle" font-family="sans-serif" font-size="18">Bus 1 · 100 kHz · address 0x1D · physical identity AD 1D ED 01</text>
+  <text x="600" y="111" text-anchor="middle" font-family="sans-serif" font-size="15">Power off before rewiring · 3.3 V only · do not leave mode/address straps floating</text>
+
+  <rect x="55" y="140" width="430" height="550" rx="18" fill="#eef6ff" stroke="#24557a" stroke-width="3"/>
+  <text x="270" y="184" text-anchor="middle" font-family="sans-serif" font-size="26" font-weight="700">Raspberry Pi 5</text>
+  <text x="270" y="212" text-anchor="middle" font-family="sans-serif" font-size="16">40-pin header — physical pin numbers</text>
+
+  <rect x="715" y="140" width="430" height="550" rx="18" fill="#f4fff0" stroke="#3c6d2a" stroke-width="3"/>
+  <text x="930" y="184" text-anchor="middle" font-family="sans-serif" font-size="26" font-weight="700">ADXL355 breakout</text>
+  <text x="930" y="212" text-anchor="middle" font-family="sans-serif" font-size="16">3.3 V supply and logic</text>
+
+  <g font-family="sans-serif" font-size="18">
+    <text x="90" y="270">Pin 1 · 3V3</text>
+    <text x="90" y="330">Pin 6 · GND</text>
+    <text x="90" y="390">Pin 3 · GPIO2 / SDA1</text>
+    <text x="90" y="450">Pin 5 · GPIO3 / SCL1</text>
+    <text x="90" y="510">Pin 9 · GND (mode strap)</text>
+    <text x="90" y="570">Pin 14 · GND (address strap)</text>
+    <text x="90" y="630">Pin 11 · GPIO17 (optional)</text>
+
+    <text x="895" y="270">3.3 V / VDDIO</text>
+    <text x="895" y="330">GND</text>
+    <text x="895" y="390">MOSI / SDA</text>
+    <text x="895" y="450">CS / SCL</text>
+    <text x="895" y="510">SCLK / VSSIO → GND</text>
+    <text x="895" y="570">MISO / ASEL → GND (0x1D)</text>
+    <text x="895" y="630">DRDY</text>
+  </g>
+
+  <g fill="none" stroke-width="7" stroke-linecap="round">
+    <path d="M 475 262 C 575 262, 625 262, 725 262" stroke="#c33b32"/>
+    <path d="M 475 322 C 575 322, 625 322, 725 322" stroke="#333333"/>
+    <path d="M 475 382 C 575 382, 625 382, 725 382" stroke="#3178b8"/>
+    <path d="M 475 442 C 575 442, 625 442, 725 442" stroke="#b98b16"/>
+    <path d="M 475 502 C 575 502, 625 502, 725 502" stroke="#555555"/>
+    <path d="M 475 562 C 575 562, 625 562, 725 562" stroke="#7656a6"/>
+    <path d="M 475 622 C 575 622, 625 622, 725 622" stroke="#7a7a7a" stroke-dasharray="14 12"/>
+  </g>
+
+  <g fill="#ffffff" stroke-width="3">
+    <circle cx="475" cy="262" r="9" stroke="#c33b32"/><circle cx="725" cy="262" r="9" stroke="#c33b32"/>
+    <circle cx="475" cy="322" r="9" stroke="#333333"/><circle cx="725" cy="322" r="9" stroke="#333333"/>
+    <circle cx="475" cy="382" r="9" stroke="#3178b8"/><circle cx="725" cy="382" r="9" stroke="#3178b8"/>
+    <circle cx="475" cy="442" r="9" stroke="#b98b16"/><circle cx="725" cy="442" r="9" stroke="#b98b16"/>
+    <circle cx="475" cy="502" r="9" stroke="#555555"/><circle cx="725" cy="502" r="9" stroke="#555555"/>
+    <circle cx="475" cy="562" r="9" stroke="#7656a6"/><circle cx="725" cy="562" r="9" stroke="#7656a6"/>
+    <circle cx="475" cy="622" r="9" stroke="#7a7a7a"/><circle cx="725" cy="622" r="9" stroke="#7a7a7a"/>
+  </g>
+
+  <text x="600" y="720" text-anchor="middle" font-family="sans-serif" font-size="16">Pi SDA/SCL include host-side pull-ups; custom hosts must provide pull-ups to the selected 3.3 V logic rail.</text>
+  <text x="600" y="748" text-anchor="middle" font-family="sans-serif" font-size="16">Dashed DRDY is optional; the maintained HIL runner polls STATUS.DATA_RDY over I²C.</text>
+  <text x="600" y="772" text-anchor="middle" font-family="sans-serif" font-size="14">Repository-authored diagram · MIT licensed · not a Raspberry Pi or Analog Devices logo/artwork derivative</text>
+</svg>

@@ -32,10 +32,12 @@ coverage requirements.
 ## Current evidence status
 
 The Raspberry Pi 5 SPI fixture has passed on `main` in workflow run
-[30725059679](https://github.com/oaslananka/adxl355/actions/runs/30725059679).
-I2C evidence remains pending. Because release evidence must reference the exact
-release-candidate commit, both SPI and I2C runs are repeated after the final
-candidate SHA is selected.
+[30725059679](https://github.com/oaslananka/adxl355/actions/runs/30725059679), and
+the `0x1D` I2C fixture has passed in workflow run
+[30734635341](https://github.com/oaslananka/adxl355/actions/runs/30734635341).
+These are feature and fixture evidence. Because release evidence must reference
+the exact release-candidate commit, both SPI and I2C runs are repeated after the
+final candidate SHA is selected.
 
 ## Enforced gates
 

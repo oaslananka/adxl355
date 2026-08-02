@@ -129,16 +129,22 @@ class PublicDocumentationTests(unittest.TestCase):
         self.assertIn("Node.js 22 or >= 24", contributing)
         self.assertIn("CI covers 22, 24, and 26", contributing)
 
-    def test_hil_status_distinguishes_spi_evidence_from_i2c_requirement(self) -> None:
+    def test_hil_status_distinguishes_feature_evidence_from_final_release_pair(
+        self,
+    ) -> None:
         readme = README.read_text()
         todo = (REPO_ROOT / "TODO.md").read_text()
         hardware = (REPO_ROOT / "docs" / "hardware-testing.md").read_text()
         releasing = (REPO_ROOT / "docs" / "releasing.md").read_text()
-        for text in (readme, todo, hardware, releasing):
-            self.assertIn("30725059679", text)
-        self.assertIn("SPI pass on Raspberry Pi 5; I2C pending", readme)
+        for content in (readme, hardware, releasing):
+            self.assertIn("30725059679", content)
+            self.assertIn("30734635341", content)
+        self.assertIn("Raspberry Pi 5 SPI and I2C feature passes", readme)
         self.assertIn("final release-candidate", todo)
-        self.assertIn("I2C run is still pending", hardware)
+        self.assertIn(
+            "run SPI and I2C against the same final release-candidate SHA", hardware
+        )
+        self.assertIn("exact release-candidate commit", releasing)
 
     def test_contributor_templates_exist_and_route_security_privately(self) -> None:
         issue_root = REPO_ROOT / ".github" / "ISSUE_TEMPLATE"
@@ -183,7 +189,7 @@ class PublicDocumentationTests(unittest.TestCase):
             "Linux amd64 and arm64",
             "--samples 8 --timeout 10s",
             "restore standby",
-            "Raspberry Pi 5 SPI bounded example pass; I2C pending",
+            "Raspberry Pi 5 SPI and I2C bounded example passes",
             "08273bff4611a33f1b88dae6a08c92d5199eab28",
         ):
             self.assertIn(phrase, readme)
@@ -201,7 +207,10 @@ class PublicDocumentationTests(unittest.TestCase):
         self.assertIn(
             "[x] Bounded SPI example with real hardware on Raspberry Pi 5", todo
         )
-        self.assertIn("[ ] Bounded I2C example with real hardware (#41)", todo)
+        self.assertIn(
+            "[x] Bounded I2C example with real hardware on Raspberry Pi 5 (`0x1D`)",
+            todo,
+        )
         hardware = (REPO_ROOT / "docs" / "hardware-testing.md").read_text()
         for phrase in (
             "Go Linux SPI bounded example",
@@ -211,7 +220,10 @@ class PublicDocumentationTests(unittest.TestCase):
             "POWER_CTL=0x01",
             "233.2873 °C",
             "That rejected run is not accepted as evidence",
-            "Go I2C example remains physically unverified",
+            "Go Linux I2C bounded example",
+            "1c97921239baea9994942a4a77fbbd2b2048ba9f84e81f452d929bb7715c367c",
+            "28.4254 °C",
+            "32 unique tuples",
         ):
             self.assertIn(phrase, hardware)
 

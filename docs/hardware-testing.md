@@ -73,9 +73,20 @@ For I2C, tie **`SCLK/VSSIO` to ground** and use pull-ups from `MOSI/SDA` and
 | `CS/SCL` | SCL | Pull up to `VDDIO` |
 | `MISO/ASEL` | ground or `VDDIO` | Selects `0x1D` or `0x53` |
 
-No I2C image is published yet because physical I2C HIL evidence is still pending
-in issue #41. The text table above is the current wiring plan, not a verified
-fixture photograph or diagram.
+![Verified Raspberry Pi 5 I2C wiring: physical pin 1 to 3.3 V, pin 6 to GND,
+pin 3 GPIO2/SDA1 to MOSI/SDA, pin 5 GPIO3/SCL1 to CS/SCL, pin 9 GND to
+SCLK/VSSIO for I2C mode, pin 14 GND to MISO/ASEL for address 0x1D, and optional
+pin 11 GPIO17 to DRDY.](media/raspberry-pi-5-i2c-adxl355.svg)
+
+The diagram is an original MIT-licensed repository asset matched to the physical
+fixture used in workflow run
+[30734635341](https://github.com/oaslananka/adxl355/actions/runs/30734635341).
+Its complete text alternative is embedded in the SVG and the same mapping remains
+available in the table above. Raspberry Pi SDA/SCL provide host-side pull-ups;
+custom hosts must provide pull-ups to the selected compatible logic rail.
+
+Only address `0x1D` is physically verified. Testing `0x53` requires powering down,
+moving `MISO/ASEL` from ground to `VDDIO`, and repeating the full evidence flow.
 
 The workflow accepts declared bus rates of 100 kHz, 400 kHz, 1 MHz, or 3.4 MHz.
 Linux adapters do not provide a portable API for changing the controller clock,
@@ -171,7 +182,7 @@ python scripts/hil_runner.py \
   --transport i2c \
   --i2c-bus 1 \
   --i2c-address 0x1D \
-  --i2c-bus-hz 400000 \
+  --i2c-bus-hz 100000 \
   --samples 32 \
   --report artifacts/hil-report.json
 ```
@@ -355,10 +366,21 @@ A manual SPI integration run succeeded on Raspberry Pi 5 against commit
 - samples: 32 captured and 32 unique;
 - restore state: standby, ±2 g, default ODR.
 
-This result proves the integrated SPI path and runner setup. It is not the final
-release-candidate evidence because documentation and governance changes may move
-the candidate commit. A successful I2C run is still pending. Before publication,
-run both transports against the same final release-candidate SHA.
+This result proves the integrated SPI path and runner setup. A separate I2C HIL
+integration run also succeeded on `main` commit
+`43629a5d5f0eb9ff815cdbdd26288e904ba3a573`:
+
+- workflow run: [30734635341](https://github.com/oaslananka/adxl355/actions/runs/30734635341);
+- transport and device: I2C bus 1, address `0x1D`, declared 100 kHz;
+- identity: `DEVID_AD=0xAD`, `DEVID_MST=0x1D`, `PARTID=0xED`;
+- revision: `0x01`;
+- temperature: `28.6464 °C`;
+- samples: 32 captured and 32 unique;
+- artifact: `adxl355-hil-i2c-30734635341` with 30-day retention.
+
+These results prove both physical bus paths, but they are not yet the final paired
+release evidence because repository changes may move the candidate commit. Before
+publication, run SPI and I2C against the same final release-candidate SHA.
 
 ### Go Linux SPI bounded example
 
@@ -394,8 +416,35 @@ That rejected run is not accepted as evidence.
 
 This Go result is feature-specific SPI evidence. It is not a GitHub Actions HIL
 artifact and does not satisfy the separate final release-candidate requirement.
-The Go I2C example remains physically unverified until issue #41 provides an I2C
-fixture and evidence.
+
+### Go Linux I2C bounded example
+
+The maintained Go `adxl355/linuxio` i2c-dev adapter and bounded example were
+physically verified against exact `main` commit
+`43629a5d5f0eb9ff815cdbdd26288e904ba3a573`. The ARM64 binary was built only from
+a `git archive` of that commit; its SHA-256 was
+`1c97921239baea9994942a4a77fbbd2b2048ba9f84e81f452d929bb7715c367c`, and the
+same hash was checked on the fixture before execution.
+
+The public-safe invocation was:
+
+```bash
+go run ./examples/linux_i2c \
+  --bus 1 --address 0x1D --bus-hz 100000 \
+  --samples 32 --timeout 10s
+```
+
+The run established:
+
+- identity `0xAD/0x1D/0xED`, revision `0x01`;
+- temperature `28.4254 °C` after entering measurement mode and a bounded settle;
+- 32 nonzero XYZ samples with 32 unique tuples; and
+- independent post-run `POWER_CTL=0x01`, proving standby restoration after the
+  bounded command closed its owned descriptor.
+
+This is feature-specific evidence for the physically tested `0x1D` strap. It does
+not claim the alternate `0x53` strap or replace the final paired SPI/I2C release
+artifacts.
 
 A separate self-test response validation used the exact C/Python implementation
 from commit `12d6206393223439e14b8e36b97e567751e8f8bb` on the same Raspberry Pi 5

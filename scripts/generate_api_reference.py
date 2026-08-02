@@ -114,7 +114,7 @@ LANGUAGES: Final = (
         ),
         "cd go && go doc ./adxl355 ./adxl355/linuxio",
         "Core lifecycle, range, power mode, raw/converted reads, temperature, status, and stateless conversions, plus maintained 64-bit Linux amd64/arm64 spidev and i2c-dev transports with explicit descriptor ownership and bounded examples.",
-        "No public ODR, offset, calibration, self-test, FIFO, or interrupt methods. I2C adapter speed is externally configured and physical I2C evidence remains pending.",
+        "No public ODR, offset, calibration, self-test, FIFO, or interrupt methods. I2C adapter speed is externally configured; physical evidence covers address 0x1D at 100 kHz, not the alternate 0x53 strap.",
     ),
 )
 
@@ -215,10 +215,11 @@ def render_index(surfaces: dict[str, list[str]]) -> str:
             "## Hardware setup media",
             "",
             (
-                "The physically verified Raspberry Pi 5 SPI wiring diagram is available "
-                "at [../media/raspberry-pi-5-spi-adxl355.svg]"
-                "(../media/raspberry-pi-5-spi-adxl355.svg). I2C media remains pending "
-                "physical I2C validation; see issue #41 and the hardware testing guide."
+                "Physically verified Raspberry Pi 5 wiring diagrams are available for "
+                "[SPI](../media/raspberry-pi-5-spi-adxl355.svg) and "
+                "[I2C at address 0x1D](../media/raspberry-pi-5-i2c-adxl355.svg). "
+                "The hardware testing guide preserves the text-equivalent mappings and "
+                "the unverified boundary for the alternate 0x53 strap."
             ),
         )
     )
