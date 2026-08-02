@@ -63,10 +63,10 @@
 - [x] Core device API with race-tested transport-contract coverage
 
 ### C++
-- [ ] Arduino/PlatformIO compatibility layer
-- [ ] Exception-free error handling option
+- [x] Arduino/PlatformIO SPI compatibility layer with an Arduino Uno compile fixture
+- [x] Stack-owned exception-free `Status`/`Result<T>` C++ API
 - [x] RAII wrapper for the implemented C++ core surface
-- [ ] Add C++ ODR configuration wrapper
+- [x] Add C++ ODR configuration wrapper
 
 ### Documentation
 - [x] Hardware wiring tables and voltage/bus assumptions

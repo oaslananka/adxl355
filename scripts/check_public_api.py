@@ -12,7 +12,7 @@ import subprocess
 import sys
 from enum import Enum
 from pathlib import Path
-from typing import Any, Iterator
+from typing import Any, Iterable, Iterator
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 BASELINE_PATH = REPO_ROOT / "spec" / "compatibility" / "public-api.json"
@@ -251,30 +251,63 @@ def named_blocks(text: str, keyword: str) -> Iterator[tuple[str, str, str]]:
         cursor = end + 1
 
 
-def class_public_statements(body: str, default_public: bool) -> Iterator[str]:
-    current_public = default_public
-    start = 0
-    brace_depth = 0
+def function_declaration_header(header: str) -> str:
+    """Remove a constructor initializer list while retaining the public signature."""
+    normalized = normalize(header)
     paren_depth = 0
-    for index, char in enumerate(body):
-        if char == "{":
-            brace_depth += 1
-        elif char == "}":
-            brace_depth = max(0, brace_depth - 1)
-        elif char == "(":
+    angle_depth = 0
+    for index, char in enumerate(normalized):
+        if char == "(":
             paren_depth += 1
         elif char == ")":
             paren_depth = max(0, paren_depth - 1)
-        elif char == ":" and brace_depth == paren_depth == 0:
-            label = body[start:index].strip()
+        elif char == "<":
+            angle_depth += 1
+        elif char == ">":
+            angle_depth = max(0, angle_depth - 1)
+        elif char == ":" and paren_depth == angle_depth == 0:
+            return normalize(normalized[:index])
+    return normalized
+
+
+def class_public_statements(body: str, default_public: bool) -> Iterator[str]:
+    """Yield granular public C++ declarations, excluding inline implementations."""
+    current_public = default_public
+    start = 0
+    cursor = 0
+    paren_depth = 0
+    bracket_depth = 0
+    while cursor < len(body):
+        char = body[cursor]
+        if char == "(":
+            paren_depth += 1
+        elif char == ")":
+            paren_depth = max(0, paren_depth - 1)
+        elif char == "[":
+            bracket_depth += 1
+        elif char == "]":
+            bracket_depth = max(0, bracket_depth - 1)
+        elif char == ":" and paren_depth == bracket_depth == 0:
+            label = body[start:cursor].strip()
             if label in {"public", "private", "protected"}:
                 current_public = label == "public"
-                start = index + 1
-        elif char == ";" and brace_depth == paren_depth == 0:
-            statement = normalize(body[start : index + 1])
+                start = cursor + 1
+        elif char == "{" and paren_depth == bracket_depth == 0:
+            header = body[start:cursor].strip()
+            if "(" in header:
+                end = matching_brace(body, cursor)
+                if current_public:
+                    declaration = function_declaration_header(header)
+                    if declaration:
+                        yield declaration
+                cursor = end
+                start = end + 1
+        elif char == ";" and paren_depth == bracket_depth == 0:
+            statement = normalize(body[start : cursor + 1])
             if current_public and statement:
                 yield statement
-            start = index + 1
+            start = cursor + 1
+        cursor += 1
 
 
 def cpp_enum_entries(text: str) -> set[str]:
@@ -557,13 +590,47 @@ def snapshot(root: Path = REPO_ROOT) -> dict[str, Any]:
     }
 
 
+LEGACY_CPP_PRIVATE_ENTRIES = {
+    "member:Device:std::unique_ptr<BusInterface> bus_iface_;",
+}
+
+
+def canonical_cpp_entries(entries: Iterable[str]) -> set[str]:
+    """Migrate schema-v1 inline-body entries to stable public signatures."""
+    canonical: set[str] = set()
+    for entry in entries:
+        if entry in LEGACY_CPP_PRIVATE_ENTRIES:
+            continue
+        if not entry.startswith("member:"):
+            canonical.add(entry)
+            continue
+        _prefix, class_name, payload = entry.split(":", 2)
+        if "{" not in payload:
+            canonical.add(entry)
+            continue
+        migrated = list(class_public_statements(payload, True))
+        if migrated:
+            canonical.update(f"member:{class_name}:{item}" for item in migrated)
+        else:
+            canonical.add(entry)
+    return canonical
+
+
+def normalized_surface_entries(surface: str, entries: Iterable[str]) -> set[str]:
+    values = set(entries)
+    return canonical_cpp_entries(values) if surface == "cpp" else values
+
+
 def compare(baseline: dict[str, Any], current: dict[str, Any]) -> list[str]:
     failures: list[str] = []
     for surface, expected_entries in baseline.get("surfaces", {}).items():
-        current_entries = set(current.get("surfaces", {}).get(surface, []))
+        expected = normalized_surface_entries(surface, expected_entries)
+        actual = normalized_surface_entries(
+            surface, current.get("surfaces", {}).get(surface, [])
+        )
         failures.extend(
             f"{surface}: removed or changed public declaration: {missing}"
-            for missing in sorted(set(expected_entries) - current_entries)
+            for missing in sorted(expected - actual)
         )
     return failures
 

@@ -20,7 +20,7 @@ outside that core is intentionally language-specific.
 | Language | Core device API | ODR configuration | FIFO entry count | Self-test response | Linux SPI adapter | Linux I2C adapter | embedded-hal SPI/I2C | Packaging dry run | Physical HIL evidence |
 |---|---|---|---|---|---|---|---|---|---|
 | C | Yes | Yes | No public method | Yes, bounded measured response | Example only | No | No | Yes, CMake install/export | Raspberry Pi 5 SPI response pass |
-| C++ | Yes, C wrapper | No | No public method | No public wrapper | User `BusInterface` | User `BusInterface` | No | Yes, CMake install/export | No language-specific physical pass |
+| C++ | Yes, C wrapper | Yes | No public method | No public wrapper | User `BusInterface` | User `BusInterface` | Arduino SPI compile fixture | Yes, CMake install/export plus PlatformIO pack | No language-specific physical pass |
 | Python | Yes | Yes | Yes, count only | Yes, bounded measured response | Yes, `spidev` | Yes, `smbus2` | No | Yes, sdist/wheel | SPI pass on Raspberry Pi 5; I2C pending |
 | Rust | Yes | No | No public method | No public method | No Linux-specific adapter | No Linux-specific adapter | Yes | Yes, `cargo package` | No language-specific physical pass |
 | Node.js | Yes | No | No public method | No public method | User `Transport` | User `Transport` | No | Yes, `npm pack` | No language-specific physical pass |
@@ -38,6 +38,7 @@ Linux device adapter for that language. The repository contains buildable packag
 - C/Python signed hardware-offset APIs and deterministic raw-LSB calibration helpers.
 - C/Python electrostatic self-test response APIs with bounded `DATA_RDY` polling,
   exact register restoration, and optional caller-owned thresholds.
+- C++ ODR configuration, an owning exception API, a stack-owned `Status`/`Result<T>` no-exception API, and a hash-locked Arduino Uno PlatformIO compile fixture.
 - Mock-based tests in all six languages and a required zero-skip vector gate.
 - CI quality gates for sanitizers, lint/type analysis, package smoke tests,
   dependency auditing, CodeQL, race detection, and coverage reporting.
@@ -53,7 +54,9 @@ implemented consistently as public driver methods. Signed offset programming,
 calibration helpers, and electrostatic self-test response measurement are
 implemented only in C and Python. The self-test APIs report measured response;
 they do not apply undocumented factory acceptance limits or imply parity in the
-other languages.
+other languages. The Arduino Uno fixture proves package and exception-free AVR
+compilation only; it is not physical Arduino hardware evidence and does not imply
+support for boards or frameworks that are not built in CI.
 
 ## Hardware validation status
 
@@ -79,7 +82,7 @@ and unit-conversion helpers remain usable without a device.
 | Language | Required startup | Pre-probe error |
 |---|---|---|
 | C | `adxl355_init()` → `adxl355_probe()` | `ADXL355_ERR_STATE` |
-| C++ | construct `Device` → `probe()` | `InvalidStateError` |
+| C++ | construct `Device` or `NoexceptDevice` → `probe()` | `InvalidStateError` or `Status::InvalidState` |
 | Python | construct `ADXL355` → `probe()` | `DeviceStateError` |
 | Rust | `Adxl355::new()` → `probe()` | `Error::InvalidState` |
 | Node.js | construct `ADXL355` → `await probe()` | `DeviceStateError` |
@@ -119,6 +122,26 @@ cmake -S cpp -B build/cpp -DADXL355_BUILD_TESTS=ON -DADXL355_BUILD_EXAMPLES=ON -
 cmake --build build/cpp
 ctest --test-dir build/cpp --output-on-failure
 ```
+
+Installed consumers can select `adxl355::cpp` for the owning exception API or
+`adxl355::cpp_noexcept` for the stack-owned `Status`/`Result<T>` API.
+
+The representative Arduino compile fixture uses the repository's hash-locked
+PlatformIO toolchain and does not require sensor hardware:
+
+```bash
+python3 -m venv .venv-platformio
+. .venv-platformio/bin/activate
+export PIP_CONFIG_FILE=/dev/null
+export PIP_INDEX_URL=https://pypi.org/simple
+export PIP_EXTRA_INDEX_URL=
+python -m pip install --require-hashes --no-deps --only-binary=:all: \
+  -r requirements/python/platformio.txt
+PLATFORMIO_CORE_DIR="$PWD/.platformio" pio run -d embedded/platformio/uno
+```
+
+This compile proves only the pinned Arduino Uno/AVR package surface. It is not a
+physical Arduino HIL result.
 
 ### Rust
 
