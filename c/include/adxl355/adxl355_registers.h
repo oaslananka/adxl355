@@ -82,6 +82,18 @@ extern "C" {
 #define ADXL355_STATUS_FIFO_FULL   (1U << 1)
 #define ADXL355_STATUS_DATA_RDY    (1U << 0)
 
+/* DATA_RDY routing and timing (datasheet Rev.D, Tables 46-49) */
+#define ADXL355_INT_MAP_RDY_EN1      (1U << 0)
+#define ADXL355_INT_MAP_RDY_EN2      (1U << 4)
+#define ADXL355_INT_MAP_DATA_RDY_MASK \
+    (ADXL355_INT_MAP_RDY_EN1 | ADXL355_INT_MAP_RDY_EN2)
+#define ADXL355_SYNC_EXT_SYNC_MASK   0x03U
+#define ADXL355_SYNC_EXT_CLK         (1U << 2)
+#define ADXL355_SYNC_TIMING_MASK     \
+    (ADXL355_SYNC_EXT_SYNC_MASK | ADXL355_SYNC_EXT_CLK)
+#define ADXL355_RANGE_INT_POL         (1U << ADXL355_RANGE_INT_POL_BIT)
+#define ADXL355_POWER_DRDY_OFF        (1U << ADXL355_POWER_DRDY_OFF_BIT)
+
 /* Filter register (datasheet Rev.D, Table 38) */
 /* bits 3:0 = ODR_LPF, bits 6:4 = HPF_CORNER, bit 7 = reserved */
 #define ADXL355_FILTER_ODR_MASK   0x0FU

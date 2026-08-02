@@ -33,17 +33,25 @@ from adxl355.errors import (
     InvalidConfigurationError,
     RestoreError,
     SelfTestThresholdError,
+    UnsupportedConfigurationError,
 )
 from adxl355.registers import (
     FILTER_HPF_MASK,
     FILTER_ODR_MASK,
     FILTER_ODR_SHIFT,
+    INT_MAP_DATA_READY_MASK,
+    INT_MAP_RDY_EN1,
+    INT_MAP_RDY_EN2,
     ODR,
+    POWER_DRDY_OFF,
+    RANGE_INT_POL,
     RANGE_SEL_MASK,
     SELF_TEST_MASK,
     STATUS_DATA_RDY,
     STATUS_FIFO_OVR,
+    SYNC_TIMING_MASK,
     Axis,
+    InterruptPolarity,
     PowerMode,
     Range,
     Register,
@@ -51,6 +59,7 @@ from adxl355.registers import (
 from adxl355.transport import Transport
 from adxl355.types import (
     AccelXYZ,
+    DataReadyConfig,
     FifoLocation,
     FifoReadResult,
     RawXYZ,
@@ -224,6 +233,99 @@ class ADXL355:
             self._write_reg(Register.FILTER, reg)
         finally:
             self._restore_configuration_mode(original_power_ctl)
+
+    @staticmethod
+    def _validate_data_ready_config(config: DataReadyConfig) -> None:
+        if not isinstance(config, DataReadyConfig):
+            raise InvalidConfigurationError("config must be a DataReadyConfig")
+        if not isinstance(config.dedicated_drdy_enabled, bool):
+            raise InvalidConfigurationError("dedicated_drdy_enabled must be bool")
+        if not isinstance(config.route_to_int1, bool) or not isinstance(config.route_to_int2, bool):
+            raise InvalidConfigurationError("interrupt routing fields must be bool")
+        if config.interrupt_polarity not in (
+            InterruptPolarity.ACTIVE_LOW,
+            InterruptPolarity.ACTIVE_HIGH,
+        ):
+            raise InvalidConfigurationError("invalid INT1/INT2 polarity")
+
+    def _read_internal_timing_registers(self) -> tuple[int, int, int]:
+        sync = self._read_reg(Register.SYNC)
+        if sync & SYNC_TIMING_MASK:
+            raise UnsupportedConfigurationError(
+                "external clock/synchronization pin multiplexing is outside "
+                "the maintained data-ready contract"
+            )
+        return (
+            self._read_reg(Register.INT_MAP),
+            self._read_reg(Register.RANGE),
+            self._read_reg(Register.POWER_CTL),
+        )
+
+    def get_data_ready_config(self) -> DataReadyConfig:
+        """Read dedicated DRDY and DATA_RDY-to-INT routing without clearing STATUS."""
+        self._check_init()
+        int_map, range_reg, power_ctl = self._read_internal_timing_registers()
+        return DataReadyConfig(
+            dedicated_drdy_enabled=not bool(power_ctl & POWER_DRDY_OFF),
+            route_to_int1=bool(int_map & INT_MAP_RDY_EN1),
+            route_to_int2=bool(int_map & INT_MAP_RDY_EN2),
+            interrupt_polarity=(
+                InterruptPolarity.ACTIVE_HIGH
+                if range_reg & RANGE_INT_POL
+                else InterruptPolarity.ACTIVE_LOW
+            ),
+        )
+
+    def _restore_data_ready_state(self, *, power_ctl: int, range_reg: int, int_map: int) -> None:
+        failures: list[BaseException] = []
+        for reg, value in (
+            (Register.POWER_CTL, power_ctl | 0x01),
+            (Register.RANGE, range_reg),
+            (Register.INT_MAP, int_map),
+            (Register.POWER_CTL, power_ctl),
+        ):
+            try:
+                self._write_reg(reg, value)
+            except BusError as exc:
+                failures.append(exc)
+        if failures:
+            raise RestoreError(tuple(failures))
+
+    def configure_data_ready(self, config: DataReadyConfig) -> None:
+        """Configure internal-clock DRDY/INT routing with exact rollback.
+
+        Dedicated DRDY is always active high. ``interrupt_polarity`` affects only
+        INT1/INT2. External synchronization modes are rejected because DRDY and
+        INT2 are multiplexed differently in those modes.
+        """
+        self._check_init()
+        self._validate_data_ready_config(config)
+        int_map, range_reg, power_ctl = self._read_internal_timing_registers()
+
+        target_int_map = int_map & ~INT_MAP_DATA_READY_MASK
+        if config.route_to_int1:
+            target_int_map |= INT_MAP_RDY_EN1
+        if config.route_to_int2:
+            target_int_map |= INT_MAP_RDY_EN2
+
+        target_range = range_reg & ~RANGE_INT_POL
+        if config.interrupt_polarity == InterruptPolarity.ACTIVE_HIGH:
+            target_range |= RANGE_INT_POL
+
+        target_power = power_ctl & ~POWER_DRDY_OFF
+        if not config.dedicated_drdy_enabled:
+            target_power |= POWER_DRDY_OFF
+
+        try:
+            self._write_reg(Register.POWER_CTL, power_ctl | 0x01)
+            self._write_reg(Register.RANGE, target_range)
+            self._write_reg(Register.INT_MAP, target_int_map)
+            self._write_reg(Register.POWER_CTL, target_power)
+        except BusError:
+            self._restore_data_ready_state(
+                power_ctl=power_ctl, range_reg=range_reg, int_map=int_map
+            )
+            raise
 
     @staticmethod
     def _offset_register(axis: Axis) -> Register:

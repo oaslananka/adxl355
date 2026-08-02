@@ -24,11 +24,20 @@ from adxl355.errors import (
     InvalidConfigurationError,
     RestoreError,
     SelfTestThresholdError,
+    UnsupportedConfigurationError,
 )
-from adxl355.registers import ODR, Axis, PowerMode, Range, Register
+from adxl355.registers import (
+    ODR,
+    Axis,
+    InterruptPolarity,
+    PowerMode,
+    Range,
+    Register,
+)
 from adxl355.transport import Transport
 from adxl355.types import (
     AccelXYZ,
+    DataReadyConfig,
     FifoLocation,
     FifoReadResult,
     RawXYZ,
@@ -48,6 +57,8 @@ __all__ = [
     "Range",
     "PowerMode",
     "ODR",
+    "InterruptPolarity",
+    "DataReadyConfig",
     "RawXYZ",
     "FifoLocation",
     "FifoReadResult",
@@ -67,6 +78,7 @@ __all__ = [
     "DeviceNotFoundError",
     "DeviceStateError",
     "InvalidConfigurationError",
+    "UnsupportedConfigurationError",
     "RestoreError",
     "SelfTestThresholdError",
     "DataNotReadyError",

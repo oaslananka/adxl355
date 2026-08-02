@@ -1130,6 +1130,137 @@ static void test_offset_argument_and_lifecycle_validation(void)
 }
 
 
+static void prepare_data_ready_fixture(adxl355_mock_bus_t *mock,
+                                       adxl355_t *dev,
+                                       adxl355_bus_t *bus)
+{
+    adxl355_mock_bus_init(mock);
+    adxl355_mock_bus_set_identity_ok(mock);
+    mock->regs[ADXL355_REG_RANGE] = (uint8_t)(0xA0U | ADXL355_RANGE_4G);
+    mock->regs[ADXL355_REG_POWER_CTL] = 0x82U;
+    mock->regs[ADXL355_REG_INT_MAP] = 0x88U;
+    mock->regs[ADXL355_REG_SYNC] = 0U;
+    *bus = adxl355_mock_bus_get_interface(mock);
+    (void)adxl355_init(dev, bus);
+    (void)adxl355_probe(dev);
+    mock->regs[ADXL355_REG_POWER_CTL] = 0x82U;
+    mock->call_count = 0U;
+}
+
+static void test_data_ready_defaults_and_configuration(void)
+{
+    TEST_START("data_ready_defaults_and_configuration");
+    adxl355_data_ready_config_t config;
+    TEST_ASSERT(adxl355_data_ready_config_default(&config) == ADXL355_OK,
+                "default data-ready configuration should succeed");
+    TEST_ASSERT(config.dedicated_drdy_enabled && !config.route_to_int1 &&
+                    !config.route_to_int2 &&
+                    config.interrupt_polarity == ADXL355_INTERRUPT_ACTIVE_LOW,
+                "default should use dedicated active-high DRDY only");
+
+    adxl355_mock_bus_t mock;
+    adxl355_bus_t bus;
+    adxl355_t dev;
+    prepare_data_ready_fixture(&mock, &dev, &bus);
+    config.dedicated_drdy_enabled = false;
+    config.route_to_int1 = true;
+    config.route_to_int2 = true;
+    config.interrupt_polarity = ADXL355_INTERRUPT_ACTIVE_HIGH;
+
+    TEST_ASSERT(adxl355_configure_data_ready(&dev, &config) == ADXL355_OK,
+                "data-ready configuration should succeed");
+    TEST_ASSERT(mock.regs[ADXL355_REG_POWER_CTL] == 0x86U,
+                "DRDY_OFF and measurement mode should be preserved exactly");
+    TEST_ASSERT(mock.regs[ADXL355_REG_RANGE] == 0xE2U,
+                "INT_POL should change without altering I2C/range/reserved bits");
+    TEST_ASSERT(mock.regs[ADXL355_REG_INT_MAP] == 0x99U,
+                "DATA_RDY routes should preserve unrelated interrupt mappings");
+
+    size_t status_reads = 0U;
+    for (size_t index = 0U; index < mock.call_count &&
+                           index < ADXL355_MOCK_MAX_CALLS; index++) {
+        if (!mock.calls[index].is_write && mock.calls[index].reg == ADXL355_REG_STATUS) {
+            status_reads++;
+        }
+    }
+    TEST_ASSERT(status_reads == 0U,
+                "configuration must not clear DATA_RDY by reading STATUS");
+
+    adxl355_data_ready_config_t observed;
+    TEST_ASSERT(adxl355_get_data_ready_config(&dev, &observed) == ADXL355_OK,
+                "configured state should be readable");
+    TEST_ASSERT(!observed.dedicated_drdy_enabled && observed.route_to_int1 &&
+                    observed.route_to_int2 &&
+                    observed.interrupt_polarity == ADXL355_INTERRUPT_ACTIVE_HIGH,
+                "readback should distinguish DRDY from mapped DATA_RDY");
+    TEST_END();
+}
+
+static void test_data_ready_external_timing_and_validation(void)
+{
+    TEST_START("data_ready_external_timing_and_validation");
+    adxl355_mock_bus_t mock;
+    adxl355_bus_t bus;
+    adxl355_t dev;
+    prepare_data_ready_fixture(&mock, &dev, &bus);
+    mock.regs[ADXL355_REG_SYNC] = ADXL355_SYNC_EXT_SYNC_MASK;
+
+    adxl355_data_ready_config_t config = {
+        true, true, false, ADXL355_INTERRUPT_ACTIVE_LOW
+    };
+    TEST_ASSERT(adxl355_configure_data_ready(&dev, &config) == ADXL355_ERR_UNSUPPORTED,
+                "external synchronization should be rejected");
+    adxl355_data_ready_config_t sentinel = {
+        false, false, true, ADXL355_INTERRUPT_ACTIVE_HIGH
+    };
+    TEST_ASSERT(adxl355_get_data_ready_config(&dev, &sentinel) == ADXL355_ERR_UNSUPPORTED,
+                "readback should reject multiplexed timing modes");
+    TEST_ASSERT(!sentinel.dedicated_drdy_enabled && !sentinel.route_to_int1 &&
+                    sentinel.route_to_int2,
+                "failed readback must not modify output");
+
+    mock.regs[ADXL355_REG_SYNC] = 0U;
+    config.interrupt_polarity = (adxl355_interrupt_polarity_t)7;
+    TEST_ASSERT(adxl355_configure_data_ready(&dev, &config) == ADXL355_ERR_INVALID_ARG,
+                "invalid polarity should be rejected");
+    TEST_ASSERT(adxl355_data_ready_config_default(NULL) == ADXL355_ERR_NULL,
+                "NULL default output should be rejected");
+    TEST_END();
+}
+
+static void test_data_ready_failure_rollback(void)
+{
+    TEST_START("data_ready_failure_rollback");
+    adxl355_mock_bus_t mock;
+    adxl355_bus_t bus;
+    adxl355_t dev;
+    prepare_data_ready_fixture(&mock, &dev, &bus);
+    const uint8_t original_power = mock.regs[ADXL355_REG_POWER_CTL];
+    const uint8_t original_range = mock.regs[ADXL355_REG_RANGE];
+    const uint8_t original_map = mock.regs[ADXL355_REG_INT_MAP];
+    adxl355_data_ready_config_t config = {
+        false, true, true, ADXL355_INTERRUPT_ACTIVE_HIGH
+    };
+
+    mock.fail_write_reg = ADXL355_REG_INT_MAP;
+    mock.fail_write_occurrence = 1U;
+    TEST_ASSERT(adxl355_configure_data_ready(&dev, &config) == ADXL355_ERR_BUS,
+                "target failure with successful rollback should remain a bus error");
+    TEST_ASSERT(mock.regs[ADXL355_REG_POWER_CTL] == original_power &&
+                    mock.regs[ADXL355_REG_RANGE] == original_range &&
+                    mock.regs[ADXL355_REG_INT_MAP] == original_map,
+                "target failure should restore exact prior state");
+
+    prepare_data_ready_fixture(&mock, &dev, &bus);
+    mock.fail_write_reg = ADXL355_REG_INT_MAP;
+    mock.fail_write_occurrence = 0U;
+    TEST_ASSERT(adxl355_configure_data_ready(&dev, &config) == ADXL355_ERR_RESTORE,
+                "rollback failure should be distinct");
+    TEST_ASSERT((mock.regs[ADXL355_REG_POWER_CTL] & 0x01U) == 0U,
+                "best-effort rollback should restore measurement mode");
+    TEST_END();
+}
+
 static void prepare_self_test_fixture(adxl355_mock_bus_t *mock,
                                       adxl355_t *dev,
                                       adxl355_bus_t *bus)
@@ -1526,6 +1657,9 @@ int main(void)
     test_set_range_failure_restores_measurement();
     test_set_range_restore_failure_keeps_range_cache_consistent();
     test_set_odr_temporarily_enters_standby();
+    test_data_ready_defaults_and_configuration();
+    test_data_ready_external_timing_and_validation();
+    test_data_ready_failure_rollback();
     test_set_range_writes_expected_register();
     test_set_range_preserves_unrelated_bits();
     test_set_range_read_error_prevents_write();

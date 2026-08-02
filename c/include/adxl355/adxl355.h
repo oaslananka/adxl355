@@ -56,6 +56,13 @@ typedef enum {
 } adxl355_power_mode_t;
 
 
+/** Polarity of DATA_RDY when routed to INT1 or INT2. */
+typedef enum {
+    ADXL355_INTERRUPT_ACTIVE_LOW = 0,
+    ADXL355_INTERRUPT_ACTIVE_HIGH = 1
+} adxl355_interrupt_polarity_t;
+
+
 /** Axis selection for offset calibration registers. */
 typedef enum {
     ADXL355_AXIS_X = 0,
@@ -131,6 +138,14 @@ typedef struct {
 } adxl355_fifo_location_t;
 
 /** Metadata for one bounded FIFO read. */
+/** Internal-clock data-ready output configuration. */
+typedef struct {
+    bool dedicated_drdy_enabled; /**< Dedicated DRDY pin; always active high. */
+    bool route_to_int1;          /**< Route DATA_RDY status condition to INT1. */
+    bool route_to_int2;          /**< Route DATA_RDY status condition to INT2. */
+    adxl355_interrupt_polarity_t interrupt_polarity; /**< Shared INT1/INT2 polarity. */
+} adxl355_data_ready_config_t;
+
 typedef struct {
     uint8_t available_locations; /**< Valid FIFO locations reported before reading. */
     uint8_t consumed_locations;  /**< Locations physically popped by completed reads. */
@@ -298,6 +313,52 @@ adxl355_status_t adxl355_set_power_mode(adxl355_t *dev, adxl355_power_mode_t mod
  * @return ADXL355_OK or error code.
  */
 adxl355_status_t adxl355_set_odr(adxl355_t *dev, adxl355_odr_t odr);
+
+
+/**
+ * Fill the Rev.D internal-clock data-ready defaults.
+ *
+ * The dedicated DRDY pin is enabled and remains always active high. DATA_RDY is
+ * not routed to INT1 or INT2; their shared polarity defaults active low.
+ *
+ * @param[out] config Configuration to initialize.
+ * @return ADXL355_OK or ADXL355_ERR_NULL.
+ */
+adxl355_status_t adxl355_data_ready_config_default(adxl355_data_ready_config_t *config);
+
+/**
+ * Read the maintained internal-clock data-ready configuration.
+ *
+ * This API distinguishes the dedicated DRDY pin from DATA_RDY routed through
+ * INT_MAP. It returns ADXL355_ERR_UNSUPPORTED when SYNC selects external clock
+ * or synchronization because those modes multiplex DRDY/INT2 differently.
+ * Reading this configuration does not read STATUS and therefore does not clear
+ * a pending DATA_RDY condition.
+ *
+ * @param dev Initialised and probed device handle.
+ * @param[out] config Decoded configuration, modified only on success.
+ * @return ADXL355_OK, ADXL355_ERR_UNSUPPORTED, or another driver error.
+ */
+adxl355_status_t adxl355_get_data_ready_config(
+    adxl355_t *dev, adxl355_data_ready_config_t *config);
+
+/**
+ * Configure dedicated DRDY and optional DATA_RDY routing to INT1/INT2.
+ *
+ * The maintained contract supports internal synchronization only (SYNC bits
+ * 2:0 equal zero). The operation preserves all unrelated INT_MAP, RANGE, and
+ * POWER_CTL bits, enters standby when necessary, and restores the original
+ * measurement state. If a write fails, exact register rollback is attempted; a
+ * rollback failure returns ADXL355_ERR_RESTORE. Dedicated DRDY is always active
+ * high; `interrupt_polarity` affects only INT1 and INT2.
+ *
+ * @param dev Initialised and probed device handle.
+ * @param config Requested routing and polarity.
+ * @return ADXL355_OK, ADXL355_ERR_UNSUPPORTED for external timing modes,
+ *         ADXL355_ERR_INVALID_ARG, ADXL355_ERR_BUS, or ADXL355_ERR_RESTORE.
+ */
+adxl355_status_t adxl355_configure_data_ready(
+    adxl355_t *dev, const adxl355_data_ready_config_t *config);
 
 
 /* ---------------------------------------------------------------------------

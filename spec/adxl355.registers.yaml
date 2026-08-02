@@ -286,23 +286,37 @@ registers:
     address: 0x2A
     type: read-write
     default: 0x00
-    description: Interrupt mapping
-    datasheet_ref: "Table 40, page 37"
-    note: "Bit fields control which interrupt goes to INT1 vs INT2 pins"
+    description: Interrupt pin function mapping
+    datasheet_ref: "Rev.D Table 46, page 42"
+    fields:
+      - { bit: 7, name: ACT_EN2, description: "Activity routed to INT2" }
+      - { bit: 6, name: OVR_EN2, description: "FIFO overrun routed to INT2" }
+      - { bit: 5, name: FULL_EN2, description: "FIFO full routed to INT2" }
+      - { bit: 4, name: RDY_EN2, description: "DATA_RDY routed to INT2" }
+      - { bit: 3, name: ACT_EN1, description: "Activity routed to INT1" }
+      - { bit: 2, name: OVR_EN1, description: "FIFO overrun routed to INT1" }
+      - { bit: 1, name: FULL_EN1, description: "FIFO full routed to INT1" }
+      - { bit: 0, name: RDY_EN1, description: "DATA_RDY routed to INT1" }
 
   - name: SYNC
     address: 0x2B
     type: read-write
     default: 0x00
     description: External synchronization control
-    datasheet_ref: "Table 41, page 38"
+    datasheet_ref: "Rev.D Table 47, page 42"
+    fields:
+      - { bit: 2, name: EXT_CLK, description: "External clock enable" }
+      - bit: 1..0
+        name: EXT_SYNC
+        description: "External synchronization mode; 0 is internal synchronization"
+      - { bit: 7..3, name: RESERVED, description: "Reserved, do not modify" }
 
   - name: RANGE
     address: 0x2C
     type: read-write
     default: 0x01
     description: Acceleration range selection (reset default ±2g)
-    datasheet_ref: "Table 42, page 38"
+    datasheet_ref: "Rev.D Table 48, page 42"
     fields:
       - bit: 7
         name: I2C_HS
@@ -326,7 +340,7 @@ registers:
     type: read-write
     default: 0x01
     description: Power control
-    datasheet_ref: "Table 43, page 38"
+    datasheet_ref: "Rev.D Table 49, page 43"
     fields:
       - bit: 0
         name: MODE

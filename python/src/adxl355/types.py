@@ -2,6 +2,8 @@
 
 from dataclasses import dataclass
 
+from adxl355.registers import InterruptPolarity
+
 
 @dataclass(frozen=True)
 class RawXYZ:
@@ -19,6 +21,16 @@ class AccelXYZ:
     x: float
     y: float
     z: float
+
+
+@dataclass(frozen=True)
+class DataReadyConfig:
+    """Internal-clock DRDY and DATA_RDY interrupt routing configuration."""
+
+    dedicated_drdy_enabled: bool = True
+    route_to_int1: bool = False
+    route_to_int2: bool = False
+    interrupt_polarity: InterruptPolarity = InterruptPolarity.ACTIVE_LOW
 
 
 @dataclass(frozen=True)
