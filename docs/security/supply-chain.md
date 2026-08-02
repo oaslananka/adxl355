@@ -80,21 +80,31 @@ files contain no timestamp, index URL, or environment-specific secret. Workflows
 ignore host pip configuration and explicitly use only `https://pypi.org/simple`,
 so an inherited mirror or extra index cannot silently supply a different file.
 
-Regenerate after reviewing an intended package/version change:
+Check public PyPI for newer versions, then regenerate only after reviewing the
+intended update:
 
 ```bash
+python scripts/generate_python_locks.py --check-latest
+# Edit the exact versions in the relevant requirements/python/*.in files.
 python scripts/generate_python_locks.py
 python scripts/generate_python_locks.py --verify
 python -m unittest scripts.tests.test_python_locks -v
 ```
 
-Review both sides of the change: `.in` files prove which package versions are
-intended, while `.txt` files show the authenticated PyPI artifact set. Unexpected
-new packages, removed hashes, yanked-only releases, source-only substitutions, or
-large platform expansion require investigation before merge. Dependabot checks
-`/requirements/python` weekly with a seven-day cooldown and one open lock-update
-PR, but generated changes are never self-approving and must pass the offline lock
-verifier and full workflow tests.
+`--check-latest` is read-only and reports every group/current/latest tuple. It does
+not choose compatibility policy or rewrite files. Review both sides of the final
+change: `.in` files prove which package versions are intended, while `.txt` files
+show the authenticated PyPI artifact set. Unexpected new packages, removed hashes,
+yanked-only releases, source-only substitutions, or large platform expansion
+require investigation before merge.
+
+Dependabot remains weekly and rate-limited for the normal `/python` package
+metadata. It is intentionally **not** configured for `/requirements/python`:
+Dependabot edits both reviewed `.in` manifests and generated `.txt` files without
+running this repository's generator, which can remove required build backends or
+leave the pair inconsistent. Custom lock updates therefore use the documented
+report/edit/regenerate workflow and must pass the offline verifier, dependency
+review, and full CI.
 
 Workflow installs use `--only-binary=:all:` where every package has a compatible
 wheel. The SPI adapter is the narrow exception because `spidev` is distributed as

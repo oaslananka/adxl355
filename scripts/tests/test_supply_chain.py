@@ -40,7 +40,6 @@ class SupplyChainTests(unittest.TestCase):
         expected_targets = {
             ("github-actions", "/"),
             ("pip", "/python"),
-            ("pip", "/requirements/python"),
             ("cargo", "/rust"),
             ("npm", "/node"),
             ("gomod", "/go"),
