@@ -61,6 +61,11 @@ extern "C" {
 #define ADXL355_POWER_TEMP_OFF_BIT  1U
 #define ADXL355_POWER_DRDY_OFF_BIT  2U
 
+/* Self-test register bits (datasheet Rev.D, Table 44) */
+#define ADXL355_SELF_TEST_ST1      (1U << 0)
+#define ADXL355_SELF_TEST_ST2      (1U << 1)
+#define ADXL355_SELF_TEST_MASK     (ADXL355_SELF_TEST_ST1 | ADXL355_SELF_TEST_ST2)
+
 /* Range register (datasheet Rev.D, Table 42) */
 #define ADXL355_RANGE_SEL_MASK   0x03U
 /* Range field values: 0x01=2g, 0x02=4g, 0x03=8g */

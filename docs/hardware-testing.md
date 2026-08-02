@@ -94,6 +94,25 @@ hints. It never copies the process environment, host name, credentials, or raw
 secret values. Strings resembling tokens, passwords, secrets, or API keys are
 redacted.
 
+## Electrostatic self-test response
+
+The maintained C and Python drivers implement the Rev.D response sequence as a
+bounded diagnostic measurement:
+
+1. save `SELF_TEST`, `RANGE`, `FILTER`, `POWER_CTL`, and the cached range;
+2. configure ±2 g, 125 Hz, and measurement mode;
+3. enable ST1 only and collect the baseline mean;
+4. enable ST1+ST2 and collect the stimulated mean;
+5. report signed and absolute per-axis delta values;
+6. restore every saved register and cached range on success or failure.
+
+Default calls do not turn datasheet typical response values into acceptance
+limits. A caller may supply bounded, fixture-specific absolute-delta windows, but
+those windows must be documented as local policy and must not be presented as
+Analog Devices production limits. Timeout, transport, threshold, and restoration
+failures remain distinct. Physical validation must also compare every saved
+register before and after the run.
+
 ## Local opt-in execution
 
 Install only the selected adapter and run the command explicitly. These commands

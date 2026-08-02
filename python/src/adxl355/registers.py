@@ -107,6 +107,11 @@ FILTER_ODR_SHIFT = 0
 FILTER_HPF_MASK = 0x70
 FILTER_HPF_SHIFT = 4
 
+# Self-test register bits (datasheet Rev.D, Table 44)
+SELF_TEST_ST1 = 1 << 0
+SELF_TEST_ST2 = 1 << 1
+SELF_TEST_MASK = SELF_TEST_ST1 | SELF_TEST_ST2
+
 # Range register mask (datasheet Rev.D, Table 42)
 RANGE_SEL_MASK = 0x03
 

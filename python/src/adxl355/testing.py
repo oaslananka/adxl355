@@ -15,7 +15,8 @@ import time
 from typing import Optional
 
 from adxl355.constants import DEVID_AD, DEVID_MST, PARTID, RESET_CODE
-from adxl355.registers import Range, Register
+from adxl355.registers import SELF_TEST_MASK, STATUS_DATA_RDY, Range, Register
+from adxl355.types import RawXYZ
 
 
 class MockTransport:
@@ -38,6 +39,8 @@ class MockTransport:
         self.fail_write_reg: Optional[int] = None
         self.fail_write_occurrence = 0
         self._matching_writes = 0
+        self._self_test_baseline: RawXYZ | None = None
+        self._self_test_stimulated: RawXYZ | None = None
         self.call_count = 0
         self.calls: list[dict[str, object]] = []
 
@@ -49,7 +52,21 @@ class MockTransport:
         if self._force_error is not None:
             raise self._force_error
         self._log_call(False, reg, length)
-        data = bytes(self._regs[reg : reg + length])
+        if (
+            reg == Register.XDATA3
+            and length == 9
+            and self._self_test_baseline is not None
+            and self._self_test_stimulated is not None
+        ):
+            mode = self._regs[Register.SELF_TEST] & SELF_TEST_MASK
+            if mode == SELF_TEST_MASK:
+                data = self._encode_xyz(self._self_test_stimulated)
+            elif mode == 0x01:
+                data = self._encode_xyz(self._self_test_baseline)
+            else:
+                data = bytes(self._regs[reg : reg + length])
+        else:
+            data = bytes(self._regs[reg : reg + length])
         # Pad if beyond register file size
         if len(data) < length:
             data += b"\x00" * (length - len(data))
@@ -69,7 +86,7 @@ class MockTransport:
                 or self._matching_writes == self.fail_write_occurrence
             ):
                 raise RuntimeError(f"injected write failure at register 0x{reg:02X}")
-        self._log_call(True, reg, len(data))
+        self._log_call(True, reg, len(data), data[0] if data else None)
         for i, b in enumerate(data):
             if reg + i < self.NUM_REGS:
                 self._regs[reg + i] = b
@@ -85,13 +102,14 @@ class MockTransport:
     # Test helpers
     # ------------------------------------------------------------------
 
-    def _log_call(self, is_write: bool, reg: int, length: int) -> None:
+    def _log_call(self, is_write: bool, reg: int, length: int, data: int | None = None) -> None:
         if self.call_count < self.MAX_CALL_LOG:
             self.calls.append(
                 {
                     "is_write": is_write,
                     "reg": reg,
                     "length": length,
+                    "data": data,
                 }
             )
         self.call_count += 1
@@ -141,6 +159,28 @@ class MockTransport:
         _encode(x, Register.XDATA3)
         _encode(y, Register.YDATA3)
         _encode(z, Register.ZDATA3)
+
+    @staticmethod
+    def _encode_xyz(raw: RawXYZ) -> bytes:
+        """Encode one raw XYZ sample into the nine data-register bytes."""
+
+        def encode_axis(value: int) -> bytes:
+            encoded = value & 0xFFFFF
+            return bytes(
+                (
+                    (encoded >> 12) & 0xFF,
+                    (encoded >> 4) & 0xFF,
+                    (encoded & 0x0F) << 4,
+                )
+            )
+
+        return encode_axis(raw.x) + encode_axis(raw.y) + encode_axis(raw.z)
+
+    def set_self_test_xyz(self, baseline: RawXYZ, stimulated: RawXYZ) -> None:
+        """Enable deterministic ST1-only and ST1+ST2 sample responses."""
+        self._self_test_baseline = baseline
+        self._self_test_stimulated = stimulated
+        self._regs[Register.STATUS] = STATUS_DATA_RDY
 
     def inject_error(self, error: Exception) -> None:
         """Make all subsequent bus calls raise the given error."""

@@ -34,3 +34,19 @@ One offset count equals 16 raw acceleration LSB. Writes are volatile, require a
 successful probe, enter standby when necessary, and restore the prior power mode.
 See `../docs/calibration.md` for orientation, sampling, temperature, rollback,
 and accuracy limitations.
+
+## Electrostatic self-test response
+
+```python
+from adxl355 import ADXL355, SelfTestConfig
+
+result = device.run_self_test(SelfTestConfig(sample_count=64, settle_samples=8))
+print(result.abs_delta_g)
+```
+
+The sequence measures an ST1-only baseline followed by ST1+ST2 stimulation using
+bounded `DATA_RDY` polling. The driver temporarily uses ±2 g and 125 Hz, then
+restores `SELF_TEST`, `RANGE`, `FILTER`, `POWER_CTL`, and the cached range.
+Default configuration reports the measured response without inventing normative
+pass/fail limits. Applications may provide fixture-specific thresholds when they
+own and document that policy.

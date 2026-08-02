@@ -17,14 +17,14 @@ range and power-mode control, raw XYZ reads, acceleration conversion,
 temperature, status, and stateless decode/conversion helpers. Feature coverage
 outside that core is intentionally language-specific.
 
-| Language | Core device API | ODR configuration | FIFO entry count | Linux SPI adapter | Linux I2C adapter | embedded-hal SPI/I2C | Packaging dry run | Physical HIL evidence |
-|---|---|---|---|---|---|---|---|---|
-| C | Yes | Yes | No public method | Example only | No | No | Yes, CMake install/export | No language-specific physical pass |
-| C++ | Yes, C wrapper | No | No public method | User `BusInterface` | User `BusInterface` | No | Yes, CMake install/export | No language-specific physical pass |
-| Python | Yes | Yes | Yes, count only | Yes, `spidev` | Yes, `smbus2` | No | Yes, sdist/wheel | SPI pass on Raspberry Pi 5; I2C pending |
-| Rust | Yes | No | No public method | No Linux-specific adapter | No Linux-specific adapter | Yes | Yes, `cargo package` | No language-specific physical pass |
-| Node.js | Yes | No | No public method | User `Transport` | User `Transport` | No | Yes, `npm pack` | No language-specific physical pass |
-| Go | Yes | No | No public method | User `Transport` | User `Transport` | No | Module/build checks | No language-specific physical pass |
+| Language | Core device API | ODR configuration | FIFO entry count | Self-test response | Linux SPI adapter | Linux I2C adapter | embedded-hal SPI/I2C | Packaging dry run | Physical HIL evidence |
+|---|---|---|---|---|---|---|---|---|---|
+| C | Yes | Yes | No public method | Yes, bounded measured response | Example only | No | No | Yes, CMake install/export | Raspberry Pi 5 SPI response pass |
+| C++ | Yes, C wrapper | No | No public method | No public wrapper | User `BusInterface` | User `BusInterface` | No | Yes, CMake install/export | No language-specific physical pass |
+| Python | Yes | Yes | Yes, count only | Yes, bounded measured response | Yes, `spidev` | Yes, `smbus2` | No | Yes, sdist/wheel | SPI pass on Raspberry Pi 5; I2C pending |
+| Rust | Yes | No | No public method | No public method | No Linux-specific adapter | No Linux-specific adapter | Yes | Yes, `cargo package` | No language-specific physical pass |
+| Node.js | Yes | No | No public method | No public method | User `Transport` | User `Transport` | No | Yes, `npm pack` | No language-specific physical pass |
+| Go | Yes | No | No public method | No public method | User `Transport` | User `Transport` | No | Module/build checks | No language-specific physical pass |
 
 “User transport” means the driver exposes a bus contract but does not ship a
 Linux device adapter for that language. The repository contains buildable package metadata and verification artifacts, but packages are not published by this repository to PyPI, crates.io, npm, or a Go proxy. Intended distribution names are `adxl355` (PyPI), `adxl355-driver` (crates.io, imported as `adxl355`), and `@oaslananka/adxl355` (npm).
@@ -36,6 +36,8 @@ Linux device adapter for that language. The repository contains buildable packag
 - Probe-before-use lifecycle and standby-safe range/configuration behavior.
 - Raw 20-bit decode, g and m/s² conversion, temperature, and status reads.
 - C/Python signed hardware-offset APIs and deterministic raw-LSB calibration helpers.
+- C/Python electrostatic self-test response APIs with bounded `DATA_RDY` polling,
+  exact register restoration, and optional caller-owned thresholds.
 - Mock-based tests in all six languages and a required zero-skip vector gate.
 - CI quality gates for sanitizers, lint/type analysis, package smoke tests,
   dependency auditing, CodeQL, race detection, and coverage reporting.
@@ -46,10 +48,12 @@ Linux device adapter for that language. The repository contains buildable packag
 ## Explicitly not claimed
 
 Register constants document the chip, but **Register presence does not imply a public API**. `FIFO_DATA`, offset registers, and `SELF_TEST` are represented in
-the register map. Full FIFO sample decoding, self-test control, and interrupt
-configuration are not implemented consistently as public driver methods. Signed
-offset programming and calibration helpers are implemented only in C and Python;
-that coverage does not imply factory accuracy or parity in the other languages.
+the register map. Full FIFO sample decoding and interrupt configuration are not
+implemented consistently as public driver methods. Signed offset programming,
+calibration helpers, and electrostatic self-test response measurement are
+implemented only in C and Python. The self-test APIs report measured response;
+they do not apply undocumented factory acceptance limits or imply parity in the
+other languages.
 
 ## Hardware validation status
 

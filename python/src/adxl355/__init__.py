@@ -13,13 +13,16 @@ from adxl355.errors import (
     ADXL355Error,
     BusError,
     DataNotReadyError,
+    DataReadyTimeoutError,
     DeviceNotFoundError,
     DeviceStateError,
     InvalidConfigurationError,
+    RestoreError,
+    SelfTestThresholdError,
 )
 from adxl355.registers import ODR, Axis, PowerMode, Range, Register
 from adxl355.transport import Transport
-from adxl355.types import AccelXYZ, RawXYZ
+from adxl355.types import AccelXYZ, RawXYZ, SelfTestConfig, SelfTestResult, SelfTestThresholds
 
 __all__ = [
     "__version__",
@@ -31,13 +34,19 @@ __all__ = [
     "PowerMode",
     "ODR",
     "RawXYZ",
+    "SelfTestConfig",
+    "SelfTestResult",
+    "SelfTestThresholds",
     "AccelXYZ",
     "Transport",
     "ADXL355Error",
     "BusError",
+    "DataReadyTimeoutError",
     "DeviceNotFoundError",
     "DeviceStateError",
     "InvalidConfigurationError",
+    "RestoreError",
+    "SelfTestThresholdError",
     "DataNotReadyError",
     "STANDARD_GRAVITY_M_S2",
     "SCALE_2G_G_PER_LSB",

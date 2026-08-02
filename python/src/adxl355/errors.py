@@ -23,3 +23,23 @@ class InvalidConfigurationError(ADXL355Error):
 
 class DataNotReadyError(ADXL355Error):
     """Data not yet available."""
+
+
+class DataReadyTimeoutError(ADXL355Error):
+    """Raised when bounded DATA_RDY polling expires."""
+
+
+class SelfTestThresholdError(ADXL355Error):
+    """Raised when measured self-test response violates caller-owned thresholds."""
+
+    def __init__(self, result: object) -> None:
+        super().__init__("Self-test response violated caller-owned thresholds")
+        self.result = result
+
+
+class RestoreError(ADXL355Error):
+    """Raised when one or more saved hardware registers cannot be restored."""
+
+    def __init__(self, failures: tuple[BaseException, ...]) -> None:
+        super().__init__(f"Failed to restore {len(failures)} self-test state write(s)")
+        self.failures = failures

@@ -1128,6 +1128,226 @@ static void test_offset_argument_and_lifecycle_validation(void)
     TEST_END();
 }
 
+
+static void prepare_self_test_fixture(adxl355_mock_bus_t *mock,
+                                      adxl355_t *dev,
+                                      adxl355_bus_t *bus)
+{
+    adxl355_mock_bus_init(mock);
+    adxl355_mock_bus_set_identity_ok(mock);
+    mock->regs[ADXL355_REG_RANGE] = (uint8_t)(UINT8_C(0x80) | ADXL355_RANGE_4G_VAL);
+    mock->regs[ADXL355_REG_FILTER] = UINT8_C(0xA5);
+    mock->regs[ADXL355_REG_POWER_CTL] = UINT8_C(0x04);
+    adxl355_raw_xyz_t baseline = {100, -200, 300};
+    adxl355_raw_xyz_t stimulated = {25741, -25841, 128505};
+    adxl355_mock_bus_set_self_test_xyz(mock, baseline, stimulated);
+    *bus = adxl355_mock_bus_get_interface(mock);
+    TEST_ASSERT(adxl355_init(dev, bus) == ADXL355_OK, "self-test fixture init should succeed");
+    TEST_ASSERT(adxl355_probe(dev) == ADXL355_OK, "self-test fixture probe should succeed");
+}
+
+static adxl355_self_test_config_t small_self_test_config(void)
+{
+    adxl355_self_test_config_t config;
+    (void)adxl355_self_test_config_default(&config);
+    config.sample_count = 4U;
+    config.settle_samples = 1U;
+    config.max_ready_polls = 4U;
+    config.poll_delay_ms = 1U;
+    return config;
+}
+
+static void test_self_test_default_and_validation(void)
+{
+    TEST_START("self_test_default_and_validation");
+    adxl355_self_test_config_t config;
+    TEST_ASSERT(adxl355_self_test_config_default(NULL) == ADXL355_ERR_NULL,
+                "null default config should be rejected");
+    TEST_ASSERT(adxl355_self_test_config_default(&config) == ADXL355_OK,
+                "default config should succeed");
+    TEST_ASSERT(config.sample_count == 32U && config.settle_samples == 4U,
+                "default sample and settle counts should be bounded");
+    TEST_ASSERT(config.max_ready_polls == 500U && config.poll_delay_ms == 1U,
+                "default polling should be bounded");
+    TEST_ASSERT(!config.enforce_thresholds,
+                "datasheet typical values must not become default pass/fail thresholds");
+
+    adxl355_mock_bus_t mock;
+    adxl355_mock_bus_init(&mock);
+    adxl355_bus_t bus = adxl355_mock_bus_get_interface(&mock);
+    adxl355_t dev;
+    adxl355_init(&dev, &bus);
+    adxl355_self_test_result_t result;
+    TEST_ASSERT(adxl355_run_self_test(&dev, &config, &result) == ADXL355_ERR_STATE,
+                "pre-probe self-test should fail without bus access");
+    TEST_ASSERT(mock.call_count == 0U, "pre-probe self-test must not touch bus");
+
+    prepare_self_test_fixture(&mock, &dev, &bus);
+    config.sample_count = 0U;
+    TEST_ASSERT(adxl355_run_self_test(&dev, &config, &result) == ADXL355_ERR_INVALID_ARG,
+                "zero samples should be rejected");
+    config = small_self_test_config();
+    config.enforce_thresholds = true;
+    config.thresholds.min_abs_delta_g.x = NAN;
+    TEST_ASSERT(adxl355_run_self_test(&dev, &config, &result) == ADXL355_ERR_INVALID_ARG,
+                "non-finite threshold should be rejected");
+    mock.regs[ADXL355_REG_SELF_TEST] = ADXL355_SELF_TEST_ST1;
+    config = small_self_test_config();
+    TEST_ASSERT(adxl355_run_self_test(&dev, &config, &result) == ADXL355_ERR_STATE,
+                "pre-existing self-test mode should be rejected");
+    TEST_END();
+}
+
+static void test_self_test_measures_typical_response_and_restores_state(void)
+{
+    TEST_START("self_test_measures_typical_response_and_restores_state");
+    adxl355_mock_bus_t mock;
+    adxl355_t dev;
+    adxl355_bus_t bus;
+    prepare_self_test_fixture(&mock, &dev, &bus);
+    const uint8_t original_range = mock.regs[ADXL355_REG_RANGE];
+    const uint8_t original_filter = mock.regs[ADXL355_REG_FILTER];
+    const uint8_t original_power = mock.regs[ADXL355_REG_POWER_CTL];
+    const uint8_t original_self_test = mock.regs[ADXL355_REG_SELF_TEST];
+    const adxl355_range_t original_cached_range = dev.range;
+    adxl355_self_test_config_t config = small_self_test_config();
+    adxl355_self_test_result_t result;
+
+    TEST_ASSERT(adxl355_run_self_test(&dev, &config, &result) == ADXL355_OK,
+                "self-test measurement should succeed");
+    TEST_ASSERT(result.samples == config.sample_count, "result should record sample count");
+    TEST_ASSERT(approx_eq(result.delta_g.x, 0.1000f, 0.00002f),
+                "X response should measure approximately 0.1 g");
+    TEST_ASSERT(approx_eq(result.delta_g.y, -0.1000f, 0.00002f),
+                "Y signed response should be preserved");
+    TEST_ASSERT(approx_eq(result.delta_g.z, 0.4999995f, 0.00002f),
+                "Z response should measure approximately 0.5 g");
+    TEST_ASSERT(approx_eq(result.abs_delta_g.y, 0.1000f, 0.00002f),
+                "absolute response should be available for policy checks");
+    TEST_ASSERT(!result.thresholds_evaluated && result.thresholds_passed,
+                "default run should report measurement without normative thresholds");
+    TEST_ASSERT(mock.regs[ADXL355_REG_RANGE] == original_range &&
+                    mock.regs[ADXL355_REG_FILTER] == original_filter &&
+                    mock.regs[ADXL355_REG_POWER_CTL] == original_power &&
+                    mock.regs[ADXL355_REG_SELF_TEST] == original_self_test,
+                "all relevant registers should be restored exactly");
+    TEST_ASSERT(dev.range == original_cached_range, "cached range should be restored");
+
+    bool saw_mode = false;
+    bool saw_enabled = false;
+    for (size_t index = 0U; index < mock.call_count && index < ADXL355_MOCK_MAX_CALLS; index++) {
+        if (mock.calls[index].is_write && mock.calls[index].reg == ADXL355_REG_SELF_TEST) {
+            const uint8_t mode =
+                (uint8_t)(mock.calls[index].data & ADXL355_SELF_TEST_MASK);
+            saw_mode = saw_mode || mode == ADXL355_SELF_TEST_ST1;
+            saw_enabled = saw_enabled || mode == ADXL355_SELF_TEST_MASK;
+        }
+    }
+    TEST_ASSERT(saw_mode, "sequence should enter ST1-only mode before baseline");
+    TEST_ASSERT(saw_enabled, "sequence should add ST2 after the ST1-only baseline");
+    TEST_END();
+}
+
+static void test_self_test_threshold_policy(void)
+{
+    TEST_START("self_test_threshold_policy");
+    adxl355_mock_bus_t mock;
+    adxl355_t dev;
+    adxl355_bus_t bus;
+    prepare_self_test_fixture(&mock, &dev, &bus);
+    adxl355_self_test_config_t config = small_self_test_config();
+    config.enforce_thresholds = true;
+    config.thresholds.min_abs_delta_g = (adxl355_float_xyz_t){0.08f, 0.08f, 0.40f};
+    config.thresholds.max_abs_delta_g = (adxl355_float_xyz_t){0.12f, 0.12f, 0.60f};
+    adxl355_self_test_result_t result;
+    TEST_ASSERT(adxl355_run_self_test(&dev, &config, &result) == ADXL355_OK,
+                "caller fixture policy should pass representative response");
+    TEST_ASSERT(result.thresholds_evaluated && result.thresholds_passed,
+                "passing caller thresholds should be recorded");
+
+    config.thresholds.min_abs_delta_g.x = 0.11f;
+    config.thresholds.max_abs_delta_g.x = 0.12f;
+    TEST_ASSERT(adxl355_run_self_test(&dev, &config, &result) == ADXL355_ERR_THRESHOLD,
+                "caller threshold violation should be distinct");
+    TEST_ASSERT(result.thresholds_evaluated && !result.thresholds_passed,
+                "failed result should remain populated");
+    TEST_ASSERT(result.abs_delta_g.x > 0.09f,
+                "threshold failure should retain measured response");
+    TEST_ASSERT(mock.regs[ADXL355_REG_SELF_TEST] == 0U,
+                "threshold failure should still restore self-test register");
+    TEST_END();
+}
+
+static void test_self_test_timeout_and_short_read_restore(void)
+{
+    TEST_START("self_test_timeout_and_short_read_restore");
+    adxl355_mock_bus_t mock;
+    adxl355_t dev;
+    adxl355_bus_t bus;
+    prepare_self_test_fixture(&mock, &dev, &bus);
+    adxl355_self_test_config_t config = small_self_test_config();
+    config.sample_count = 1U;
+    config.settle_samples = 0U;
+    config.max_ready_polls = 2U;
+    adxl355_self_test_result_t result;
+    const uint8_t original_power = mock.regs[ADXL355_REG_POWER_CTL];
+
+    mock.regs[ADXL355_REG_STATUS] = 0U;
+    TEST_ASSERT(adxl355_run_self_test(&dev, &config, &result) == ADXL355_ERR_TIMEOUT,
+                "missing DATA_RDY should produce a bounded timeout");
+    TEST_ASSERT(mock.regs[ADXL355_REG_POWER_CTL] == original_power &&
+                    mock.regs[ADXL355_REG_SELF_TEST] == 0U,
+                "timeout should restore power and self-test state");
+
+    mock.regs[ADXL355_REG_STATUS] = ADXL355_STATUS_DATA_RDY;
+    mock.short_read_reg = ADXL355_REG_XDATA3;
+    mock.short_read_length = 8U;
+    TEST_ASSERT(adxl355_run_self_test(&dev, &config, &result) == ADXL355_ERR_BUS,
+                "short XYZ response should be reported as transport failure");
+    TEST_ASSERT(mock.regs[ADXL355_REG_POWER_CTL] == original_power &&
+                    mock.regs[ADXL355_REG_SELF_TEST] == 0U,
+                "short response should restore hardware state");
+    TEST_END();
+}
+
+static void test_self_test_target_and_restore_failures(void)
+{
+    TEST_START("self_test_target_and_restore_failures");
+    adxl355_mock_bus_t mock;
+    adxl355_t dev;
+    adxl355_bus_t bus;
+    prepare_self_test_fixture(&mock, &dev, &bus);
+    adxl355_self_test_config_t config = small_self_test_config();
+    config.sample_count = 1U;
+    config.settle_samples = 0U;
+    adxl355_self_test_result_t result;
+    const uint8_t original_range = mock.regs[ADXL355_REG_RANGE];
+    const uint8_t original_filter = mock.regs[ADXL355_REG_FILTER];
+    const uint8_t original_power = mock.regs[ADXL355_REG_POWER_CTL];
+
+    mock.fail_write_reg = ADXL355_REG_SELF_TEST;
+    mock.fail_write_occurrence = 3U;
+    TEST_ASSERT(adxl355_run_self_test(&dev, &config, &result) == ADXL355_ERR_BUS,
+                "ST1/ST2 enable failure should preserve operation error");
+    TEST_ASSERT(mock.regs[ADXL355_REG_RANGE] == original_range &&
+                    mock.regs[ADXL355_REG_FILTER] == original_filter &&
+                    mock.regs[ADXL355_REG_POWER_CTL] == original_power &&
+                    mock.regs[ADXL355_REG_SELF_TEST] == 0U,
+                "target failure should restore all state");
+
+    prepare_self_test_fixture(&mock, &dev, &bus);
+    mock.fail_write_reg = ADXL355_REG_POWER_CTL;
+    mock.fail_write_occurrence = 4U;
+    TEST_ASSERT(adxl355_run_self_test(&dev, &config, &result) == ADXL355_ERR_RESTORE,
+                "restore failure should take precedence");
+    TEST_ASSERT(mock.regs[ADXL355_REG_SELF_TEST] == 0U,
+                "restore failure must still disable ST1/ST2");
+    TEST_ASSERT((mock.regs[ADXL355_REG_POWER_CTL] & (1U << ADXL355_POWER_MODE_BIT)) != 0U,
+                "failed final power restore should leave safe standby");
+    TEST_ASSERT(dev.range == ADXL355_RANGE_4G, "cached range should still be restored");
+    TEST_END();
+}
+
 int main(void)
 {
     printf("ADXL355 C Test Suite\n");
@@ -1188,6 +1408,11 @@ int main(void)
     test_offset_read_write_and_state_restore();
     test_offset_failures_are_state_safe();
     test_offset_argument_and_lifecycle_validation();
+    test_self_test_default_and_validation();
+    test_self_test_measures_typical_response_and_restores_state();
+    test_self_test_threshold_policy();
+    test_self_test_timeout_and_short_read_restore();
+    test_self_test_target_and_restore_failures();
 
     printf("\n====================\n");
     printf("Results: %d/%d passed, %d failed\n",

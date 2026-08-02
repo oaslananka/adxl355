@@ -1,6 +1,7 @@
 #include "adxl355/adxl355.h"
 
 #include <limits.h>
+#include <math.h>
 #include <string.h>
 
 enum {
@@ -394,6 +395,264 @@ adxl355_status_t adxl355_write_offset(adxl355_t *dev, adxl355_axis_t axis, int16
     return finish_configuration(dev, &guard, status);
 }
 
+
+typedef struct {
+    uint8_t range_reg;
+    uint8_t filter_reg;
+    uint8_t power_ctl_reg;
+    uint8_t self_test_reg;
+    adxl355_range_t cached_range;
+} adxl355_self_test_state_t;
+
+static bool finite_nonnegative_xyz(const adxl355_float_xyz_t *value)
+{
+    return isfinite(value->x) && isfinite(value->y) && isfinite(value->z) &&
+           value->x >= 0.0f && value->y >= 0.0f && value->z >= 0.0f;
+}
+
+static bool self_test_config_valid(const adxl355_self_test_config_t *config)
+{
+    if (config->sample_count == 0U || config->sample_count > 1024U ||
+        config->settle_samples > 1024U || config->max_ready_polls == 0U ||
+        config->max_ready_polls > 60000U || config->poll_delay_ms == 0U ||
+        config->poll_delay_ms > 1000U) {
+        return false;
+    }
+    if (!config->enforce_thresholds) {
+        return true;
+    }
+    const adxl355_float_xyz_t *minimum = &config->thresholds.min_abs_delta_g;
+    const adxl355_float_xyz_t *maximum = &config->thresholds.max_abs_delta_g;
+    return finite_nonnegative_xyz(minimum) && finite_nonnegative_xyz(maximum) &&
+           maximum->x >= minimum->x && maximum->y >= minimum->y &&
+           maximum->z >= minimum->z;
+}
+
+static adxl355_status_t wait_for_data_ready(adxl355_t *dev,
+                                             const adxl355_self_test_config_t *config)
+{
+    if (dev->bus.delay_ms == NULL) {
+        return ADXL355_ERR_UNSUPPORTED;
+    }
+    for (uint16_t poll = 0U; poll < config->max_ready_polls; poll++) {
+        uint8_t status;
+        if (read_reg(dev, ADXL355_REG_STATUS, &status) != 0) {
+            return ADXL355_ERR_BUS;
+        }
+        if ((status & ADXL355_STATUS_DATA_RDY) != 0U) {
+            return ADXL355_OK;
+        }
+        dev->bus.delay_ms(dev->bus.ctx, config->poll_delay_ms);
+    }
+    return ADXL355_ERR_TIMEOUT;
+}
+
+static adxl355_status_t discard_self_test_samples(
+    adxl355_t *dev,
+    const adxl355_self_test_config_t *config)
+{
+    for (uint16_t sample = 0U; sample < config->settle_samples; sample++) {
+        adxl355_status_t status = wait_for_data_ready(dev, config);
+        if (status != ADXL355_OK) {
+            return status;
+        }
+        adxl355_raw_xyz_t ignored;
+        status = adxl355_read_raw(dev, &ignored);
+        if (status != ADXL355_OK) {
+            return status;
+        }
+    }
+    return ADXL355_OK;
+}
+
+static adxl355_status_t collect_self_test_mean(
+    adxl355_t *dev,
+    const adxl355_self_test_config_t *config,
+    adxl355_float_xyz_t *mean_g)
+{
+    adxl355_status_t status = discard_self_test_samples(dev, config);
+    if (status != ADXL355_OK) {
+        return status;
+    }
+    int64_t sum_x = 0;
+    int64_t sum_y = 0;
+    int64_t sum_z = 0;
+    for (uint16_t sample = 0U; sample < config->sample_count; sample++) {
+        status = wait_for_data_ready(dev, config);
+        if (status != ADXL355_OK) {
+            return status;
+        }
+        adxl355_raw_xyz_t raw;
+        status = adxl355_read_raw(dev, &raw);
+        if (status != ADXL355_OK) {
+            return status;
+        }
+        sum_x += raw.x;
+        sum_y += raw.y;
+        sum_z += raw.z;
+    }
+    const float scale = ADXL355_SCALE_2G_G_PER_LSB / (float)config->sample_count;
+    mean_g->x = (float)sum_x * scale;
+    mean_g->y = (float)sum_y * scale;
+    mean_g->z = (float)sum_z * scale;
+    return ADXL355_OK;
+}
+
+static bool within_axis_threshold(float value, float minimum, float maximum)
+{
+    return value >= minimum && value <= maximum;
+}
+
+static bool self_test_thresholds_pass(
+    const adxl355_self_test_thresholds_t *thresholds,
+    const adxl355_float_xyz_t *absolute_delta)
+{
+    return within_axis_threshold(absolute_delta->x,
+                                 thresholds->min_abs_delta_g.x,
+                                 thresholds->max_abs_delta_g.x) &&
+           within_axis_threshold(absolute_delta->y,
+                                 thresholds->min_abs_delta_g.y,
+                                 thresholds->max_abs_delta_g.y) &&
+           within_axis_threshold(absolute_delta->z,
+                                 thresholds->min_abs_delta_g.z,
+                                 thresholds->max_abs_delta_g.z);
+}
+
+static adxl355_status_t read_self_test_state(adxl355_t *dev,
+                                              adxl355_self_test_state_t *state)
+{
+    if (read_reg(dev, ADXL355_REG_RANGE, &state->range_reg) != 0 ||
+        read_reg(dev, ADXL355_REG_FILTER, &state->filter_reg) != 0 ||
+        read_reg(dev, ADXL355_REG_POWER_CTL, &state->power_ctl_reg) != 0 ||
+        read_reg(dev, ADXL355_REG_SELF_TEST, &state->self_test_reg) != 0) {
+        return ADXL355_ERR_BUS;
+    }
+    state->cached_range = dev->range;
+    if ((state->self_test_reg & ADXL355_SELF_TEST_MASK) != 0U) {
+        return ADXL355_ERR_STATE;
+    }
+    return ADXL355_OK;
+}
+
+static adxl355_status_t configure_self_test(adxl355_t *dev,
+                                             const adxl355_self_test_state_t *state)
+{
+    const uint8_t standby = (uint8_t)(state->power_ctl_reg |
+                                      (uint8_t)(1U << ADXL355_POWER_MODE_BIT));
+    const uint8_t range_2g = (uint8_t)(clear_u8_bits(state->range_reg,
+                                                     ADXL355_RANGE_SEL_MASK) |
+                                       ADXL355_RANGE_2G_VAL);
+    const uint8_t filter_125hz = (uint8_t)(clear_u8_bits(state->filter_reg,
+                                                         ADXL355_FILTER_ODR_MASK) |
+                                           (uint8_t)ADXL355_ODR_125_HZ);
+    const uint8_t self_test_off = clear_u8_bits(state->self_test_reg,
+                                                ADXL355_SELF_TEST_MASK);
+    const uint8_t measurement = clear_u8_bits(state->power_ctl_reg,
+                                               (uint8_t)(1U << ADXL355_POWER_MODE_BIT));
+    if (write_reg(dev, ADXL355_REG_POWER_CTL, standby) != 0 ||
+        write_reg(dev, ADXL355_REG_RANGE, range_2g) != 0 ||
+        write_reg(dev, ADXL355_REG_FILTER, filter_125hz) != 0 ||
+        write_reg(dev, ADXL355_REG_SELF_TEST, self_test_off) != 0 ||
+        write_reg(dev, ADXL355_REG_POWER_CTL, measurement) != 0) {
+        return ADXL355_ERR_BUS;
+    }
+    dev->range = ADXL355_RANGE_2G;
+    return ADXL355_OK;
+}
+
+static adxl355_status_t restore_self_test_state(adxl355_t *dev,
+                                                 const adxl355_self_test_state_t *state)
+{
+    bool failed = false;
+    const uint8_t standby = (uint8_t)(state->power_ctl_reg |
+                                      (uint8_t)(1U << ADXL355_POWER_MODE_BIT));
+    failed = write_reg(dev, ADXL355_REG_SELF_TEST, state->self_test_reg) != 0 || failed;
+    failed = write_reg(dev, ADXL355_REG_POWER_CTL, standby) != 0 || failed;
+    failed = write_reg(dev, ADXL355_REG_RANGE, state->range_reg) != 0 || failed;
+    failed = write_reg(dev, ADXL355_REG_FILTER, state->filter_reg) != 0 || failed;
+    failed = write_reg(dev, ADXL355_REG_POWER_CTL, state->power_ctl_reg) != 0 || failed;
+    dev->range = state->cached_range;
+    return failed ? ADXL355_ERR_RESTORE : ADXL355_OK;
+}
+
+adxl355_status_t adxl355_self_test_config_default(adxl355_self_test_config_t *config)
+{
+    if (config == NULL) {
+        return ADXL355_ERR_NULL;
+    }
+    memset(config, 0, sizeof(*config));
+    config->sample_count = 32U;
+    config->settle_samples = 4U;
+    config->max_ready_polls = 500U;
+    config->poll_delay_ms = 1U;
+    return ADXL355_OK;
+}
+
+adxl355_status_t adxl355_run_self_test(adxl355_t *dev,
+                                        const adxl355_self_test_config_t *config,
+                                        adxl355_self_test_result_t *result)
+{
+    if (dev == NULL || config == NULL || result == NULL) {
+        return ADXL355_ERR_NULL;
+    }
+    adxl355_status_t status = require_initialized(dev);
+    if (status != ADXL355_OK) {
+        return status;
+    }
+    if (!self_test_config_valid(config)) {
+        return ADXL355_ERR_INVALID_ARG;
+    }
+    memset(result, 0, sizeof(*result));
+    adxl355_self_test_state_t state;
+    status = read_self_test_state(dev, &state);
+    if (status != ADXL355_OK) {
+        return status;
+    }
+
+    status = configure_self_test(dev, &state);
+    if (status == ADXL355_OK) {
+        const uint8_t self_test_mode =
+            (uint8_t)(clear_u8_bits(state.self_test_reg, ADXL355_SELF_TEST_MASK) |
+                      ADXL355_SELF_TEST_ST1);
+        status = write_reg(dev, ADXL355_REG_SELF_TEST, self_test_mode) == 0
+                     ? ADXL355_OK
+                     : ADXL355_ERR_BUS;
+    }
+    if (status == ADXL355_OK) {
+        status = collect_self_test_mean(dev, config, &result->baseline_g);
+    }
+    if (status == ADXL355_OK) {
+        const uint8_t enabled = (uint8_t)(clear_u8_bits(state.self_test_reg,
+                                                        ADXL355_SELF_TEST_MASK) |
+                                           ADXL355_SELF_TEST_MASK);
+        status = write_reg(dev, ADXL355_REG_SELF_TEST, enabled) == 0
+                     ? ADXL355_OK
+                     : ADXL355_ERR_BUS;
+    }
+    if (status == ADXL355_OK) {
+        status = collect_self_test_mean(dev, config, &result->stimulated_g);
+    }
+    if (status == ADXL355_OK) {
+        result->delta_g.x = result->stimulated_g.x - result->baseline_g.x;
+        result->delta_g.y = result->stimulated_g.y - result->baseline_g.y;
+        result->delta_g.z = result->stimulated_g.z - result->baseline_g.z;
+        result->abs_delta_g.x = fabsf(result->delta_g.x);
+        result->abs_delta_g.y = fabsf(result->delta_g.y);
+        result->abs_delta_g.z = fabsf(result->delta_g.z);
+        result->samples = config->sample_count;
+        result->thresholds_evaluated = config->enforce_thresholds;
+        result->thresholds_passed = !config->enforce_thresholds ||
+                                    self_test_thresholds_pass(&config->thresholds,
+                                                              &result->abs_delta_g);
+        if (!result->thresholds_passed) {
+            status = ADXL355_ERR_THRESHOLD;
+        }
+    }
+
+    const adxl355_status_t restore = restore_self_test_state(dev, &state);
+    return restore == ADXL355_OK ? status : restore;
+}
+
 adxl355_status_t adxl355_read_raw(adxl355_t *dev, adxl355_raw_xyz_t *out)
 {
     if (dev == NULL || out == NULL) {
@@ -580,6 +839,8 @@ const char *adxl355_status_string(adxl355_status_t status)
         case ADXL355_ERR_NOT_READY:  return "ADXL355_ERR_NOT_READY";
         case ADXL355_ERR_UNSUPPORTED: return "ADXL355_ERR_UNSUPPORTED";
         case ADXL355_ERR_STATE:       return "ADXL355_ERR_STATE";
+        case ADXL355_ERR_THRESHOLD:   return "ADXL355_ERR_THRESHOLD";
+        case ADXL355_ERR_RESTORE:     return "ADXL355_ERR_RESTORE";
         default:                     return "ADXL355_UNKNOWN";
     }
 }

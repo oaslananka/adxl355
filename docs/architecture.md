@@ -146,9 +146,11 @@ failed reads do not modify caller-provided output values or fabricate measuremen
 
 The shared register model documents the device even when a high-level method is
 not present. Register presence does not imply a public API. For example,
-`FIFO_DATA`, offset registers, and `SELF_TEST` are defined for consistency and
-future work, but `SELF_TEST` is not implemented as a public driver method and
-full FIFO/offset APIs are not available uniformly across languages.
+`FIFO_DATA`, offset registers, and `SELF_TEST` are defined for consistency, but
+full FIFO APIs are not available and offset/self-test APIs are not uniform across
+languages. C and Python expose signed offset programming and bounded
+self-test-response measurement; C++, Rust, Node.js, and Go do not currently expose
+those high-level methods.
 
 ## Register Specification as Single Source of Truth
 

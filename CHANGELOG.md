@@ -32,6 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Added C and Python signed hardware-offset read/write APIs and deterministic raw-LSB calibration helpers with standby-safe writes and documented physical rollback procedures.
+- Added C and Python bounded electrostatic self-test response APIs with ST1-only baseline acquisition, ST1+ST2 stimulation, exact state restoration, distinct timeout/threshold/restore errors, and optional caller-owned fixture policy.
 - Required clean-checkout shared-vector verification for C, C++, Python, Rust,
   Node.js, and Go with zero permitted CI skips.
 - C/C++ sanitizer, warning-as-error, install/export, and consumer smoke gates.
