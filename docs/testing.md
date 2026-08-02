@@ -216,6 +216,32 @@ Before every ruleset mutation, export the current ruleset JSON. If a valid pull
 request cannot satisfy the new gate, restore that captured required-check set
 and investigate the workflow/context mismatch without bypassing CI.
 
+## Verified native build matrix
+
+The portable C and C++ surfaces are required to build, test, install, and pass
+downstream CMake consumer smoke checks on these GitHub-hosted environments:
+
+| Environment | Compiler / architecture | Verification |
+|---|---|---|
+| Ubuntu 24.04 x64 | GCC | warnings, ASan/UBSan, unit tests, install/export |
+| Ubuntu 24.04 x64 | Clang | warnings, ASan/UBSan, unit tests, install/export |
+| Ubuntu 24.04 ARM64 | GCC / AArch64 | native unit tests and install/export |
+| macOS 15 ARM64 | AppleClang | native unit tests and install/export |
+| Windows Server 2025 x64 | MSVC | native unit tests and install/export |
+
+The Linux `spidev` example is built only when `CMAKE_SYSTEM_NAME` is `Linux`.
+Platform jobs validate portable library behavior; they are not physical sensor
+validation. Only the manual HIL workflow may establish SPI/I2C hardware evidence.
+All native platform jobs are dependencies of the required
+`Cross-language Consistency` check, so a platform failure blocks merge without
+adding unstable matrix-generated ruleset context names.
+
+Run the Windows package consumer smoke locally from PowerShell with:
+
+```powershell
+./scripts/smoke_cmake_packages.ps1
+```
+
 ## Hardware-in-the-Loop Tests
 
 Physical validation is implemented as the explicit CLI

@@ -109,6 +109,35 @@ class CiQualityGateTests(unittest.TestCase):
         self.assertIn("go tool cover -func=coverage.out", commands)
         self.assertNotIn("cover-threshold", commands)
 
+    def test_native_platform_matrix_is_required_by_consistency(self) -> None:
+        jobs = self.load_jobs()
+        expected = {
+            "native-clang": ("Native (Clang/Linux)", "ubuntu-24.04"),
+            "native-macos": ("Native (macOS/arm64)", "macos-15"),
+            "native-windows": ("Native (Windows/MSVC)", "windows-2025"),
+            "native-arm": ("Native (Linux/arm64)", "ubuntu-24.04-arm"),
+        }
+        for job_id, (name, runner) in expected.items():
+            job = jobs[job_id]
+            self.assertEqual(job["name"], name)
+            self.assertEqual(job["runs-on"], runner)
+            commands = self.commands(job)
+            self.assertIn("ADXL355_WARNINGS_AS_ERRORS=ON", commands)
+            self.assertIn("ctest --test-dir", commands)
+            self.assertIn("smoke_cmake_packages", commands)
+
+        consistency_needs = set(jobs["consistency"]["needs"])
+        self.assertTrue(set(expected).issubset(consistency_needs))
+
+    def test_windows_smoke_script_is_bounded_and_uses_installed_consumers(self) -> None:
+        script = (REPO_ROOT / "scripts" / "smoke_cmake_packages.ps1").read_text()
+        self.assertIn('$ErrorActionPreference = "Stop"', script)
+        self.assertIn("cmake --install", script)
+        self.assertIn("adxl355_c_consumer.exe", script)
+        self.assertIn("adxl355_cpp_consumer.exe", script)
+        self.assertIn("CMAKE_PREFIX_PATH", script)
+
+
 
 if __name__ == "__main__":
     unittest.main()
