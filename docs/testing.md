@@ -203,8 +203,7 @@ The Linux acquisition tests inject a fake libgpiod v2 request and event source.
 They require blocking `wait_edge_events`, rising-edge detection, monotonic kernel
 timestamps, line sequence numbers, finite sample/deadline bounds, no `while True`
 or sleep-based GPIO polling, explicit missed-event and FIFO-overrun reporting,
-partial-result transport errors, and unconditional GPIO/bus closure. The physical
-GPIO17/DRDY run is separate HIL evidence and is not inferred from these tests.
+partial-result transport errors, and unconditional GPIO/bus closure. The physical GPIO17/DRDY result is separate HIL evidence: commit `002173d0c8dae8b15261b6d00cf011011cf8db7c` passed 32/32 unique I2C samples with zero gaps/overruns and safe restoration; it is not inferred from unit tests and does not cover SPI or INT1/INT2 routing.
 
 Local deterministic commands:
 

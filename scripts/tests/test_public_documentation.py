@@ -79,16 +79,26 @@ class PublicDocumentationTests(unittest.TestCase):
             "line sequence",
             "FIFO overrun",
             "not a background service",
-            "Physical GPIO17/DRDY evidence is pending",
+            "Recorded dedicated DRDY result",
         ):
             self.assertIn(phrase, combined)
         self.assertIn("Internal-clock DRDY/INT1/INT2 configuration", readme)
         self.assertIn("bounded libgpiod reference", readme)
+        for phrase in (
+            "002173d0c8dae8b15261b6d00cf011011cf8db7c",
+            "32 samples, 32 unique raw XYZ tuples",
+            "zero missed events",
+            "zero FIFO overruns",
+            "POWER_CTL=0x01",
+            "GPIO17 was released",
+            "does **not** prove SPI DRDY",
+        ):
+            self.assertIn(phrase, hardware)
         self.assertIn(
             "[x] Internal-clock DRDY and DATA_RDY-to-INT1/INT2 configuration API",
             todo,
         )
-        self.assertIn("[ ] Physical GPIO17/DRDY event and restoration evidence", todo)
+        self.assertIn("[x] Physical GPIO17/DRDY event and restoration evidence", todo)
 
     def test_fifo_contract_is_scoped_bounded_and_nonblocking(self) -> None:
         readme = README.read_text()

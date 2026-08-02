@@ -20,9 +20,9 @@ outside that core is intentionally language-specific.
 
 | Language | Core device API | ODR configuration | FIFO support | Self-test response | DRDY / event flow | Linux SPI adapter | Linux I2C adapter | embedded-hal SPI/I2C | Packaging dry run | Physical HIL evidence |
 |---|---|---|---|---|---|---|---|---|---|---|
-| C | Yes | Yes | Bounded count/decode/read, caller storage | Yes, bounded measured response | Internal-clock DRDY/INT1/INT2 configuration; no GPIO loop | Example only | No | No | Yes, CMake install/export | Raspberry Pi 5 SPI response pass; DRDY GPIO pending |
+| C | Yes | Yes | Bounded count/decode/read, caller storage | Yes, bounded measured response | Internal-clock DRDY/INT1/INT2 configuration; no GPIO loop | Example only | No | No | Yes, CMake install/export | Raspberry Pi 5 SPI response pass; C DRDY API is unit/sanitizer verified |
 | C++ | Yes, C wrapper | Yes | No public method | No public wrapper | No public wrapper | User `BusInterface` | User `BusInterface` | Arduino SPI compile fixture | Yes, CMake install/export plus PlatformIO pack | No language-specific physical pass |
-| Python | Yes | Yes | Bounded count/decode/read, typed partial results | Yes, bounded measured response | Internal-clock DRDY/INT configuration plus bounded libgpiod reference | Yes, `spidev` | Yes, `smbus2` | No | Yes, sdist/wheel | Raspberry Pi 5 SPI and I2C feature passes; DRDY GPIO pending |
+| Python | Yes | Yes | Bounded count/decode/read, typed partial results | Yes, bounded measured response | Internal-clock DRDY/INT configuration plus bounded libgpiod reference | Yes, `spidev` | Yes, `smbus2` | No | Yes, sdist/wheel | Raspberry Pi 5 I2C + dedicated DRDY/GPIO17 pass at `002173d` |
 | Rust | Yes | No | No public method | No public method | No public method | No Linux-specific adapter | No Linux-specific adapter | Yes | Yes, `cargo package` | No language-specific physical pass |
 | Node.js | Yes | No | No public method | No public method | No public method | Yes, optional `spi-device` adapter | Yes, optional `i2c-bus` adapter | No | Yes, `npm pack` plus core-only smoke | Raspberry Pi 5 I2C bounded example pass; SPI pending |
 | Go | Yes | No | No public method | No public method | No public method | Yes, `adxl355/linuxio` on Linux amd64/arm64 | Yes, `adxl355/linuxio` on Linux amd64/arm64 | No | Module/build and cross-build checks | Raspberry Pi 5 SPI and I2C bounded example passes |
@@ -43,6 +43,7 @@ Linux device adapter for that language. The repository contains buildable packag
   XYZ reads, caller-owned storage in C, and typed partial-progress errors in Python.
 - C/Python internal-clock data-ready configuration that distinguishes the always-active-high dedicated DRDY pin from DATA_RDY routed to INT1/INT2, preserves unrelated register bits, and performs exact rollback on failure.
 - A finite Linux Python libgpiod v2 reference flow with blocking rising-edge waits, kernel monotonic timestamps, GPIO sequence-gap accounting, timeout/overrun/transport errors, and safe cleanup; it is not a daemon or a portable-core GPIO dependency.
+  The dedicated Raspberry Pi 5 fixture produced 32/32 unique I2C samples from GPIO17 with zero sequence gaps and zero FIFO overruns at exact commit `002173d0c8dae8b15261b6d00cf011011cf8db7c`; this does not claim SPI or INT1/INT2-routed interrupt validation.
 - C++ ODR configuration, an owning exception API, a stack-owned `Status`/`Result<T>` no-exception API, and a hash-locked Arduino Uno PlatformIO compile fixture.
 - Mock-based tests in all six languages and a required zero-skip vector gate.
 - CI quality gates for sanitizers, lint/type analysis, package smoke tests,

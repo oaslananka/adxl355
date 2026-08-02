@@ -44,7 +44,7 @@
 - [x] Bounded self-test response API with physical SPI validation
 - [x] I2C address constants
 - [x] Internal-clock DRDY/INT1/INT2 configuration and bounded libgpiod reference
-- [ ] Physical GPIO17/DRDY event and restoration evidence on Raspberry Pi 5
+- [x] Physical GPIO17/DRDY event and restoration evidence on Raspberry Pi 5 (I2C fixture, commit `002173d`)
 
 ### Rust
 - [x] embedded-hal trait integration
@@ -96,5 +96,5 @@
 - [x] Manual-only self-hosted HIL workflow
 - [x] Record a successful physical SPI HIL integration run on Raspberry Pi 5 (`main`, run `30725059679`)
 - [x] Record repeatable C/Python self-test response evidence with exact register restoration
-- [ ] Record bounded physical GPIO17/DRDY acquisition evidence with timestamps, zero overruns, and safe restoration
+- [x] Record bounded physical GPIO17/DRDY acquisition evidence with timestamps, zero overruns, and safe restoration
 - [ ] Publish successful SPI and I2C HIL artifacts for the final release-candidate commit

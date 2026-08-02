@@ -129,8 +129,34 @@ record the host name, private address, environment, credentials, or raw device
 paths beyond the public fixture mapping.
 
 Unit tests prove the bounded event/lifecycle contract with fake GPIO requests;
-they do not prove the wire. Physical GPIO17/DRDY evidence is pending until the
-optional line is confirmed and the exact-commit command succeeds.
+they do not prove the wire.
+
+### Recorded dedicated DRDY result
+
+A bounded physical run succeeded on **2026-08-02** against exact implementation
+commit `002173d0c8dae8b15261b6d00cf011011cf8db7c` on the dedicated Raspberry Pi 5
+I2C fixture:
+
+- runtime: Linux ARM64, Python `3.13.5`, libgpiod Python binding `2.2.0`, and
+  `smbus2 0.4.3`;
+- sensor bus: I2C bus 1 at address `0x1D`; event input: `/dev/gpiochip0` line 17;
+- bounds: 32 requested samples, a 5-second acquisition deadline, zero allowed
+  missed events, and a 20-second outer process timeout;
+- result: 32 samples, 32 unique raw XYZ tuples, GPIO line sequence 1 through 32,
+  zero missed events, and zero FIFO overruns;
+- timing: 250,573,771 ns total duration, event intervals from 8,028,153 ns to
+  8,034,245 ns, and maximum event-to-capture latency of 1,630,712 ns; and
+- independent post-run register readback: `POWER_CTL=0x01`, `RANGE=0x81`,
+  `FILTER=0x00`, `INT_MAP=0x00`, and `SYNC=0x00`, confirming standby, enabled
+  dedicated DRDY, ±2 g, default ODR, no DATA_RDY mapping to INT1/INT2, and
+  internal synchronization. GPIO17 was released and returned to an unclaimed
+  input state.
+
+The command ran as the non-root fixture account from a separate `/tmp` checkout
+and exited normally. No host name, private address, environment dump, credential,
+or raw report was committed. This evidence is intentionally scoped to I2C plus
+the dedicated active-high DRDY output on GPIO17. It does **not** prove SPI DRDY,
+INT1/INT2-routed DATA_RDY, external synchronization, or other GPIO offsets.
 
 ## What the runner verifies
 

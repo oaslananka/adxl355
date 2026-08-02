@@ -65,8 +65,12 @@ number. Sequence gaps, overall timeout, GPIO source failure, sensor bus failure,
 and `STATUS.FIFO_OVR` are distinct and retain completed samples. The example is
 finite, restores standby/±2 g/default ODR/default DRDY routing, and closes both
 GPIO and bus resources. It is a reference command, not a background service.
-Physical GPIO17/DRDY evidence remains pending until the optional wire is confirmed
-on the dedicated fixture.
+The dedicated Raspberry Pi 5 I2C fixture physically passed this flow at commit
+`002173d0c8dae8b15261b6d00cf011011cf8db7c`: 32/32 unique samples, GPIO line
+sequence 1 through 32, zero missed events, zero FIFO overruns, and independent
+readback of standby, ±2 g, default ODR, default interrupt mapping, internal sync,
+and enabled dedicated DRDY. This result does not claim SPI or INT1/INT2-routed
+interrupt validation.
 
 ## Hardware offset calibration
 
