@@ -11,6 +11,30 @@ OFFSET_MAX = (1 << 15) - 1
 OFFSET_RAW_LSB_PER_COUNT = 16
 
 
+def _bounded_integer(name: str, value: int, minimum: int, maximum: int, unit: str) -> int:
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise InvalidConfigurationError(f"{name} must be an integer {unit}")
+    if not minimum <= value <= maximum:
+        raise InvalidConfigurationError(f"{name} is outside the {unit} range")
+    return value
+
+
+def _round_raw_delta_to_offset(delta: int) -> int:
+    half_count = OFFSET_RAW_LSB_PER_COUNT // 2
+    if delta >= 0:
+        return (delta + half_count) // OFFSET_RAW_LSB_PER_COUNT
+    return -((-delta + half_count) // OFFSET_RAW_LSB_PER_COUNT)
+
+
+def _limit_offset(value: int, saturate: bool) -> int:
+    if OFFSET_MIN <= value <= OFFSET_MAX:
+        return value
+    if saturate:
+        return max(OFFSET_MIN, min(OFFSET_MAX, value))
+    direction = "positive" if value > OFFSET_MAX else "negative"
+    raise InvalidConfigurationError(f"required {direction} offset exceeds int16 range")
+
+
 def calculate_offset(
     measured_raw: int,
     expected_raw: int,
@@ -27,26 +51,10 @@ def calculate_offset(
     Inputs must already be rounded to integer raw LSB and lie in the signed
     20-bit acceleration range.
     """
-    for name, value in (("measured_raw", measured_raw), ("expected_raw", expected_raw)):
-        if isinstance(value, bool) or not isinstance(value, int):
-            raise InvalidConfigurationError(f"{name} must be an integer raw-LSB value")
-        if not RAW_MIN <= value <= RAW_MAX:
-            raise InvalidConfigurationError(f"{name} is outside the signed 20-bit range")
-
-    if isinstance(current_offset, bool) or not isinstance(current_offset, int):
-        raise InvalidConfigurationError("current_offset must be an integer")
-    if not OFFSET_MIN <= current_offset <= OFFSET_MAX:
-        raise InvalidConfigurationError("current_offset is outside the signed 16-bit range")
-
-    delta = measured_raw - expected_raw
-    adjustment = (delta + 8) // 16 if delta >= 0 else -((-delta + 8) // 16)
-    counts = current_offset + adjustment
-    if counts > OFFSET_MAX:
-        if not saturate:
-            raise InvalidConfigurationError("required positive offset exceeds int16 range")
-        return OFFSET_MAX
-    if counts < OFFSET_MIN:
-        if not saturate:
-            raise InvalidConfigurationError("required negative offset exceeds int16 range")
-        return OFFSET_MIN
-    return counts
+    measured = _bounded_integer("measured_raw", measured_raw, RAW_MIN, RAW_MAX, "raw-LSB")
+    expected = _bounded_integer("expected_raw", expected_raw, RAW_MIN, RAW_MAX, "raw-LSB")
+    current = _bounded_integer(
+        "current_offset", current_offset, OFFSET_MIN, OFFSET_MAX, "signed 16-bit"
+    )
+    adjustment = _round_raw_delta_to_offset(measured - expected)
+    return _limit_offset(current + adjustment, saturate)

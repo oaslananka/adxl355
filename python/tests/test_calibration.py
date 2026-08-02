@@ -96,31 +96,30 @@ def test_offset_read_write_uses_signed_big_endian_burst_and_restores_mode() -> N
     assert calls[1]["length"] == 2
 
 
-def test_offset_target_failure_restores_measurement() -> None:
+@pytest.mark.parametrize(
+    ("fail_reg", "occurrence", "expected_power", "expected_low"),
+    [
+        (Register.OFFSET_Z_H, 0, PowerMode.MEASUREMENT, 0),
+        (Register.POWER_CTL, 2, PowerMode.STANDBY, 100),
+    ],
+)
+def test_offset_write_failures_preserve_safe_state(
+    fail_reg: Register,
+    occurrence: int,
+    expected_power: PowerMode,
+    expected_low: int,
+) -> None:
     device, transport = probed_device()
     transport.set_register(Register.POWER_CTL, PowerMode.MEASUREMENT)
-    transport.fail_write_reg = Register.OFFSET_Z_H
+    transport.fail_write_reg = fail_reg
+    transport.fail_write_occurrence = occurrence
 
     with pytest.raises(BusError):
         device.write_offset(Axis.Z, 100)
 
-    assert transport.register(Register.POWER_CTL) == PowerMode.MEASUREMENT
+    assert transport.register(Register.POWER_CTL) == expected_power
     assert transport.register(Register.OFFSET_Z_H) == 0
-    assert transport.register(Register.OFFSET_Z_L) == 0
-
-
-def test_offset_restore_failure_keeps_write_and_safe_standby() -> None:
-    device, transport = probed_device()
-    transport.set_register(Register.POWER_CTL, PowerMode.MEASUREMENT)
-    transport.fail_write_reg = Register.POWER_CTL
-    transport.fail_write_occurrence = 2
-
-    with pytest.raises(BusError):
-        device.write_offset(Axis.Z, 100)
-
-    assert transport.register(Register.POWER_CTL) == PowerMode.STANDBY
-    assert transport.register(Register.OFFSET_Z_H) == 0
-    assert transport.register(Register.OFFSET_Z_L) == 100
+    assert transport.register(Register.OFFSET_Z_L) == expected_low
 
 
 def test_offset_validation_and_pre_probe_contract() -> None:
