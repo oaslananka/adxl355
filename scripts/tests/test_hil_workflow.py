@@ -48,6 +48,22 @@ class HilWorkflowTests(unittest.TestCase):
         self.assertIn("spidev==3.8", text)
         self.assertIn("smbus2==0.6.1", text)
 
+    def test_hil_uses_supported_runner_python_in_an_isolated_environment(self) -> None:
+        workflow = self.load_workflow()
+        steps = workflow["jobs"]["hil"]["steps"]
+        step_names = [str(step.get("name", "")) for step in steps]
+        text = WORKFLOW_PATH.read_text()
+
+        self.assertNotIn("actions/setup-python@", text)
+        self.assertIn("python3 --version", text)
+        self.assertIn("sys.version_info < (3, 10)", text)
+        self.assertIn('python3 -m venv "$RUNNER_TEMP/adxl355-hil-venv"', text)
+        self.assertIn('"$RUNNER_TEMP/adxl355-hil-venv/bin" >> "$GITHUB_PATH"', text)
+        self.assertLess(
+            step_names.index("Record bounded runner context"),
+            step_names.index("Prepare isolated Python"),
+        )
+
     def test_actions_are_pinned_and_credentials_are_not_persisted(self) -> None:
         workflow = self.load_workflow()
         steps = workflow["jobs"]["hil"]["steps"]

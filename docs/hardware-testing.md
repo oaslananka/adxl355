@@ -137,8 +137,10 @@ Use a dedicated Linux machine or isolated lab account:
 2. add the labels `self-hosted`, `linux`, and `adxl355-hil`;
 3. add the runner account to the group permitted to access the selected `spidev`
    or `i2c-dev` node, preferably through a narrow udev rule;
-4. install Python 3.12, a C compiler needed by `spidev`, and the Linux SPI/I2C
-   kernel modules;
+4. install a supported Python 3.10 or later with the `venv` module, a C compiler
+   needed by `spidev`, and the Linux SPI/I2C kernel modules; the workflow uses the
+   runner's provisioned `python3` inside a job-local virtual environment rather
+   than downloading a runtime with `actions/setup-python`;
 5. disable unrelated services that might claim the bus;
 6. keep registry credentials and other secrets off this runner; the HIL workflow
    requests only read access to repository contents and persists no GitHub token;
