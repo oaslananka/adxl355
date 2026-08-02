@@ -242,6 +242,28 @@ constructs isolated C/C++ builds, and executes every maintained language suite.
 The required mode rejects missing toolchains and skips, so a constant or conversion
 regression cannot be silently omitted from CI.
 
+## Node.js Linux adapter boundary
+
+The transport-agnostic Node core does not import native modules. The Linux
+subpaths dynamically load exact optional dependencies only when `open()` is
+called. Public declaration files expose repository-owned backend interfaces and
+do not reference `spi-device` or `i2c-bus` types, so core-only installations can
+import the package and both subpaths without native modules.
+
+`LinuxSpiTransport` owns one `spi-device` handle and performs every register
+operation as one transfer message with one transfer element. The command byte and
+all payload/dummy bytes therefore share one chip-select assertion. Mode 0, 8-bit
+words, MSB-first ordering, and the datasheet clock range are fixed by the adapter.
+
+`LinuxI2cTransport` owns one promisified `i2c-bus` handle and supports only `0x1D`
+and `0x53`. Register operations use block APIs with exact returned byte counts.
+The `busHz` value is a validated declaration of the externally configured Linux
+adapter rate, not a request to change kernel clock configuration.
+
+Both transports reject use after close and make `close()` idempotent. Optional
+module load failures, native backend errors, and exact-length violations are
+normalized to `BusError` while preserving the original error as `cause`.
+
 ## CI Quality Architecture
 
 Each maintained language retains one stable primary job name for branch

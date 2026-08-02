@@ -471,6 +471,29 @@ The raw temporary JSON report is not stored in the repository. This evidence
 validates the self-test feature on SPI; it does not replace final SPI/I2C
 release-candidate HIL evidence.
 
+## Node.js Linux adapter physical validation plan
+
+Physical Node adapter evidence must use a clean package build from one exact
+commit and a supported Node version. The examples are bounded and must run as the
+non-root HIL runner account.
+
+1. Build the Node package, explicitly rebuild the two exact optional native
+   modules, and record Node/npm versions plus the tested commit.
+2. On I2C, use bus 1, the physically strapped `0x1D` address, and the externally
+   configured 100 kHz rate. Capture identity, temperature, finite sample count,
+   uniqueness, and an independent post-run standby readback.
+3. On SPI, use `/dev/spidev0.0`, Mode 0, and 1 MHz. Confirm command and payload
+   stay in one chip-select transaction through the adapter unit contract, then
+   record the same physical measurements and standby readback.
+4. Verify the example exits within its timeout, closes the native descriptor on
+   both success and failure, and publishes no hostname, private address, or raw
+   environment data.
+5. Keep SPI and I2C evidence tied to the same implementation commit where
+   practical. A successful Python HIL run does not substitute for exercising the
+   Node adapter itself.
+
+No physical Node adapter result is claimed until these bounded runs pass.
+
 ## FIFO physical validation plan
 
 The C/Python FIFO API is currently supported by shared protocol vectors, mock

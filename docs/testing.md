@@ -458,3 +458,19 @@ The C and Python suites consume the same vectors and cover:
 These are deterministic protocol tests. They do not replace later physical FIFO
 validation with controlled ODR, watermark, fill level, overflow, and ordering
 observations.
+
+
+## Node.js optional native adapter verification
+
+The Node 22/24/26 matrix installs the lockfile with scripts disabled, then
+explicitly runs only the reviewed `spi-device` and `i2c-bus` rebuild scripts and
+loads both modules. Unit tests use injected fake backends, so protocol behavior
+is deterministic and does not require hardware. They verify one-message SPI
+framing, both I2C addresses, exact read/write counts, normalized backend errors,
+configuration bounds, idempotent close, and use-after-close rejection.
+
+On Node 24, package verification also installs the generated tarball with
+`--omit=optional --ignore-scripts`, imports the root and both Linux subpaths, and
+confirms that attempting to open a missing optional backend yields `BusError`
+rather than an import-time failure. `npm audit --audit-level=moderate` covers the
+full lockfile; no blanket suppression is used.
