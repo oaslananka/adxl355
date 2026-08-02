@@ -37,7 +37,7 @@ class PackageMetadataTests(unittest.TestCase):
             ["src/**", "Cargo.toml", "Cargo.lock", "README.md", "LICENSE"],
         )
 
-    def test_node_distribution_uses_owned_scope_and_single_export(self) -> None:
+    def test_node_distribution_uses_owned_scope_and_optional_linux_exports(self) -> None:
         package = json.loads((REPO_ROOT / "node/package.json").read_text())
         lock = json.loads((REPO_ROOT / "node/package-lock.json").read_text())
 
@@ -46,7 +46,9 @@ class PackageMetadataTests(unittest.TestCase):
         self.assertEqual(lock["packages"][""]["name"], "@oaslananka/adxl355")
         self.assertEqual(package["version"], "0.1.0-alpha.3")
         self.assertEqual(package["publishConfig"], {"access": "public"})
-        self.assertEqual(set(package["exports"]), {"."})
+        self.assertEqual(set(package["exports"]), {".", "./linux/spi", "./linux/i2c"})
+        self.assertEqual(package["optionalDependencies"], {"i2c-bus": "5.2.3", "spi-device": "3.1.2"})
+        self.assertEqual(lock["packages"][""]["optionalDependencies"], package["optionalDependencies"])
         self.assertEqual(package["files"], ["dist", "README.md", "LICENSE"])
 
     def test_go_submodule_tag_convention_is_documented(self) -> None:

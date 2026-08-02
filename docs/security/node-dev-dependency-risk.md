@@ -34,3 +34,26 @@ version no longer carries the alert, or the test runner must be replaced.
 
 This acceptance is limited to `@emnapi/runtime@1.11.1`; it is not a blanket ignore
 for Socket alerts or Node development dependencies.
+
+## 2026-08-02 reassessment after Linux adapter addition
+
+The optional Linux runtime adapters do not broaden this acceptance:
+
+- `spi-device@3.1.2` and `i2c-bus@5.2.3` are exact `optionalDependencies`, not
+  development-only WASM fallbacks.
+- Both native addons were built from the lockfile and loaded successfully on
+  Node.js 22.23.1, 24.18.0, and 26.5.0 on Linux x64.
+- The combined native dependency closure reported zero npm audit findings at
+  moderate or higher severity on all three runtimes.
+- CI continues to begin with `npm ci --ignore-scripts`; it then explicitly runs
+  only `npm rebuild spi-device i2c-bus --foreground-scripts` and verifies both
+  module entry points.
+- The published package contains only compiled repository output and metadata;
+  dependency source and native build products are not embedded in the tarball.
+- A separate clean-install smoke uses `--omit=optional --ignore-scripts` and
+  proves the core and Linux subpath modules import without native packages.
+- `npm ls @emnapi/runtime --all` remains empty on the supported Linux x64 install.
+
+The original `@emnapi/runtime@1.11.1` decision therefore remains dev-tool-only,
+expires on 2026-10-23, and is not used to suppress findings in either new native
+adapter dependency.

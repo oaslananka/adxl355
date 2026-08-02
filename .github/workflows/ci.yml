@@ -334,6 +334,10 @@ jobs:
           cache-dependency-path: node/package-lock.json
       - name: Install locked dependencies
         run: npm ci --ignore-scripts
+      - name: Build reviewed optional native adapters
+        run: npm rebuild spi-device i2c-bus --foreground-scripts
+      - name: Verify optional native adapters load
+        run: npm run native:check
       - name: Build
         run: npm run build
       - name: Type check
@@ -343,6 +347,9 @@ jobs:
       - name: Verify package contents
         if: matrix.node-version == '24'
         run: npm run pack:check
+      - name: Verify core-only clean install
+        if: matrix.node-version == '24'
+        run: npm run pack:core-only
       - name: Audit dependencies
         if: matrix.node-version == '24'
         run: npm run audit:ci

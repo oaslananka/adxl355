@@ -246,7 +246,10 @@ unit-test success:
 - **Rust:** rustfmt, all-feature and optional-HAL clippy, all-feature and
   no-default-feature tests, documentation tests, and `cargo package` verification.
 - **Node.js:** supported Node 22/24/26 tests, TypeScript build/type checking,
-  allow-listed npm package contents, and an audit gate at moderate severity.
+  exact optional native-module rebuild/load checks, allow-listed npm package
+  contents, a core-only clean-install smoke, and an audit gate at moderate
+  severity. The bounded I2C example has a Raspberry Pi 5 physical pass at `0x1D`;
+  the Node SPI physical example remains pending.
 - **Go:** gofmt, vet, the race detector, and a full coverage profile plus
   function report. Coverage is reported as evidence and is not reduced to an
   arbitrary pass/fail percentage.
@@ -458,3 +461,19 @@ The C and Python suites consume the same vectors and cover:
 These are deterministic protocol tests. They do not replace later physical FIFO
 validation with controlled ODR, watermark, fill level, overflow, and ordering
 observations.
+
+
+## Node.js optional native adapter verification
+
+The Node 22/24/26 matrix installs the lockfile with scripts disabled, then
+explicitly runs only the reviewed `spi-device` and `i2c-bus` rebuild scripts and
+loads both modules. Unit tests use injected fake backends, so protocol behavior
+is deterministic and does not require hardware. They verify one-message SPI
+framing, both I2C addresses, exact read/write counts, normalized backend errors,
+configuration bounds, idempotent close, and use-after-close rejection.
+
+On Node 24, package verification also installs the generated tarball with
+`--omit=optional --ignore-scripts`, imports the root and both Linux subpaths, and
+confirms that attempting to open a missing optional backend yields `BusError`
+rather than an import-time failure. `npm audit --audit-level=moderate` covers the
+full lockfile; no blanket suppression is used.

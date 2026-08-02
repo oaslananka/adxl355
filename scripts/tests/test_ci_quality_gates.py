@@ -93,8 +93,11 @@ class CiQualityGateTests(unittest.TestCase):
         self.assertEqual(versions, ["22", "24", "26"])
         commands = self.commands(node)
         self.assertIn("npm ci --ignore-scripts", commands)
+        self.assertIn("npm rebuild spi-device i2c-bus --foreground-scripts", commands)
+        self.assertIn("npm run native:check", commands)
         self.assertIn("npm run typecheck", commands)
         self.assertIn("npm run pack:check", commands)
+        self.assertIn("npm run pack:core-only", commands)
         self.assertIn("npm run audit:ci", commands)
 
     def test_all_ci_actions_are_pinned_to_full_commit_shas(self) -> None:

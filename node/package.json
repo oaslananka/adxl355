@@ -21,9 +21,12 @@
     "lint": "tsc --noEmit",
     "typecheck": "tsc --noEmit",
     "pack:check": "npm run build && npm pack --dry-run --json > .npm-pack.json && node scripts/check-package.mjs",
-    "audit:ci": "npm audit --audit-level=moderate"
+    "audit:ci": "npm audit --audit-level=moderate",
+    "native:check": "node scripts/check-native-modules.mjs",
+    "pack:core-only": "npm run build && npm pack --json > .npm-install-pack.json && node scripts/check-core-only-install.mjs .npm-install-pack.json"
   },
   "devDependencies": {
+    "@types/node": "24.10.1",
     "typescript": "7.0.2",
     "vitest": "4.1.10"
   },
@@ -48,9 +51,21 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./linux/spi": {
+      "types": "./dist/linux/spi.d.ts",
+      "import": "./dist/linux/spi.js"
+    },
+    "./linux/i2c": {
+      "types": "./dist/linux/i2c.d.ts",
+      "import": "./dist/linux/i2c.js"
     }
   },
   "publishConfig": {
     "access": "public"
+  },
+  "optionalDependencies": {
+    "i2c-bus": "5.2.3",
+    "spi-device": "3.1.2"
   }
 }

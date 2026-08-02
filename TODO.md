@@ -52,10 +52,12 @@
 - [x] Mock transport and shared-vector tests
 
 ### Node.js
-- [ ] spi-device adapter
-- [ ] i2c-bus adapter
+- [x] Optional `spi-device` Linux adapter and bounded example
+- [x] Optional `i2c-bus` Linux adapter and bounded example
+- [x] Bounded I2C example with real hardware on Raspberry Pi 5 (`0x1D`)
+- [ ] Bounded SPI example with real hardware on Raspberry Pi 5
 - [x] npm package.json publish configuration
-- [ ] Reassess the documented `@emnapi/runtime@1.11.1` dev-only risk by 2026-10-23
+- [x] Reassess the documented `@emnapi/runtime@1.11.1` dev-only risk after adding optional Linux adapters; keep the 2026-10-23 expiry
 - [x] Core device API with transport-contract tests
 
 ### Go

@@ -480,7 +480,12 @@ def typescript_class_methods(name: str, body: str) -> set[str]:
 
 def typescript_surface(root: Path) -> set[str]:
     entries: set[str] = set()
-    for path in sorted((root / "node/src").glob("*.ts")):
+    source_root = root / "node/src"
+    paths = sorted(
+        (*source_root.glob("*.ts"), source_root / "linux/spi.ts", source_root / "linux/i2c.ts")
+    )
+    for path in paths:
+        label = path.name if path.parent == source_root else path.relative_to(source_root).as_posix()
         text = strip_comments(path.read_text())
         lines = text.splitlines()
         index = 0
@@ -488,10 +493,10 @@ def typescript_surface(root: Path) -> set[str]:
             line = lines[index].strip()
             if line.startswith("export {"):
                 header, index = declaration_header(lines, index)
-                entries.add(f"declaration:{path.name}:{header}")
+                entries.add(f"declaration:{label}:{header}")
             elif exported_typescript_header(line):
                 header, index = declaration_header(lines, index)
-                entries.add(f"declaration:{path.name}:{header}")
+                entries.add(f"declaration:{label}:{header}")
             index += 1
         for header, name, body in named_blocks(text, "class"):
             prefix = text[max(0, text.find(header) - 16) : text.find(header)]

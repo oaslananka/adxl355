@@ -6,20 +6,22 @@
 
 ## Capability boundary
 
-Typed transport-agnostic core lifecycle, range, power mode, raw/converted reads, temperature, status, and stateless conversions.
+Typed core lifecycle plus optional maintained Linux SPI/I2C subpath adapters with explicit close ownership and bounded exact-length operations.
 
-**Not exposed:** No maintained Linux SPI/I2C adapter and no public ODR, offset, calibration, self-test, FIFO, or interrupt methods.
+**Not exposed:** No public ODR, offset, calibration, self-test, FIFO, interrupt, or background acquisition methods.
 
 ## Authoritative sources
 
 - [`$node/src/index.ts`](../../node/src/index.ts)
 - [`$node/src/device.ts`](../../node/src/device.ts)
 - [`$node/src/transport.ts`](../../node/src/transport.ts)
+- [`$node/src/linux/spi.ts`](../../node/src/linux/spi.ts)
+- [`$node/src/linux/i2c.ts`](../../node/src/linux/i2c.ts)
 
 ## Native documentation command
 
 ```bash
-cd node && npm ci --ignore-scripts && npm run build
+cd node && npm ci --ignore-scripts && npm rebuild spi-device i2c-bus --foreground-scripts && npm run build
 ```
 
 ## Public declarations
@@ -41,6 +43,19 @@ errors.ts:export class DeviceStateError extends ADXL355Error
 errors.ts:export class InvalidConfigurationError extends ADXL355Error
 index.ts:export
 index.ts:export type
+linux/i2c.ts:export class LinuxI2cTransport implements Transport
+linux/i2c.ts:export interface I2cBusBackend
+linux/i2c.ts:export interface I2cModuleBackend
+linux/i2c.ts:export interface LinuxI2cOptions
+linux/i2c.ts:export type I2cModuleLoader
+linux/spi.ts:export class LinuxSpiTransport implements Transport
+linux/spi.ts:export interface LinuxSpiOptions
+linux/spi.ts:export interface SpiDeviceBackend
+linux/spi.ts:export interface SpiModuleBackend
+linux/spi.ts:export interface SpiOpenOptions
+linux/spi.ts:export interface SpiTransfer
+linux/spi.ts:export type SpiMessage
+linux/spi.ts:export type SpiModuleLoader
 registers.ts:export const DEVID_AD_VALUE
 registers.ts:export const DEVID_MST_VALUE
 registers.ts:export const FILTER_HPF_MASK
@@ -88,4 +103,14 @@ DataNotReadyError:constructor(message = "Data not ready")
 DeviceNotFoundError:constructor(message = "Device not found (ID mismatch)")
 DeviceStateError:constructor(message = "Invalid device state")
 InvalidConfigurationError:constructor(message = "Invalid configuration")
+LinuxI2cTransport:async close(): Promise<void>
+LinuxI2cTransport:async delayMs(ms: number): Promise<void>
+LinuxI2cTransport:async readRegister(reg: number, length: number): Promise<Uint8Array>
+LinuxI2cTransport:async writeRegister(reg: number, data: Uint8Array): Promise<void>
+LinuxI2cTransport:static async open( options: LinuxI2cOptions =
+LinuxSpiTransport:async close(): Promise<void>
+LinuxSpiTransport:async delayMs(ms: number): Promise<void>
+LinuxSpiTransport:async readRegister(reg: number, length: number): Promise<Uint8Array>
+LinuxSpiTransport:async writeRegister(reg: number, data: Uint8Array): Promise<void>
+LinuxSpiTransport:static async open( options: LinuxSpiOptions =
 ```

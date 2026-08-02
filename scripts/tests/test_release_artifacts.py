@@ -108,7 +108,11 @@ class ReleaseArtifactTests(unittest.TestCase):
             package = {
                 "name": "@oaslananka/adxl355",
                 "version": "0.1.0-alpha.2",
-                "exports": {".": {"import": "./dist/index.js"}},
+                "exports": {
+                    ".": {"import": "./dist/index.js"},
+                    "./linux/spi": {"import": "./dist/linux/spi.js"},
+                    "./linux/i2c": {"import": "./dist/linux/i2c.js"},
+                },
             }
             self.add_tar_text(handle, "package/package.json", json.dumps(package))
             self.add_tar_text(handle, "package/README.md", "readme")
@@ -117,6 +121,24 @@ class ReleaseArtifactTests(unittest.TestCase):
             if extra_file is not None:
                 self.add_tar_text(handle, extra_file, "unexpected")
         return directory
+
+    def test_node_artifact_rejects_unreviewed_exports(self) -> None:
+        directory = self.make_node_artifact()
+        tarball = next(directory.glob("*.tgz"))
+        replacement = directory / "replacement.tgz"
+        with tarfile.open(tarball, "r:gz") as source, tarfile.open(replacement, "w:gz") as target:
+            for member in source.getmembers():
+                extracted = source.extractfile(member) if member.isfile() else None
+                if member.name == "package/package.json":
+                    package = json.loads(extracted.read())
+                    package["exports"]["./internal"] = {"import": "./dist/internal.js"}
+                    self.add_tar_text(target, member.name, json.dumps(package))
+                else:
+                    target.addfile(member, extracted)
+        tarball.unlink()
+        replacement.rename(tarball)
+        with self.assertRaisesRegex(ArtifactError, "unsupported entry points"):
+            inspect_node(directory, "0.1.0-alpha.2", smoke=False)
 
     def test_node_artifact_rejects_development_files(self) -> None:
         report = inspect_node(self.make_node_artifact(), "0.1.0-alpha.2", smoke=False)
