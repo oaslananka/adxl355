@@ -192,6 +192,23 @@ Grant the dedicated runner account narrow group/udev access to the selected node
 Do not solve persistent permission problems by running the entire GitHub runner as
 root.
 
+## Current recorded evidence
+
+A manual SPI integration run succeeded on Raspberry Pi 5 against commit
+`4505385518dc62522888560700dc12cb2c8d0467`:
+
+- workflow run: [30725059679](https://github.com/oaslananka/adxl355/actions/runs/30725059679);
+- transport and device: SPI Mode 0 on `/dev/spidev0.0` at 1 MHz;
+- identity: `DEVID_AD=0xAD`, `DEVID_MST=0x1D`, `PARTID=0xED`;
+- revision: `0x01`;
+- samples: 32 captured and 32 unique;
+- restore state: standby, ±2 g, default ODR.
+
+This result proves the integrated SPI path and runner setup. It is not the final
+release-candidate evidence because documentation and governance changes may move
+the candidate commit. A successful I2C run is still pending. Before publication,
+run both transports against the same final release-candidate SHA.
+
 ## Release evidence policy
 
 A production-ready claim requires recent successful HIL evidence for both a Linux

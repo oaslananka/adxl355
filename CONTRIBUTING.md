@@ -20,9 +20,9 @@ This project follows a [Code of Conduct](CODE_OF_CONDUCT.md). Please be respectf
 ### Prerequisites
 
 - CMake >= 3.14 (C/C++ builds)
-- Python >= 3.9 (Python package)
+- Python >= 3.10 (Python package)
 - Rust toolchain (Rust crate)
-- Node.js >= 18 (npm package)
+- Node.js 22 or >= 24 (npm package; CI covers 22, 24, and 26)
 - Go >= 1.21 (Go module)
 
 ### Testing
@@ -33,7 +33,7 @@ See [docs/testing.md](docs/testing.md) for full testing instructions.
 
 - C: C99, no dynamic allocation in core, no global mutable state
 - C++: C++17, RAII, thin wrapper over C core
-- Python: Python 3.9+, type hints, ruff linting, mypy strict
+- Python: Python 3.10+, type hints, Ruff linting, strict mypy
 - Rust: no_std compatible, embedded-hal friendly
 - TypeScript: strict mode, ES modules
 - Go: gofmt, standard Go conventions

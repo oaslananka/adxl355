@@ -19,12 +19,12 @@ outside that core is intentionally language-specific.
 
 | Language | Core device API | ODR configuration | FIFO entry count | Linux SPI adapter | Linux I2C adapter | embedded-hal SPI/I2C | Packaging dry run | Physical HIL evidence |
 |---|---|---|---|---|---|---|---|---|
-| C | Yes | Yes | No public method | Example only | No | No | Yes, CMake install/export | Framework available; no recorded pass |
-| C++ | Yes, C wrapper | No | No public method | User `BusInterface` | User `BusInterface` | No | Yes, CMake install/export | Framework available; no recorded pass |
-| Python | Yes | Yes | Yes, count only | Yes, `spidev` | Yes, `smbus2` | No | Yes, sdist/wheel | HIL runner implementation; no recorded pass |
-| Rust | Yes | No | No public method | No Linux-specific adapter | No Linux-specific adapter | Yes | Yes, `cargo package` | Framework available; no recorded pass |
-| Node.js | Yes | No | No public method | User `Transport` | User `Transport` | No | Yes, `npm pack` | Framework available; no recorded pass |
-| Go | Yes | No | No public method | User `Transport` | User `Transport` | No | Module/build checks | Framework available; no recorded pass |
+| C | Yes | Yes | No public method | Example only | No | No | Yes, CMake install/export | No language-specific physical pass |
+| C++ | Yes, C wrapper | No | No public method | User `BusInterface` | User `BusInterface` | No | Yes, CMake install/export | No language-specific physical pass |
+| Python | Yes | Yes | Yes, count only | Yes, `spidev` | Yes, `smbus2` | No | Yes, sdist/wheel | SPI pass on Raspberry Pi 5; I2C pending |
+| Rust | Yes | No | No public method | No Linux-specific adapter | No Linux-specific adapter | Yes | Yes, `cargo package` | No language-specific physical pass |
+| Node.js | Yes | No | No public method | User `Transport` | User `Transport` | No | Yes, `npm pack` | No language-specific physical pass |
+| Go | Yes | No | No public method | User `Transport` | User `Transport` | No | Module/build checks | No language-specific physical pass |
 
 “User transport” means the driver exposes a bus contract but does not ship a
 Linux device adapter for that language. The repository contains buildable package metadata and verification artifacts, but packages are not published by this repository to PyPI, crates.io, npm, or a Go proxy. Intended distribution names are `adxl355` (PyPI), `adxl355-driver` (crates.io, imported as `adxl355`), and `@oaslananka/adxl355` (npm).
@@ -52,10 +52,11 @@ is a procedure, not a callable calibration API.
 
 ## Hardware validation status
 
-The HIL runner and self-hosted workflow are implemented and unit-tested, but no
-successful physical HIL artifact is currently recorded in this repository.
-Wiring, runner setup, supported SPI/I2C settings, diagnostics, and release
-evidence requirements are documented in
+The manual HIL workflow has a successful Raspberry Pi 5 SPI result on `main`
+([run 30725059679](https://github.com/oaslananka/adxl355/actions/runs/30725059679)): the ADXL355 returned revision `0x01` and 32 unique samples. I2C
+physical evidence is still pending. Both SPI and I2C must be rerun against the
+final release-candidate commit before publication. Wiring, runner setup, supported
+bus settings, diagnostics, and evidence requirements are documented in
 [`docs/hardware-testing.md`](docs/hardware-testing.md).
 
 ## Device lifecycle contract
