@@ -9,6 +9,7 @@ import yaml  # type: ignore[import-untyped]
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 CI_WORKFLOW = REPO_ROOT / ".github/workflows/ci.yml"
+PYTHON_LOCK_ROOT = REPO_ROOT / "requirements/python"
 NODE_RISK_ACCEPTANCE = REPO_ROOT / "docs/security/node-dev-dependency-risk.md"
 
 
@@ -20,9 +21,7 @@ class CiQualityGateTests(unittest.TestCase):
     @staticmethod
     def commands(job: dict[str, Any]) -> str:
         return "\n".join(
-            str(step.get("run", ""))
-            for step in job["steps"]
-            if isinstance(step, dict)
+            str(step.get("run", "")) for step in job["steps"] if isinstance(step, dict)
         )
 
     @staticmethod
@@ -56,7 +55,12 @@ class CiQualityGateTests(unittest.TestCase):
             python_job["strategy"]["matrix"]["python-version"],
             ["3.10", "3.11", "3.12"],
         )
-        self.assertIn("setuptools==83.0.0", commands)
+        self.assertIn("requirements/python/ci-test.txt", commands)
+        self.assertIn("requirements/python/ci-quality.txt", commands)
+        quality_lock = (PYTHON_LOCK_ROOT / "ci-quality.txt").read_text()
+        self.assertIn("setuptools==83.0.0", quality_lock)
+        self.assertIn("ruff==0.15.22", quality_lock)
+        self.assertIn("mypy==1.20.2", quality_lock)
         self.assertIn("ruff check", commands)
         self.assertIn("mypy src examples", commands)
         self.assertIn("python -m build --no-isolation", commands)
@@ -70,7 +74,9 @@ class CiQualityGateTests(unittest.TestCase):
     def test_rust_runs_format_hal_lint_docs_and_package_verification(self) -> None:
         commands = self.commands(self.load_jobs()["rust"])
         self.assertIn("cargo fmt --all -- --check", commands)
-        self.assertIn("cargo clippy --no-default-features --features hal -- -D warnings", commands)
+        self.assertIn(
+            "cargo clippy --no-default-features --features hal -- -D warnings", commands
+        )
         self.assertIn("cargo test --doc --all-features", commands)
         self.assertIn("cargo package", commands)
 
@@ -128,7 +134,9 @@ class CiQualityGateTests(unittest.TestCase):
 
         windows_commands = self.commands(jobs["native-windows"])
         self.assertIn('$ErrorActionPreference = "Stop"', windows_commands)
-        self.assertIn("$PSNativeCommandUseErrorActionPreference = $true", windows_commands)
+        self.assertIn(
+            "$PSNativeCommandUseErrorActionPreference = $true", windows_commands
+        )
 
         for job_id in expected:
             checkout = next(
@@ -149,7 +157,6 @@ class CiQualityGateTests(unittest.TestCase):
         self.assertIn("adxl355_c_consumer.exe", script)
         self.assertIn("adxl355_cpp_consumer.exe", script)
         self.assertIn("CMAKE_PREFIX_PATH", script)
-
 
 
 if __name__ == "__main__":

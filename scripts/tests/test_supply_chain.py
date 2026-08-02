@@ -33,21 +33,20 @@ def workflow_commands(job: dict[str, Any]) -> str:
 
 class SupplyChainTests(unittest.TestCase):
     def test_dependabot_groups_and_rate_limits_all_ecosystems(self) -> None:
-        config = load_yaml(DEPENDABOT)
-        updates = config["updates"]
-        ecosystems = {entry["package-ecosystem"]: entry for entry in updates}
-        self.assertEqual(
-            set(ecosystems), {"github-actions", "pip", "cargo", "npm", "gomod"}
-        )
-        expected_directories = {
-            "github-actions": "/",
-            "pip": "/python",
-            "cargo": "/rust",
-            "npm": "/node",
-            "gomod": "/go",
+        updates = load_yaml(DEPENDABOT)["updates"]
+        by_target = {
+            (entry["package-ecosystem"], entry["directory"]): entry for entry in updates
         }
-        for ecosystem, entry in ecosystems.items():
-            self.assertEqual(entry["directory"], expected_directories[ecosystem])
+        expected_targets = {
+            ("github-actions", "/"),
+            ("pip", "/python"),
+            ("pip", "/requirements/python"),
+            ("cargo", "/rust"),
+            ("npm", "/node"),
+            ("gomod", "/go"),
+        }
+        self.assertEqual(set(by_target), expected_targets)
+        for entry in by_target.values():
             self.assertEqual(entry["schedule"]["interval"], "weekly")
             self.assertEqual(entry["schedule"]["timezone"], "Europe/Istanbul")
             self.assertLessEqual(entry["open-pull-requests-limit"], 3)
@@ -60,7 +59,11 @@ class SupplyChainTests(unittest.TestCase):
 
     def test_python_build_backend_uses_patched_setuptools_floor(self) -> None:
         updates = load_yaml(DEPENDABOT)["updates"]
-        pip = next(entry for entry in updates if entry["package-ecosystem"] == "pip")
+        pip = next(
+            entry
+            for entry in updates
+            if entry["package-ecosystem"] == "pip" and entry["directory"] == "/python"
+        )
         ignored = pip.get("ignore", [])
         self.assertFalse(
             any(entry.get("dependency-name") == "setuptools" for entry in ignored)
@@ -70,10 +73,23 @@ class SupplyChainTests(unittest.TestCase):
         self.assertIn('requires-python = ">=3.10"', pyproject)
         self.assertIn('python_version = "3.10"', pyproject)
 
+    def test_python_tool_hash_lock_policy_is_documented(self) -> None:
+        policy = SUPPLY_CHAIN_DOC.read_text(encoding="utf-8")
+        for phrase in (
+            "Hash-locked Python workflow tooling",
+            "requirements/python/",
+            "pip --require-hashes",
+            "scripts/generate_python_locks.py --verify",
+            "--no-build-isolation --no-deps",
+            "No private index or registry credential",
+        ):
+            self.assertIn(phrase, policy)
 
     def test_codeql_write_permission_is_scoped_to_analysis_job(self) -> None:
         workflow = load_yaml(CODEQL)
-        self.assertEqual(workflow["permissions"], {"contents": "read", "packages": "read"})
+        self.assertEqual(
+            workflow["permissions"], {"contents": "read", "packages": "read"}
+        )
         self.assertEqual(
             workflow["jobs"]["analyze"]["permissions"],
             {"contents": "read", "packages": "read", "security-events": "write"},
@@ -96,17 +112,19 @@ class SupplyChainTests(unittest.TestCase):
             {entry["language"] for entry in matrix},
             {"c-cpp", "python", "javascript-typescript", "go"},
         )
-        self.assertEqual(
-            {entry["build_mode"] for entry in matrix}, {"manual", "none"}
-        )
+        self.assertEqual({entry["build_mode"] for entry in matrix}, {"manual", "none"})
         actions = [
             str(step["uses"])
             for step in job["steps"]
             if isinstance(step, dict) and "uses" in step
         ]
-        self.assertTrue(any(action.startswith("github/codeql-action/init@") for action in actions))
         self.assertTrue(
-            any(action.startswith("github/codeql-action/analyze@") for action in actions)
+            any(action.startswith("github/codeql-action/init@") for action in actions)
+        )
+        self.assertTrue(
+            any(
+                action.startswith("github/codeql-action/analyze@") for action in actions
+            )
         )
         commands = workflow_commands(job)
         self.assertIn("cmake -S c", commands)
@@ -128,7 +146,6 @@ class SupplyChainTests(unittest.TestCase):
                     if action.startswith("./"):
                         continue
                     self.assertRegex(action, SHA_PIN, f"{path.name}:{action}")
-
 
     def test_reviewed_action_comments_match_immutable_release_pins(self) -> None:
         expected = {
@@ -185,7 +202,9 @@ class SupplyChainTests(unittest.TestCase):
             },
         )
 
-    def test_release_bundle_has_sbom_high_severity_gate_and_oidc_attestations(self) -> None:
+    def test_release_bundle_has_sbom_high_severity_gate_and_oidc_attestations(
+        self,
+    ) -> None:
         release = load_yaml(RELEASE)
         job = release["jobs"]["release-bundle"]
         steps = job["steps"]
@@ -193,9 +212,13 @@ class SupplyChainTests(unittest.TestCase):
         commands = workflow_commands(job)
         rendered = RELEASE.read_text(encoding="utf-8")
 
-        self.assertTrue(any(action.startswith("anchore/sbom-action@") for action in actions))
+        self.assertTrue(
+            any(action.startswith("anchore/sbom-action@") for action in actions)
+        )
         scan = next(
-            step for step in steps if str(step.get("uses", "")).startswith("anchore/scan-action@")
+            step
+            for step in steps
+            if str(step.get("uses", "")).startswith("anchore/scan-action@")
         )
         self.assertEqual(scan["with"]["severity-cutoff"], "high")
         self.assertTrue(scan["with"]["fail-build"])
@@ -209,7 +232,9 @@ class SupplyChainTests(unittest.TestCase):
         self.assertIn("release.spdx.json", rendered)
         self.assertIn("release-vulnerabilities.json", rendered)
         sbom = next(
-            step for step in steps if str(step.get("uses", "")).startswith("anchore/sbom-action@")
+            step
+            for step in steps
+            if str(step.get("uses", "")).startswith("anchore/sbom-action@")
         )
         self.assertEqual(sbom["with"]["syft-version"], "v1.49.0")
         self.assertEqual(scan["with"]["grype-version"], "v0.116.0")
@@ -218,12 +243,20 @@ class SupplyChainTests(unittest.TestCase):
         self.assertIn("tar -czf", commands)
 
         attestations = [
-            step for step in steps if str(step.get("uses", "")).startswith("actions/attest@")
+            step
+            for step in steps
+            if str(step.get("uses", "")).startswith("actions/attest@")
         ]
         self.assertEqual(len(attestations), 2)
-        self.assertTrue(any("sbom-path" in step.get("with", {}) for step in attestations))
-        self.assertTrue(any("sbom-path" not in step.get("with", {}) for step in attestations))
-        self.assertNotRegex(rendered, r"secrets\.(PYPI|NPM|CARGO|TWINE|REGISTRY).*TOKEN")
+        self.assertTrue(
+            any("sbom-path" in step.get("with", {}) for step in attestations)
+        )
+        self.assertTrue(
+            any("sbom-path" not in step.get("with", {}) for step in attestations)
+        )
+        self.assertNotRegex(
+            rendered, r"secrets\.(PYPI|NPM|CARGO|TWINE|REGISTRY).*TOKEN"
+        )
 
     def test_security_policy_has_private_reporting_and_response_targets(self) -> None:
         text = SECURITY_POLICY.read_text(encoding="utf-8")
@@ -255,7 +288,6 @@ class SupplyChainTests(unittest.TestCase):
         self.assertIn("crates.io", text)
         self.assertIn("Go", text)
 
-
     def test_scorecard_is_bounded_pinned_and_least_privilege(self) -> None:
         workflow = load_yaml(SCORECARD)
         triggers = workflow.get("on", workflow.get(True, {}))
@@ -272,7 +304,9 @@ class SupplyChainTests(unittest.TestCase):
         )
         steps = job["steps"]
         scorecard = next(
-            step for step in steps if str(step.get("uses", "")).startswith("ossf/scorecard-action@")
+            step
+            for step in steps
+            if str(step.get("uses", "")).startswith("ossf/scorecard-action@")
         )
         self.assertEqual(
             scorecard["uses"],
@@ -281,13 +315,17 @@ class SupplyChainTests(unittest.TestCase):
         self.assertEqual(scorecard["with"]["results_format"], "sarif")
         self.assertTrue(scorecard["with"]["publish_results"])
         artifact = next(
-            step for step in steps if str(step.get("uses", "")).startswith("actions/upload-artifact@")
+            step
+            for step in steps
+            if str(step.get("uses", "")).startswith("actions/upload-artifact@")
         )
         self.assertEqual(artifact["with"]["retention-days"], 5)
         upload = next(
             step
             for step in steps
-            if str(step.get("uses", "")).startswith("github/codeql-action/upload-sarif@")
+            if str(step.get("uses", "")).startswith(
+                "github/codeql-action/upload-sarif@"
+            )
         )
         self.assertEqual(upload["with"]["category"], "openssf-scorecard")
 
@@ -299,7 +337,6 @@ class SupplyChainTests(unittest.TestCase):
         self.assertNotIn("~/.pypirc", text)
         self.assertNotIn("npm login", text)
         self.assertNotIn("cargo login", text)
-
 
 
 if __name__ == "__main__":

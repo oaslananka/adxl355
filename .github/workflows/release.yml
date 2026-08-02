@@ -18,6 +18,9 @@ concurrency:
 
 env:
   CARGO_TERM_COLOR: always
+  PIP_CONFIG_FILE: /dev/null
+  PIP_INDEX_URL: https://pypi.org/simple
+  PIP_EXTRA_INDEX_URL: ""
   RELEASE_TAG: ${{ github.event_name == 'push' && github.ref_name || inputs.version }}
 
 jobs:
@@ -95,8 +98,10 @@ jobs:
           PYTHON_VERSION: ${{ needs.preflight.outputs.python_version }}
         run: |
           mkdir -p "$OUT"
-          python -m pip install --disable-pip-version-check "build==1.5.0"
-          python -m build python --outdir "$OUT"
+          python -m pip install --disable-pip-version-check \
+            --require-hashes --no-deps --only-binary=:all: \
+            -r requirements/python/release.txt
+          python -m build --no-isolation python --outdir "$OUT"
           (
             cd "$OUT"
             for artifact in ./*.whl ./*.tar.gz; do

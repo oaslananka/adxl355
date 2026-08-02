@@ -71,6 +71,11 @@ concurrency:
   group: adxl355-hil
   cancel-in-progress: false
 
+env:
+  PIP_CONFIG_FILE: /dev/null
+  PIP_INDEX_URL: https://pypi.org/simple
+  PIP_EXTRA_INDEX_URL: ""
+
 jobs:
   hil:
     name: ADXL355 HIL (${{ inputs.transport }})
@@ -109,16 +114,30 @@ jobs:
           python3 -m venv "$RUNNER_TEMP/adxl355-hil-venv"
           echo "$RUNNER_TEMP/adxl355-hil-venv/bin" >> "$GITHUB_PATH"
 
+      - name: Install hash-locked build tools
+        run: >
+          python -m pip install --disable-pip-version-check
+          --require-hashes --no-deps --only-binary=:all:
+          -r requirements/python/hil-build.txt
+
       - name: Install local driver
-        run: python -m pip install --disable-pip-version-check --no-deps -e ./python
+        run: >
+          python -m pip install --disable-pip-version-check
+          --no-build-isolation --no-deps -e ./python
 
-      - name: Install SPI adapter
+      - name: Install hash-locked SPI adapter
         if: inputs.transport == 'spi'
-        run: python -m pip install --disable-pip-version-check spidev==3.8
+        run: >
+          python -m pip install --disable-pip-version-check
+          --require-hashes --no-build-isolation --no-deps
+          -r requirements/python/hil-spi.txt
 
-      - name: Install I2C adapter
+      - name: Install hash-locked I2C adapter
         if: inputs.transport == 'i2c'
-        run: python -m pip install --disable-pip-version-check smbus2==0.6.1
+        run: >
+          python -m pip install --disable-pip-version-check
+          --require-hashes --no-deps --only-binary=:all:
+          -r requirements/python/hil-i2c.txt
 
       - name: Run SPI HIL sequence
         if: inputs.transport == 'spi'

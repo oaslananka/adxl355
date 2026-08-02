@@ -9,6 +9,7 @@ import yaml
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 RELEASE_WORKFLOW = REPO_ROOT / ".github/workflows/release.yml"
+RELEASE_LOCK = REPO_ROOT / "requirements/python/release.txt"
 CI_WORKFLOW = REPO_ROOT / ".github/workflows/ci.yml"
 PACKAGE_JOBS = {
     "python-package",
@@ -60,7 +61,10 @@ class ReleaseWorkflowTests(unittest.TestCase):
 
     def test_dependency_installation_is_pinned_and_script_safe(self) -> None:
         text = RELEASE_WORKFLOW.read_text()
-        self.assertIn("build==1.5.0", text)
+        self.assertIn("requirements/python/release.txt", text)
+        self.assertIn("--require-hashes", text)
+        self.assertIn("python -m build --no-isolation", text)
+        self.assertIn("build==1.5.0", RELEASE_LOCK.read_text())
         self.assertIn("npm ci --ignore-scripts", text)
         self.assertNotIn("--github-output", text)
 
@@ -106,15 +110,15 @@ class ReleaseWorkflowTests(unittest.TestCase):
     def test_every_package_artifact_is_inspected_and_smoke_tested(self) -> None:
         jobs = self.load_release()["jobs"]
         for job_name in PACKAGE_JOBS:
-            commands = "\n".join(str(step.get("run", "")) for step in jobs[job_name]["steps"])
+            commands = "\n".join(
+                str(step.get("run", "")) for step in jobs[job_name]["steps"]
+            )
             self.assertIn("scripts/release_artifacts.py", commands, job_name)
             self.assertNotIn("--no-smoke", commands, job_name)
         rust_commands = "\n".join(
             str(step.get("run", "")) for step in jobs["rust-package"]["steps"]
         )
         self.assertIn("adxl355-driver-${VERSION}.crate", rust_commands)
-
-
 
     def test_release_enforces_and_uploads_package_size_evidence(self) -> None:
         text = RELEASE_WORKFLOW.read_text()
