@@ -53,6 +53,16 @@ target_include_directories(adxl355_cpp INTERFACE
 )
 target_link_libraries(adxl355_cpp INTERFACE adxl355::adxl355)
 
+add_library(adxl355_cpp_noexcept INTERFACE)
+add_library(adxl355::cpp_noexcept ALIAS adxl355_cpp_noexcept)
+set_target_properties(adxl355_cpp_noexcept PROPERTIES EXPORT_NAME cpp_noexcept)
+target_include_directories(adxl355_cpp_noexcept INTERFACE
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:include>
+)
+target_compile_definitions(adxl355_cpp_noexcept INTERFACE ADXL355_CPP_NO_EXCEPTIONS=1)
+target_link_libraries(adxl355_cpp_noexcept INTERFACE adxl355::adxl355)
+
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     add_compile_options(
         -Wall -Wextra -Wpedantic -Wshadow -Wconversion -Wsign-conversion
@@ -91,7 +101,7 @@ write_basic_package_version_file(
     COMPATIBILITY SameMajorVersion
 )
 
-install(TARGETS adxl355_cpp EXPORT adxl355-cpp-targets)
+install(TARGETS adxl355_cpp adxl355_cpp_noexcept EXPORT adxl355-cpp-targets)
 install(DIRECTORY include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 install(EXPORT adxl355-cpp-targets
     FILE adxl355-cpp-targets.cmake

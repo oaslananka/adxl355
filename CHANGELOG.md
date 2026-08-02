@@ -48,6 +48,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Required bounded C libFuzzer and deterministic Python/release-tool mutation smoke with sanitizer coverage and short-lived failure reproducers.
 - Added reviewed SHA-256 lock groups for Python CI, release, and HIL tooling, an offline policy verifier, deterministic PyPI hash regeneration, and a rate-limited Dependabot update path.
 - Added source-derived public API references for all six maintained languages, required drift verification, completed public C error documentation, and an accessible MIT-licensed Raspberry Pi 5 SPI wiring diagram.
+- Added C++ ODR configuration, an installed no-exception `Status`/`Result<T>` target, a thin Arduino SPI adapter, command-scoped hash-locked PlatformIO tooling without its vulnerable web/server stack, and a required Arduino Uno package/compile fixture.
 - Grouped weekly Dependabot updates for GitHub Actions, Python, Rust, Node.js,
   and Go, plus primary CodeQL analysis for C/C++, Python, JavaScript/TypeScript,
   and Go.

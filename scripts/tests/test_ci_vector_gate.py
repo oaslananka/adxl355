@@ -32,6 +32,7 @@ class VectorGateWorkflowTests(unittest.TestCase):
                 "rust",
                 "node",
                 "go",
+                "embedded",
                 "fuzz",
             },
         )

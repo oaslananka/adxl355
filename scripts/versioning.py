@@ -24,6 +24,8 @@ CPP_CMAKE_PATH = "cpp/CMakeLists.txt"
 VECTOR_SPEC_PATH = "spec/test_vectors.json"
 VERSION_HEADER_PATH = "c/include/adxl355/adxl355_version.h"
 CHANGELOG_PATH = "CHANGELOG.md"
+PLATFORMIO_MANIFEST_PATH = "library.json"
+ARDUINO_MANIFEST_PATH = "library.properties"
 
 
 SEMVER = re.compile(
@@ -107,6 +109,7 @@ def _current_values(root: Path) -> dict[str, str]:
     node_package = json.loads((root / NODE_PACKAGE_PATH).read_text())
     node_lock = json.loads((root / NODE_LOCK_PATH).read_text())
     vectors = json.loads((root / VECTOR_SPEC_PATH).read_text())
+    platformio_manifest = json.loads((root / PLATFORMIO_MANIFEST_PATH).read_text())
 
     rust_package = next(
         (
@@ -124,6 +127,7 @@ def _current_values(root: Path) -> dict[str, str]:
     header = (root / VERSION_HEADER_PATH).read_text()
     runtime = (root / PYTHON_RUNTIME_PATH).read_text()
     changelog = (root / CHANGELOG_PATH).read_text()
+    arduino_manifest = (root / ARDUINO_MANIFEST_PATH).read_text()
 
     def require(text: str, pattern: str, label: str) -> str:
         match = re.search(pattern, text, flags=re.MULTILINE)
@@ -140,7 +144,9 @@ def _current_values(root: Path) -> dict[str, str]:
         RUST_LOCK_PATH: str(rust_package["version"]),
         NODE_PACKAGE_PATH: str(node_package["version"]),
         NODE_LOCK_PATH: str(node_lock["version"]),
-        'node/package-lock.json packages[""]': str(node_lock["packages"][""]["version"]),
+        'node/package-lock.json packages[""]': str(
+            node_lock["packages"][""]["version"]
+        ),
         C_CMAKE_PATH: require(
             c_text,
             r"project\(adxl355\s+VERSION\s+([^\s\)]+)",
@@ -165,6 +171,12 @@ def _current_values(root: Path) -> dict[str, str]:
             for name in ("MAJOR", "MINOR", "PATCH")
         ),
         VECTOR_SPEC_PATH: str(vectors["version"]),
+        PLATFORMIO_MANIFEST_PATH: str(platformio_manifest["version"]),
+        ARDUINO_MANIFEST_PATH: require(
+            arduino_manifest,
+            r"^version=([^\s]+)$",
+            "Arduino library version",
+        ),
         "CHANGELOG.md Unreleased": require(
             changelog,
             r"^## \[([^\]]+)\] - Unreleased$",
@@ -187,6 +199,8 @@ def _expected_values(version: VersionSet) -> dict[str, str]:
         "c/include/adxl355/adxl355_version.h string": version.semver,
         "c/include/adxl355/adxl355_version.h components": version.core,
         VECTOR_SPEC_PATH: version.semver,
+        PLATFORMIO_MANIFEST_PATH: version.semver,
+        ARDUINO_MANIFEST_PATH: version.semver,
         "CHANGELOG.md Unreleased": version.semver,
     }
 
@@ -285,6 +299,21 @@ def _write_versions(root: Path, version: VersionSet) -> None:
         )
     )
 
+    platformio = root / PLATFORMIO_MANIFEST_PATH
+    platformio_data = json.loads(platformio.read_text())
+    platformio_data["version"] = version.semver
+    platformio.write_text(json.dumps(platformio_data, indent=2) + "\n")
+
+    arduino = root / ARDUINO_MANIFEST_PATH
+    arduino.write_text(
+        _replace_once(
+            arduino.read_text(),
+            r"^(version=)[^\s]+$",
+            rf"\g<1>{version.semver}",
+            str(arduino),
+        )
+    )
+
     changelog = root / CHANGELOG_PATH
     changelog.write_text(
         _replace_once(
@@ -318,8 +347,12 @@ def sync_versions(root: Path, *, write: bool) -> list[str]:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parents[1])
-    parser.add_argument("--write", action="store_true", help="Update declarations in place")
+    parser.add_argument(
+        "--root", type=Path, default=Path(__file__).resolve().parents[1]
+    )
+    parser.add_argument(
+        "--write", action="store_true", help="Update declarations in place"
+    )
     args = parser.parse_args(argv)
 
     try:

@@ -7,7 +7,7 @@ These compact references are generated from repository public declarations. They
 | Language | Reference | Public declarations | Capability summary |
 |---|---|---:|---|
 | C | [c.md](c.md) | 59 | Core lifecycle, range, ODR, raw/converted reads, temperature, status, signed offsets, calibration helpers, and bounded self-test response. |
-| C++ | [cpp.md](cpp.md) | 26 | RAII wrapper over the C core for probe, reset, range, power mode, raw/converted reads, temperature, status, and stateless conversions. |
+| C++ | [cpp.md](cpp.md) | 77 | Owning exception and stack-owned no-exception wrappers over the C core for probe, reset, range, ODR, power mode, raw/converted reads, temperature, status, and stateless conversions; thin Arduino SPI compile integration. |
 | Python | [python.md](python.md) | 121 | Core lifecycle, range, ODR, FIFO entry count, raw/converted reads, temperature, status, signed offsets, calibration helpers, bounded self-test response, and Linux SPI/I2C adapters. |
 | Rust | [rust.md](rust.md) | 107 | Core lifecycle, range, power mode, raw/converted reads, temperature, status, stateless conversions, and optional embedded-hal SPI/I2C adapters. |
 | Node.js / TypeScript | [node.md](node.md) | 54 | Typed transport-agnostic core lifecycle, range, power mode, raw/converted reads, temperature, status, and stateless conversions. |

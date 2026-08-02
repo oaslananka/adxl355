@@ -55,11 +55,16 @@ LANGUAGES: Final = (
     LanguageReference(
         "cpp",
         "C++ API",
-        "CMake target `adxl355::cpp`",
-        ("cpp/include/adxl355/adxl355.hpp",),
-        "cmake -S cpp -B build/cpp -DCMAKE_PREFIX_PATH=build/c-core && cmake --build build/cpp",
-        "RAII wrapper over the C core for probe, reset, range, power mode, raw/converted reads, temperature, status, and stateless conversions.",
-        "The wrapper does not currently expose C ODR, offset, calibration, self-test, FIFO, or interrupt methods.",
+        "CMake targets `adxl355::cpp` and `adxl355::cpp_noexcept`; root Arduino/PlatformIO package",
+        (
+            "cpp/include/adxl355/adxl355.hpp",
+            "embedded/arduino/include/adxl355/arduino_spi.hpp",
+            "embedded/README.md",
+            "library.json",
+        ),
+        "cmake -S cpp -B build/cpp -DCMAKE_PREFIX_PATH=build/c-core && cmake --build build/cpp; pio run -d embedded/platformio/uno",
+        "Owning exception and stack-owned no-exception wrappers over the C core for probe, reset, range, ODR, power mode, raw/converted reads, temperature, status, and stateless conversions; thin Arduino SPI compile integration.",
+        "No public offset, calibration, self-test, FIFO, or interrupt wrapper. Arduino Uno support is compile-only and does not claim physical hardware validation or unbuilt boards/frameworks.",
     ),
     LanguageReference(
         "python",

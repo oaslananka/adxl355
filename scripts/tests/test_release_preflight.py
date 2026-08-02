@@ -29,6 +29,8 @@ FIXTURE_FILES = (
     "cpp/CMakeLists.txt",
     "c/include/adxl355/adxl355_version.h",
     "spec/test_vectors.json",
+    "library.json",
+    "library.properties",
     "go/go.mod",
 )
 
@@ -71,22 +73,33 @@ class ReleasePreflightTests(unittest.TestCase):
         release = parse_release_tag("v0.1.0-alpha.2")
         errors = validate_versions(release, collect_version_sources(root))
 
-        self.assertTrue(any("node/package.json" in error and "0.1.1" in error for error in errors))
+        self.assertTrue(
+            any("node/package.json" in error and "0.1.1" in error for error in errors)
+        )
 
     def test_python_pep440_version_is_required_for_prerelease(self) -> None:
         root = self.make_fixture()
         path = root / "python/pyproject.toml"
-        path.write_text(path.read_text().replace('version = "0.1.0a2"', 'version = "0.1.0-alpha.2"'))
+        path.write_text(
+            path.read_text().replace('version = "0.1.0a2"', 'version = "0.1.0-alpha.2"')
+        )
 
         release = parse_release_tag("v0.1.0-alpha.2")
         errors = validate_versions(release, collect_version_sources(root))
-        self.assertTrue(any("python/pyproject.toml" in error and "0.1.0a2" in error for error in errors))
+        self.assertTrue(
+            any(
+                "python/pyproject.toml" in error and "0.1.0a2" in error
+                for error in errors
+            )
+        )
         self.assertFalse(any("c/CMakeLists.txt" in error for error in errors))
 
     def test_package_identity_mismatch_is_rejected(self) -> None:
         root = self.make_fixture()
         path = root / "rust/Cargo.toml"
-        path.write_text(path.read_text().replace('name = "adxl355-driver"', 'name = "adxl355"', 1))
+        path.write_text(
+            path.read_text().replace('name = "adxl355-driver"', 'name = "adxl355"', 1)
+        )
         with self.assertRaisesRegex(ValueError, "package name"):
             collect_version_sources(root)
 
@@ -94,7 +107,9 @@ class ReleasePreflightTests(unittest.TestCase):
         root = Path(tempfile.mkdtemp(prefix="adxl355-release-git-"))
         self.addCleanup(shutil.rmtree, root)
         subprocess.run(["git", "init", "-q"], cwd=root, check=True)
-        subprocess.run(["git", "config", "user.name", "Release Test"], cwd=root, check=True)
+        subprocess.run(
+            ["git", "config", "user.name", "Release Test"], cwd=root, check=True
+        )
         subprocess.run(
             ["git", "config", "user.email", "release-test@example.invalid"],
             cwd=root,

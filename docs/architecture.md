@@ -95,7 +95,7 @@ are:
 
 | C | C++ | Python | Rust | Node.js | Go |
 |---|---|---|---|---|---|
-| `ADXL355_ERR_STATE` | `InvalidStateError` | `DeviceStateError` | `Error::InvalidState` | `DeviceStateError` | `ErrInvalidState` |
+| `ADXL355_ERR_STATE` | `InvalidStateError` / `Status::InvalidState` | `DeviceStateError` | `Error::InvalidState` | `DeviceStateError` | `ErrInvalidState` |
 
 ### Standby Configuration Guard
 
@@ -114,11 +114,34 @@ a bus error, hardware remains in standby, and the cache retains the successfully
 written target value so software and hardware remain consistent.
 
 The guard applies to `set_range` in every implementation and to the public
-ODR/filter configuration APIs currently provided by C and Python. Other methods
+ODR/filter configuration APIs currently provided by C, C++, and Python. Other methods
 and adapter coverage are not assumed to be identical across languages; see the
 root feature matrix. Explicit
 power-mode changes are not wrapped by the guard because changing that mode is the
 operation requested by the caller.
+
+## C++ hosted and embedded ownership models
+
+The C++ package remains a thin wrapper over the C core and provides two explicit
+error/ownership models:
+
+- `adxl355::Device` owns a `std::unique_ptr<BusInterface>` and maps stable C
+  statuses to typed C++ exceptions for hosted applications.
+- `adxl355::NoexceptDevice` borrows a caller-owned `BusInterface`, is non-copyable
+  and non-movable, performs no dynamic allocation, and returns `Status` or
+  `Result<T>`. The installed `adxl355::cpp_noexcept` target defines
+  `ADXL355_CPP_NO_EXCEPTIONS` and is compiled in tests with exceptions and RTTI
+  disabled.
+
+Both wrappers call the same C lifecycle, range, ODR, read, and conversion
+functions. They do not duplicate register constants or formulas. The Arduino
+layer adds only a Mode 0 `SPIClass` bus adapter and forwarding headers; its bridge
+compiles the authoritative `c/src/adxl355.c` once.
+
+The representative embedded build is Arduino Uno with PlatformIO Core 6.1.19 and
+`atmelavr@5.3.0`. It is a required GitHub-hosted compile/package fixture, not a
+physical hardware test. Boards, frameworks, interrupt behavior, and electrical
+fixtures not built or measured here remain unsupported claims.
 
 ## Exact Transport Contract
 

@@ -182,6 +182,21 @@ void test_cpp_range_configuration_restores_measurement() {
          "C++ range configuration updates range");
 }
 
+void test_cpp_odr_configuration_restores_measurement() {
+    auto bus = std::make_unique<MockBus>();
+    auto *mock = bus.get();
+    adxl355::Device dev(std::move(bus));
+    dev.probe();
+    mock->regs[ADXL355_REG_POWER_CTL] = ADXL355_POWER_MEASUREMENT;
+    mock->regs[ADXL355_REG_FILTER] = 0xA0U;
+
+    dev.setOdr(adxl355::Odr::Hz125);
+    TEST(mock->regs[ADXL355_REG_POWER_CTL] == ADXL355_POWER_MEASUREMENT,
+         "C++ ODR configuration restores measurement mode");
+    TEST(mock->regs[ADXL355_REG_FILTER] == 0x25U,
+         "C++ ODR configuration preserves documented FILTER HPF bits");
+}
+
 void test_set_range_preserves_unrelated_bits() {
     auto bus = std::make_unique<MockBus>();
     auto *mock = bus.get();
@@ -273,6 +288,7 @@ int main() {
     test_reset_restores_2g_range();
     test_pre_probe_calls_throw_invalid_state();
     test_cpp_range_configuration_restores_measurement();
+    test_cpp_odr_configuration_restores_measurement();
     test_cpp_short_read_throws_bus_error();
     test_set_range_preserves_unrelated_bits();
     test_set_range_read_error_prevents_write();

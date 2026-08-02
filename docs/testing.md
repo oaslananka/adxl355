@@ -165,9 +165,10 @@ All language suites verify the same device-state behavior:
 | `TR-9-ZERO`, `TR-9-TRUNCATED` | 9 | 0, 8 |
 
 C, Python, Rust, Node.js, and Go execute the same behavioral checklist. C++ verifies
-the C core mapping through its exception wrapper. Tests additionally inject native
-read/write failures and require the stable driver-level bus error rather than an
-index exception, panic, or fabricated numeric result.
+the C core mapping through both the owning exception wrapper and the stack-owned
+no-exception wrapper. Tests additionally inject native read/write failures and
+require the stable driver-level bus error/status rather than an index exception,
+panic, or fabricated numeric result.
 
 ## Generated API references
 
@@ -185,6 +186,36 @@ The required `Cross-language Consistency` job runs verification. Native HTML or
 terminal documentation remains transient: use each reference page's documented
 `cargo doc`, `pydoc`, TypeScript build, CMake, or `go doc` command when richer
 language-native output is needed.
+
+## Embedded C++ compile gate
+
+`Embedded (Arduino Uno)` is a required GitHub-hosted job. It installs PlatformIO
+Core from `requirements/python/platformio.txt` with SHA-256 enforcement, packs the
+root Arduino library, checks that only reviewed source/package files are exported,
+and compiles `embedded/platformio/uno` with exceptions disabled.
+
+The fixture pins `atmelavr@5.3.0`, Arduino Uno, and the Arduino framework. It proves
+package layout, the thin Mode 0 SPI adapter, AVR C++11 compatibility, and reuse of
+the authoritative C core. Its 16-package PlatformIO environment deliberately
+omits the vulnerable web/server dependency stack and supports only version, pack,
+and build commands. It does not access the Raspberry Pi HIL runner, secrets, or
+physical hardware, and it does not claim compatibility for unbuilt boards,
+frameworks, PlatformIO Home, or remote/server commands.
+
+Local reproduction:
+
+```bash
+python3 -m venv .venv-platformio
+. .venv-platformio/bin/activate
+export PIP_CONFIG_FILE=/dev/null
+export PIP_INDEX_URL=https://pypi.org/simple
+export PIP_EXTRA_INDEX_URL=
+python -m pip install --require-hashes --no-deps --only-binary=:all: \
+  -r requirements/python/platformio.txt
+PLATFORMIO_CORE_DIR="$PWD/.platformio" pio pkg pack . \
+  --output /tmp/adxl355-arduino.tar.gz
+PLATFORMIO_CORE_DIR="$PWD/.platformio" pio run -d embedded/platformio/uno
+```
 
 ## Required CI Quality Gates
 

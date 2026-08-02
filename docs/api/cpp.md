@@ -2,22 +2,25 @@
 
 # C++ API
 
-**Package:** CMake target `adxl355::cpp`
+**Package:** CMake targets `adxl355::cpp` and `adxl355::cpp_noexcept`; root Arduino/PlatformIO package
 
 ## Capability boundary
 
-RAII wrapper over the C core for probe, reset, range, power mode, raw/converted reads, temperature, status, and stateless conversions.
+Owning exception and stack-owned no-exception wrappers over the C core for probe, reset, range, ODR, power mode, raw/converted reads, temperature, status, and stateless conversions; thin Arduino SPI compile integration.
 
-**Not exposed:** The wrapper does not currently expose C ODR, offset, calibration, self-test, FIFO, or interrupt methods.
+**Not exposed:** No public offset, calibration, self-test, FIFO, or interrupt wrapper. Arduino Uno support is compile-only and does not claim physical hardware validation or unbuilt boards/frameworks.
 
 ## Authoritative sources
 
 - [`$cpp/include/adxl355/adxl355.hpp`](../../cpp/include/adxl355/adxl355.hpp)
+- [`$embedded/arduino/include/adxl355/arduino_spi.hpp`](../../embedded/arduino/include/adxl355/arduino_spi.hpp)
+- [`$embedded/README.md`](../../embedded/README.md)
+- [`$library.json`](../../library.json)
 
 ## Native documentation command
 
 ```bash
-cmake -S cpp -B build/cpp -DCMAKE_PREFIX_PATH=build/c-core && cmake --build build/cpp
+cmake -S cpp -B build/cpp -DCMAKE_PREFIX_PATH=build/c-core && cmake --build build/cpp; pio run -d embedded/platformio/uno
 ```
 
 ## Public declarations
@@ -34,13 +37,16 @@ DeviceNotFoundError:class DeviceNotFoundError : public Error
 Error:class Error : public std::runtime_error
 InvalidArgumentError:class InvalidArgumentError : public Error
 InvalidStateError:class InvalidStateError : public Error
+NoexceptDevice:class NoexceptDevice
 ```
 
 ### Enum
 
 ```text
+Odr:enum class Odr : uint8_t:{Hz4000 = ADXL355_ODR_4000_HZ, Hz2000 = ADXL355_ODR_2000_HZ, Hz1000 = ADXL355_ODR_1000_HZ, Hz500 = ADXL355_ODR_500_HZ, Hz250 = ADXL355_ODR_250_HZ, Hz125 = ADXL355_ODR_125_HZ, Hz62_5 = ADXL355_ODR_62_5_HZ, Hz31_25 = ADXL355_ODR_31_25_HZ, Hz15_625 = ADXL355_ODR_15_625_HZ, Hz7_813 = ADXL355_ODR_7_813_HZ, Hz3_906 = ADXL355_ODR_3_906_HZ,}
 PowerMode:enum class PowerMode : uint8_t:{Standby = ADXL355_POWER_STANDBY, Measurement = ADXL355_POWER_MEASUREMENT,}
 Range:enum class Range : uint8_t:{G2 = ADXL355_RANGE_2G, G4 = ADXL355_RANGE_4G, G8 = ADXL355_RANGE_8G,}
+Status:enum class Status : int:{Ok = ADXL355_OK, Null = ADXL355_ERR_NULL, Bus = ADXL355_ERR_BUS, Timeout = ADXL355_ERR_TIMEOUT, InvalidArgument = ADXL355_ERR_INVALID_ARG, BadDevice = ADXL355_ERR_BAD_DEVICE, NotReady = ADXL355_ERR_NOT_READY, Unsupported = ADXL355_ERR_UNSUPPORTED, InvalidState = ADXL355_ERR_STATE, Threshold = ADXL355_ERR_THRESHOLD, Restore = ADXL355_ERR_RESTORE,}
 ```
 
 ### Member
@@ -49,18 +55,65 @@ Range:enum class Range : uint8_t:{G2 = ADXL355_RANGE_2G, G4 = ADXL355_RANGE_4G, 
 AccelXYZ:float x;
 AccelXYZ:float y;
 AccelXYZ:float z;
+BusError:explicit BusError(const std::string &msg = "Bus communication error")
 BusInterface:virtual int read(void *ctx, uint8_t reg, uint8_t *data, size_t len) = 0;
 BusInterface:virtual int write(void *ctx, uint8_t reg, const uint8_t *data, size_t len) = 0;
 BusInterface:virtual void delayMs(void *ctx, uint32_t ms) = 0;
 BusInterface:virtual ~BusInterface() = default;
+Device:AccelXYZ readG()
+Device:AccelXYZ readMps2()
+Device:Device &operator=(Device &&) = delete;
 Device:Device &operator=(const Device &) = delete;
-Device:Device(Device &&other) noexcept : dev_(other.dev_), bus_iface_(std::move(other.bus_iface_)) { dev_.bus.ctx = this; } ~Device() = default;
-Device:explicit Device(std::unique_ptr<BusInterface> bus_iface) : bus_iface_(std::move(bus_iface)) { adxl355_bus_t bus; bus.read = bus_thunk_read; bus.write = bus_thunk_write; bus.delay_ms = bus_thunk_delay; bus.ctx = this; check(adxl355_init(&dev_, &bus), "init"); } Device(const Device &) = delete;
-Device:std::unique_ptr<BusInterface> bus_iface_;
-Device:void probe() { check(adxl355_probe(&dev_), "probe"); } void reset() { check(adxl355_reset(&dev_), "reset"); } void setRange(Range range) { check(adxl355_set_range(&dev_, static_cast<adxl355_range_t>(range)), "set_range"); } Range getRange() { adxl355_range_t r; check(adxl355_get_range(&dev_, &r), "get_range"); return static_cast<Range>(r); } void setPowerMode(PowerMode mode) { check(adxl355_set_power_mode(&dev_, static_cast<adxl355_power_mode_t>(mode)), "set_power_mode"); } RawXYZ readRaw() { adxl355_raw_xyz_t raw; check(adxl355_read_raw(&dev_, &raw), "read_raw"); return {raw.x, raw.y, raw.z}; } AccelXYZ readG() { adxl355_float_xyz_t accel; check(adxl355_read_g(&dev_, &accel), "read_g"); return {accel.x, accel.y, accel.z}; } AccelXYZ readMps2() { adxl355_float_xyz_t accel; check(adxl355_read_mps2(&dev_, &accel), "read_mps2"); return {accel.x, accel.y, accel.z}; } float readTemperatureC() { float t; check(adxl355_read_temperature_c(&dev_, &t), "read_temperature_c"); return t; } uint8_t readStatus() { uint8_t s; check(adxl355_read_status(&dev_, &s), "read_status"); return s; } static int32_t decodeRaw20(uint8_t b0, uint8_t b1, uint8_t b2) { return adxl355_decode_raw20(b0, b1, b2); } static float rawToG(int32_t raw, Range range) { return adxl355_raw_to_g(raw, static_cast<adxl355_range_t>(range)); } static float rawToMps2(int32_t raw, Range range) { return adxl355_raw_to_mps2(raw, static_cast<adxl355_range_t>(range)); } static const char *statusString(int status) { return adxl355_status_string(static_cast<adxl355_status_t>(status)); } private: adxl355_t dev_{};
+Device:Device(Device &&other) noexcept
+Device:Device(const Device &) = delete;
+Device:Range getRange()
+Device:RawXYZ readRaw()
+Device:explicit Device(std::unique_ptr<BusInterface> bus_iface)
+Device:float readTemperatureC()
+Device:static const char *statusString(int status)
+Device:static float rawToG(int32_t raw, Range range)
+Device:static float rawToMps2(int32_t raw, Range range)
+Device:static int32_t decodeRaw20(uint8_t b0, uint8_t b1, uint8_t b2)
+Device:uint8_t readStatus()
+Device:void probe()
+Device:void reset()
+Device:void setOdr(Odr odr)
+Device:void setPowerMode(PowerMode mode)
+Device:void setRange(Range range)
+Device:~Device() = default;
+DeviceNotFoundError:explicit DeviceNotFoundError(const std::string &msg = "Device not found")
+InvalidArgumentError:explicit InvalidArgumentError(const std::string &msg = "Invalid argument")
+InvalidStateError:explicit InvalidStateError(const std::string &msg = "Invalid device state")
+NoexceptDevice:NoexceptDevice &operator=(NoexceptDevice &&) = delete;
+NoexceptDevice:NoexceptDevice &operator=(const NoexceptDevice &) = delete;
+NoexceptDevice:NoexceptDevice(NoexceptDevice &&) = delete;
+NoexceptDevice:NoexceptDevice(const NoexceptDevice &) = delete;
+NoexceptDevice:Result<AccelXYZ> readG() noexcept
+NoexceptDevice:Result<AccelXYZ> readMps2() noexcept
+NoexceptDevice:Result<Range> getRange() noexcept
+NoexceptDevice:Result<RawXYZ> readRaw() noexcept
+NoexceptDevice:Result<float> readTemperatureC() noexcept
+NoexceptDevice:Result<uint8_t> readStatus() noexcept
+NoexceptDevice:Status initStatus() const noexcept
+NoexceptDevice:Status probe() noexcept
+NoexceptDevice:Status reset() noexcept
+NoexceptDevice:Status setOdr(Odr odr) noexcept
+NoexceptDevice:Status setPowerMode(PowerMode mode) noexcept
+NoexceptDevice:Status setRange(Range range) noexcept
+NoexceptDevice:explicit NoexceptDevice(BusInterface &bus_iface) noexcept
+NoexceptDevice:static float rawToG(int32_t raw, Range range) noexcept
+NoexceptDevice:static float rawToMps2(int32_t raw, Range range) noexcept
+NoexceptDevice:static int32_t decodeRaw20(uint8_t b0, uint8_t b1, uint8_t b2) noexcept
+NoexceptDevice:~NoexceptDevice() = default;
 RawXYZ:int32_t x;
 RawXYZ:int32_t y;
 RawXYZ:int32_t z;
+Result:Status status;
+Result:T value;
+Result:constexpr Result() noexcept
+Result:constexpr Result(Status result_status, const T &result_value) noexcept
+Result:constexpr bool ok() const noexcept
+Result:constexpr explicit operator bool() const noexcept
 ```
 
 ### Struct
@@ -68,4 +121,5 @@ RawXYZ:int32_t z;
 ```text
 AccelXYZ:struct AccelXYZ
 RawXYZ:struct RawXYZ
+Result:struct Result
 ```

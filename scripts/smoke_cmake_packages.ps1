@@ -37,5 +37,6 @@ cmake -S (Join-Path $RepoRoot "cmake/smoke/cpp") -B (Join-Path $BuildRoot "cpp-c
     "-DCMAKE_PREFIX_PATH=$Prefix"
 cmake --build (Join-Path $BuildRoot "cpp-consumer") --config Release --parallel
 & (Join-Path $BuildRoot "cpp-consumer/Release/adxl355_cpp_consumer.exe")
+& (Join-Path $BuildRoot "cpp-consumer/Release/adxl355_cpp_noexcept_consumer.exe")
 
 Write-Host "C and C++ install/export smoke tests passed"

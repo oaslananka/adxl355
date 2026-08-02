@@ -39,7 +39,7 @@ class VersioningTests(unittest.TestCase):
             root = Path(temp)
             for relative in (
                 "VERSION",
-    "CHANGELOG.md",
+                "CHANGELOG.md",
                 "python/pyproject.toml",
                 "python/src/adxl355/_version.py",
                 "rust/Cargo.toml",
@@ -50,6 +50,8 @@ class VersioningTests(unittest.TestCase):
                 "cpp/CMakeLists.txt",
                 "c/include/adxl355/adxl355_version.h",
                 "spec/test_vectors.json",
+                "library.json",
+                "library.properties",
             ):
                 source = REPO_ROOT / relative
                 target = root / relative
@@ -63,7 +65,10 @@ class VersioningTests(unittest.TestCase):
 
             errors = sync_versions(root, write=False)
             self.assertTrue(
-                any("node/package.json" in error and "9.9.9" in error for error in errors)
+                any(
+                    "node/package.json" in error and "9.9.9" in error
+                    for error in errors
+                )
             )
 
     def test_sync_write_updates_all_ecosystem_versions(self) -> None:
@@ -71,7 +76,7 @@ class VersioningTests(unittest.TestCase):
             root = Path(temp)
             for relative in (
                 "VERSION",
-    "CHANGELOG.md",
+                "CHANGELOG.md",
                 "python/pyproject.toml",
                 "python/src/adxl355/_version.py",
                 "rust/Cargo.toml",
@@ -82,6 +87,8 @@ class VersioningTests(unittest.TestCase):
                 "cpp/CMakeLists.txt",
                 "c/include/adxl355/adxl355_version.h",
                 "spec/test_vectors.json",
+                "library.json",
+                "library.properties",
             ):
                 source = REPO_ROOT / relative
                 target = root / relative

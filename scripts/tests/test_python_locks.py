@@ -27,6 +27,7 @@ LOCK_NAMES = {
     "hil-build",
     "hil-i2c",
     "hil-spi",
+    "platformio",
     "release",
 }
 

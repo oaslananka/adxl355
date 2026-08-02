@@ -107,12 +107,28 @@ report/edit/regenerate workflow and must pass the offline verifier, dependency
 review, and full CI.
 
 Workflow installs use `--only-binary=:all:` where every package has a compatible
-wheel. The SPI adapter is the narrow exception because `spidev` is distributed as
-a source archive; HIL installs the locked build tools first, then installs the
-hash-verified adapter with `--no-build-isolation --no-deps`. Repository-local
-editable installs and locally built wheel smoke tests are not external downloads;
-they remain separate, dependency-free, and use `--no-build-isolation` or
-`--no-deps` as appropriate. No private index or registry credential is used.
+wheel. The SPI adapter is the narrow source-build exception because `spidev` is
+distributed as a source archive; HIL installs the locked build tools first, then
+installs the hash-verified adapter with `--no-build-isolation --no-deps`.
+
+The PlatformIO lock is a second, command-scoped exception to a full upstream
+runtime closure. PlatformIO Core 6.1.19 declares `starlette<0.53`, `uvicorn<0.41`,
+and `wsproto==1.*` for its web/server features. Starlette versions below 1.1.0 are
+affected by [GHSA-wqp7-x3pw-xc5r](https://github.com/advisories/GHSA-wqp7-x3pw-xc5r),
+and versions below 1.3.1 are affected by
+[GHSA-82w8-qh3p-5jfq](https://github.com/advisories/GHSA-82w8-qh3p-5jfq), so no
+patched Starlette release satisfies PlatformIO's declared range. The required CI
+job therefore installs a reviewed 16-package closure only for `pio --version`,
+`pio pkg pack`, and `pio run`. It explicitly verifies that Starlette, Uvicorn,
+wsproto, AnyIO, and h11 are absent. PlatformIO Home, web/server, remote-agent, and
+other commands outside that tested surface are not supported by this environment.
+A future PlatformIO release may restore a full dependency closure only after its
+metadata permits patched packages and the same package/build tests pass.
+
+Repository-local editable installs and locally built wheel smoke tests are not
+external downloads; they remain separate, dependency-free, and use
+`--no-build-isolation` or `--no-deps` as appropriate. No private index or registry
+credential is used.
 
 ## Immutable GitHub Actions
 

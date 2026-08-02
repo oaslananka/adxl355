@@ -41,5 +41,6 @@ cmake -S "$repo_root/cmake/smoke/cpp" -B "$build_root/cpp-consumer" \
     -DCMAKE_PREFIX_PATH="$prefix"
 cmake --build "$build_root/cpp-consumer" --parallel
 "$build_root/cpp-consumer/adxl355_cpp_consumer"
+"$build_root/cpp-consumer/adxl355_cpp_noexcept_consumer"
 
 printf 'C and C++ install/export smoke tests passed\n'

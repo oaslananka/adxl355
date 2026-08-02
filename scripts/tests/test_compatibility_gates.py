@@ -18,6 +18,7 @@ from scripts.check_package_sizes import (
 from scripts.check_public_api import (
     CompatibilityError,
     c_type_entries,
+    canonical_cpp_entries,
     compare,
     snapshot,
     validate_baseline_update,
@@ -69,6 +70,31 @@ class PublicApiCompatibilityTests(unittest.TestCase):
             ),
             [],
         )
+
+    def test_legacy_cpp_inline_body_entries_migrate_to_signatures(self) -> None:
+        legacy = {
+            "member:Device:void probe() { check(probe()); } void reset() { check(reset()); } private: int hidden{};"
+        }
+        migrated = canonical_cpp_entries(legacy)
+        self.assertEqual(
+            migrated,
+            {"member:Device:void probe()", "member:Device:void reset()"},
+        )
+        current = {
+            "surfaces": {
+                "cpp": [
+                    "member:Device:void probe()",
+                    "member:Device:void reset()",
+                    "member:Device:void setOdr(Odr odr)",
+                ]
+            }
+        }
+        self.assertEqual(compare({"surfaces": {"cpp": sorted(legacy)}}, current), [])
+
+    def test_changed_existing_cpp_method_signature_is_blocked(self) -> None:
+        baseline = {"surfaces": {"cpp": ["member:Device:void probe()"]}}
+        current = {"surfaces": {"cpp": ["member:Device:Status probe()"]}}
+        self.assertEqual(len(compare(baseline, current)), 1)
 
     def test_changed_existing_c_enum_member_is_blocked(self) -> None:
         old = "typedef enum { OK = 0, ERR = -1 } status_t;"

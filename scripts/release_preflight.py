@@ -27,6 +27,8 @@ RUST_LOCK_PATH = "rust/Cargo.lock"
 PYTHON_PROJECT_PATH = "python/pyproject.toml"
 PYTHON_RUNTIME_PATH = "python/src/adxl355/_version.py"
 VECTOR_SPEC_PATH = "spec/test_vectors.json"
+PLATFORMIO_MANIFEST_PATH = "library.json"
+ARDUINO_MANIFEST_PATH = "library.properties"
 
 
 @dataclass(frozen=True)
@@ -50,7 +52,9 @@ class VersionSource:
 
 def parse_release_tag(tag: str) -> ReleaseVersion:
     if not tag.startswith("v"):
-        raise ValueError(f"release tag must be strict SemVer prefixed with 'v': {tag!r}")
+        raise ValueError(
+            f"release tag must be strict SemVer prefixed with 'v': {tag!r}"
+        )
     try:
         version = VersionSet.parse(tag[1:])
     except ValueError as error:
@@ -80,13 +84,17 @@ def _require_match(path: Path, pattern: str, description: str) -> re.Match[str]:
 
 
 def _validate_package_identities(
-    rust_manifest: dict[str, Any], node_package: dict[str, Any], node_lock: dict[str, Any]
+    rust_manifest: dict[str, Any],
+    node_package: dict[str, Any],
+    node_lock: dict[str, Any],
 ) -> None:
     package = rust_manifest["package"]
     if package.get("name") != "adxl355-driver":
         raise ValueError("rust/Cargo.toml package name must be 'adxl355-driver'")
     if rust_manifest.get("lib", {}).get("name") != "adxl355":
-        raise ValueError("rust/Cargo.toml [lib] name must preserve the 'adxl355' import")
+        raise ValueError(
+            "rust/Cargo.toml [lib] name must preserve the 'adxl355' import"
+        )
 
     expected_node = "@oaslananka/adxl355"
     node_names = {
@@ -96,10 +104,15 @@ def _validate_package_identities(
         .get("", {})
         .get("name"),
     }
-    mismatches = [f"{label}={value!r}" for label, value in node_names.items() if value != expected_node]
+    mismatches = [
+        f"{label}={value!r}"
+        for label, value in node_names.items()
+        if value != expected_node
+    ]
     if mismatches:
         raise ValueError(
-            "Node package identity must be '@oaslananka/adxl355': " + ", ".join(mismatches)
+            "Node package identity must be '@oaslananka/adxl355': "
+            + ", ".join(mismatches)
         )
 
 
@@ -113,7 +126,12 @@ def collect_version_sources(root: Path) -> list[VersionSource]:
     node_package = json.loads((root / NODE_PACKAGE_PATH).read_text(encoding="utf-8"))
     node_lock = json.loads((root / NODE_LOCK_PATH).read_text(encoding="utf-8"))
     vectors = json.loads((root / VECTOR_SPEC_PATH).read_text(encoding="utf-8"))
+    platformio_manifest = json.loads(
+        (root / PLATFORMIO_MANIFEST_PATH).read_text(encoding="utf-8")
+    )
     _validate_package_identities(rust_manifest, node_package, node_lock)
+    if platformio_manifest.get("name") != "ADXL355 C and C++ Driver":
+        raise ValueError("library.json package name must be 'ADXL355 C and C++ Driver'")
 
     rust_lock_version = next(
         (
@@ -151,6 +169,12 @@ def collect_version_sources(root: Path) -> list[VersionSource]:
         ).group(1)
         for name in ("MAJOR", "MINOR", "PATCH")
     )
+
+    arduino_version = _require_match(
+        root / ARDUINO_MANIFEST_PATH,
+        r"^version=([^\s]+)$",
+        "Arduino library version",
+    ).group(1)
 
     changelog_version = _require_match(
         root / "CHANGELOG.md",
@@ -192,6 +216,8 @@ def collect_version_sources(root: Path) -> list[VersionSource]:
             "c/include/adxl355/adxl355_version.h components", header_core, "core"
         ),
         VersionSource(VECTOR_SPEC_PATH, str(vectors["version"])),
+        VersionSource(PLATFORMIO_MANIFEST_PATH, str(platformio_manifest["version"])),
+        VersionSource(ARDUINO_MANIFEST_PATH, arduino_version),
         VersionSource("CHANGELOG.md Unreleased", changelog_version),
     ]
 
@@ -236,9 +262,13 @@ def validate_git_state(root: Path, tag: str, expected_sha: str) -> str:
 
     errors: list[str] = []
     if head_sha.lower() != expected_sha:
-        errors.append(f"checked-out HEAD {head_sha} does not match release SHA {expected_sha}")
+        errors.append(
+            f"checked-out HEAD {head_sha} does not match release SHA {expected_sha}"
+        )
     if tag_sha.lower() != expected_sha:
-        errors.append(f"tag {tag!r} points to {tag_sha}, not release SHA {expected_sha}")
+        errors.append(
+            f"tag {tag!r} points to {tag_sha}, not release SHA {expected_sha}"
+        )
 
     dirty = _git(root, "status", "--porcelain", "--untracked-files=all")
     if dirty:
@@ -251,7 +281,9 @@ def validate_git_state(root: Path, tag: str, expected_sha: str) -> str:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parents[1])
+    parser.add_argument(
+        "--root", type=Path, default=Path(__file__).resolve().parents[1]
+    )
     parser.add_argument("--tag", required=True)
     parser.add_argument("--sha", required=True)
     args = parser.parse_args(argv)
@@ -261,7 +293,9 @@ def main(argv: list[str] | None = None) -> int:
         sources = collect_version_sources(args.root)
         errors = validate_versions(release, sources)
         if errors:
-            raise ValueError("version consistency check failed:\n- " + "\n- ".join(errors))
+            raise ValueError(
+                "version consistency check failed:\n- " + "\n- ".join(errors)
+            )
         release_sha = validate_git_state(args.root, release.tag, args.sha)
     except (KeyError, OSError, ValueError) as error:
         print(f"release preflight failed: {error}", file=sys.stderr)
