@@ -471,7 +471,7 @@ The raw temporary JSON report is not stored in the repository. This evidence
 validates the self-test feature on SPI; it does not replace final SPI/I2C
 release-candidate HIL evidence.
 
-## Node.js Linux adapter physical validation plan
+## Node.js Linux adapter physical validation
 
 Physical Node adapter evidence must use a clean package build from one exact
 commit and a supported Node version. The examples are bounded and must run as the
@@ -492,7 +492,25 @@ non-root HIL runner account.
    practical. A successful Python HIL run does not substitute for exercising the
    Node adapter itself.
 
-No physical Node adapter result is claimed until these bounded runs pass.
+### Recorded Node I2C result
+
+A bounded Node.js I2C example succeeded on **2026-08-02** against exact implementation
+commit `6a30a322cdbc482a455df25dfdf03b076a66e299` on the dedicated Raspberry Pi 5
+fixture:
+
+- runtime: checksum-verified Node.js `v24.18.0` for Linux ARM64 with npm `11.16.0`;
+- native backends: exact `i2c-bus@5.2.3` and `spi-device@3.1.2` packages built
+  from the committed lockfile, followed by a successful native-module load check;
+- transport: I2C bus 1, address `0x1D`, declared 100 kHz;
+- acquisition: 8 samples captured, all 8 unique, with a measured temperature of
+  `30.1934 °C`;
+- cleanup: independent register readback confirmed standby, ±2 g, and default ODR.
+
+The command ran as the non-root fixture account from a separate `/tmp` checkout and
+exited within its 20-second outer timeout. No host name, private address, environment
+dump, credential, or raw secret was recorded. This proves the maintained Node I2C
+adapter and bounded example on the `0x1D` fixture only. The fixture is currently
+strapped for I2C, so a Node SPI physical result remains pending and is not claimed.
 
 ## FIFO physical validation plan
 

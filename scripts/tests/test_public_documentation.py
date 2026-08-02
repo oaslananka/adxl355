@@ -257,6 +257,23 @@ class PublicDocumentationTests(unittest.TestCase):
         ):
             self.assertIn(phrase, hardware)
 
+    def test_node_i2c_physical_evidence_is_scoped_and_spi_remains_pending(self) -> None:
+        readme = " ".join(README.read_text().split())
+        hardware = " ".join(
+            (REPO_ROOT / "docs" / "hardware-testing.md").read_text().split()
+        )
+        node_readme = " ".join((REPO_ROOT / "node" / "README.md").read_text().split())
+        self.assertIn("Raspberry Pi 5 I2C bounded example pass; SPI pending", readme)
+        for phrase in (
+            "commit `6a30a322cdbc482a455df25dfdf03b076a66e299`",
+            "Node.js `v24.18.0`",
+            "8 samples captured, all 8 unique",
+            "standby, ±2 g, and default ODR",
+            "Node SPI physical result remains pending",
+        ):
+            self.assertIn(phrase, hardware)
+        self.assertIn("Physical Node SPI validation remains pending", node_readme)
+
     def test_calibration_docs_record_repeatable_physical_evidence(self) -> None:
         text = (REPO_ROOT / "docs" / "calibration.md").read_text()
         normalized = " ".join(text.split())

@@ -24,7 +24,7 @@ outside that core is intentionally language-specific.
 | C++ | Yes, C wrapper | Yes | No public method | No public wrapper | User `BusInterface` | User `BusInterface` | Arduino SPI compile fixture | Yes, CMake install/export plus PlatformIO pack | No language-specific physical pass |
 | Python | Yes | Yes | Bounded count/decode/read, typed partial results | Yes, bounded measured response | Yes, `spidev` | Yes, `smbus2` | No | Yes, sdist/wheel | Raspberry Pi 5 SPI and I2C feature passes |
 | Rust | Yes | No | No public method | No public method | No Linux-specific adapter | No Linux-specific adapter | Yes | Yes, `cargo package` | No language-specific physical pass |
-| Node.js | Yes | No | No public method | No public method | Yes, optional `spi-device` adapter | Yes, optional `i2c-bus` adapter | No | Yes, `npm pack` plus core-only smoke | Physical Node adapter evidence pending |
+| Node.js | Yes | No | No public method | No public method | Yes, optional `spi-device` adapter | Yes, optional `i2c-bus` adapter | No | Yes, `npm pack` plus core-only smoke | Raspberry Pi 5 I2C bounded example pass; SPI pending |
 | Go | Yes | No | No public method | No public method | Yes, `adxl355/linuxio` on Linux amd64/arm64 | Yes, `adxl355/linuxio` on Linux amd64/arm64 | No | Module/build and cross-build checks | Raspberry Pi 5 SPI and I2C bounded example passes |
 
 “User transport” means the driver exposes a bus contract but does not ship a

@@ -246,7 +246,10 @@ unit-test success:
 - **Rust:** rustfmt, all-feature and optional-HAL clippy, all-feature and
   no-default-feature tests, documentation tests, and `cargo package` verification.
 - **Node.js:** supported Node 22/24/26 tests, TypeScript build/type checking,
-  allow-listed npm package contents, and an audit gate at moderate severity.
+  exact optional native-module rebuild/load checks, allow-listed npm package
+  contents, a core-only clean-install smoke, and an audit gate at moderate
+  severity. The bounded I2C example has a Raspberry Pi 5 physical pass at `0x1D`;
+  the Node SPI physical example remains pending.
 - **Go:** gofmt, vet, the race detector, and a full coverage profile plus
   function report. Coverage is reported as evidence and is not reduced to an
   arbitrary pass/fail percentage.

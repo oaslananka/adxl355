@@ -37,6 +37,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added optional Node.js Linux SPI and I2C subpath adapters with exact native
   dependencies, explicit resource ownership, one-message SPI framing, exact I2C
   byte-count checks, core-only installation smoke tests, and bounded examples.
+  The Raspberry Pi 5 I2C example is physically verified at `0x1D`; Node SPI
+  physical validation remains pending.
 - Added shared C/Python FIFO location and complete XYZ sample contracts with
   bounded reads, marker/empty/framing validation, partial-progress reporting,
   caller-owned C storage, and a documented later physical validation plan.

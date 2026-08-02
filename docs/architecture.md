@@ -302,7 +302,7 @@ normal CI; it produces separate diagnostic evidence.
 - Run through `scripts/hil_runner.py` and `.github/workflows/hil.yml`
 - Require a real ADXL355 connected through Linux SPI or I2C
 - Are not executed during default tests or pull-request CI
-- Follow `docs/hardware-testing.md`; no successful physical artifact is claimed yet
+- Follow `docs/hardware-testing.md`; only the exact recorded fixture runs establish physical claims
 
 ## Cross-Language Consistency
 

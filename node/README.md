@@ -76,3 +76,8 @@ Both adapters own their native descriptor until idempotent `close()`. Operations
 after close and backend/load failures use the package `BusError` hierarchy. The
 repository examples `examples/linux-spi.mjs` and `examples/linux-i2c.mjs` collect
 a finite sample count, enforce a timeout, restore standby, and close resources.
+
+The bounded I2C example is physically verified on Raspberry Pi 5 at address `0x1D`
+with Node.js 24 ARM64. Eight samples were captured and all were unique; independent
+readback confirmed standby, ±2 g, and default ODR after exit. Physical Node SPI
+validation remains pending and is not implied by the I2C result.
