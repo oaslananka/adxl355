@@ -9,6 +9,7 @@ import yaml  # type: ignore[import-untyped]
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 CI_WORKFLOW = REPO_ROOT / ".github/workflows/ci.yml"
+CONSISTENCY_LOCK = REPO_ROOT / "requirements/python/consistency.txt"
 
 
 class VectorGateWorkflowTests(unittest.TestCase):
@@ -68,9 +69,12 @@ class VectorGateWorkflowTests(unittest.TestCase):
         commands = "\n".join(
             step.get("run", "") for step in job["steps"] if isinstance(step, dict)
         )
-        self.assertIn("python -m pip install --no-deps -e ./python", commands)
-        self.assertIn("pytest==9.1.1", commands)
-        self.assertIn("PyYAML==6.0.3", commands)
+        self.assertIn("--no-build-isolation --no-deps -e ./python", commands)
+        self.assertIn("requirements/python/consistency.txt", commands)
+        self.assertIn("--require-hashes", commands)
+        lock = CONSISTENCY_LOCK.read_text().lower()
+        self.assertIn("pytest==9.1.1", lock)
+        self.assertIn("pyyaml==6.0.3", lock)
         self.assertNotIn("./python[dev]", commands)
 
 

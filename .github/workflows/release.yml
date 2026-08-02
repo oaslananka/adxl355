@@ -95,8 +95,10 @@ jobs:
           PYTHON_VERSION: ${{ needs.preflight.outputs.python_version }}
         run: |
           mkdir -p "$OUT"
-          python -m pip install --disable-pip-version-check "build==1.5.0"
-          python -m build python --outdir "$OUT"
+          python -m pip install --disable-pip-version-check \
+            --require-hashes --only-binary=:all: \
+            -r requirements/python/release.txt
+          python -m build --no-isolation python --outdir "$OUT"
           (
             cd "$OUT"
             for artifact in ./*.whl ./*.tar.gz; do

@@ -45,8 +45,14 @@ class HilWorkflowTests(unittest.TestCase):
         self.assertIn("--transport spi", text)
         self.assertIn("--transport i2c", text)
         self.assertIn("--spi-speed-hz", text)
-        self.assertIn("spidev==3.8", text)
-        self.assertIn("smbus2==0.6.1", text)
+        self.assertIn("requirements/python/hil-spi.txt", text)
+        self.assertIn("requirements/python/hil-i2c.txt", text)
+        self.assertIn(
+            "spidev==3.8", (REPO_ROOT / "requirements/python/hil-spi.txt").read_text()
+        )
+        self.assertIn(
+            "smbus2==0.6.1", (REPO_ROOT / "requirements/python/hil-i2c.txt").read_text()
+        )
 
     def test_hil_uses_supported_runner_python_in_an_isolated_environment(self) -> None:
         workflow = self.load_workflow()
@@ -59,6 +65,9 @@ class HilWorkflowTests(unittest.TestCase):
         self.assertIn("sys.version_info < (3, 10)", text)
         self.assertIn('python3 -m venv "$RUNNER_TEMP/adxl355-hil-venv"', text)
         self.assertIn('"$RUNNER_TEMP/adxl355-hil-venv/bin" >> "$GITHUB_PATH"', text)
+        self.assertIn("requirements/python/hil-build.txt", text)
+        self.assertIn("--no-build-isolation --no-deps -e ./python", text)
+        self.assertGreaterEqual(text.count("--require-hashes"), 3)
         self.assertLess(
             step_names.index("Record bounded runner context"),
             step_names.index("Prepare isolated Python"),
@@ -67,17 +76,27 @@ class HilWorkflowTests(unittest.TestCase):
     def test_actions_are_pinned_and_credentials_are_not_persisted(self) -> None:
         workflow = self.load_workflow()
         steps = workflow["jobs"]["hil"]["steps"]
-        action_steps = [step for step in steps if isinstance(step, dict) and "uses" in step]
+        action_steps = [
+            step for step in steps if isinstance(step, dict) and "uses" in step
+        ]
         for step in action_steps:
             self.assertRegex(str(step["uses"]), r"@[0-9a-f]{40}$")
-        checkout = next(step for step in action_steps if str(step["uses"]).startswith("actions/checkout@"))
+        checkout = next(
+            step
+            for step in action_steps
+            if str(step["uses"]).startswith("actions/checkout@")
+        )
         self.assertFalse(checkout["with"]["persist-credentials"])
         self.assertNotIn("${{ secrets.", WORKFLOW_PATH.read_text())
 
     def test_report_is_always_uploaded_with_bounded_retention(self) -> None:
         workflow = self.load_workflow()
         steps = workflow["jobs"]["hil"]["steps"]
-        upload = next(step for step in steps if str(step.get("uses", "")).startswith("actions/upload-artifact@"))
+        upload = next(
+            step
+            for step in steps
+            if str(step.get("uses", "")).startswith("actions/upload-artifact@")
+        )
         self.assertEqual(upload["if"], "${{ always() }}")
         self.assertEqual(upload["with"]["path"], "artifacts/")
         self.assertEqual(upload["with"]["retention-days"], 30)
@@ -131,7 +150,6 @@ class HilWorkflowTests(unittest.TestCase):
             text = path.read_text()
             self.assertNotIn("runs-on: [self-hosted", text, path.name)
             self.assertNotIn("adxl355-hil", text, path.name)
-
 
 
 if __name__ == "__main__":
