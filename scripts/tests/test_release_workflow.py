@@ -95,6 +95,18 @@ class ReleaseWorkflowTests(unittest.TestCase):
                 )
             )
 
+    def test_preflight_checks_out_the_requested_release_tag(self) -> None:
+        steps = self.load_release()["jobs"]["preflight"]["steps"]
+        checkout_steps = [
+            step
+            for step in steps
+            if str(step.get("uses", "")).startswith("actions/checkout@")
+        ]
+        self.assertEqual(len(checkout_steps), 1)
+        self.assertEqual(checkout_steps[0]["with"]["ref"], "${{ env.RELEASE_TAG }}")
+        self.assertEqual(checkout_steps[0]["with"]["fetch-depth"], 0)
+        self.assertFalse(checkout_steps[0]["with"]["persist-credentials"])
+
     def test_preflight_resolves_the_requested_immutable_tag_commit(self) -> None:
         commands = "\n".join(
             str(step.get("run", ""))
