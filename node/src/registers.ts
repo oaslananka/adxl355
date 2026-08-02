@@ -56,6 +56,7 @@ export const TEMP2_DATA_MASK = 0x0f;
 export const TEMP_READ_ATTEMPTS = 3;
 export const TEMP_INTERCEPT_LSB = 1885.0;
 export const TEMP_INTERCEPT_C = 25.0;
+/** Nominal temperature slope in raw LSB per degree Celsius. */
 export const TEMP_SLOPE_LSB_PER_C = -9.05;
 
 /** STATUS register bit positions (datasheet Rev.D, Table 27) */
@@ -63,6 +64,7 @@ export const STATUS_NVM_BUSY = 4;
 export const STATUS_ACTIVITY = 3;
 export const STATUS_FIFO_OVR = 2;
 export const STATUS_FIFO_FULL = 1;
+/** New acceleration data ready status bit. */
 export const STATUS_DATA_RDY = 0;
 
 /** FILTER register masks (datasheet Rev.D, Table 38) */

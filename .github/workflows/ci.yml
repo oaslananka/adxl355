@@ -470,6 +470,8 @@ jobs:
           else
             python scripts/check_public_api.py
           fi
+      - name: Verify generated API references
+        run: python scripts/generate_api_reference.py --verify
       - name: Run required cross-language vector gate
         run: python scripts/verify_vectors.py --ci
       - name: Test release and CI automation

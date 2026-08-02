@@ -44,6 +44,15 @@ word, and a clock from **100 kHz to 10 MHz**. The default workflow value is 1 MH
 Start at 100 kHz or 1 MHz when diagnosing a new fixture. Increase the clock only
 after identity, reset, and continuous-read checks are stable.
 
+![Verified Raspberry Pi 5 SPI wiring: physical pin 1 to 3.3 V, pin 6 to GND,
+pin 23 GPIO11 to SCLK, pin 19 GPIO10 to MOSI, pin 21 GPIO9 to MISO, pin 24
+GPIO8/CE0 to CS, and optional pin 11 GPIO17 to DRDY.](media/raspberry-pi-5-spi-adxl355.svg)
+
+The diagram is an original MIT-licensed repository asset. Its complete text
+alternative is embedded in the SVG and the same mapping remains available in the
+table above. The optional DRDY line is dashed because the maintained runner polls
+`STATUS.DATA_RDY` over SPI.
+
 ## I2C fixture
 
 For I2C, tie **`SCLK/VSSIO` to ground** and use pull-ups from `MOSI/SDA` and
@@ -63,6 +72,10 @@ For I2C, tie **`SCLK/VSSIO` to ground** and use pull-ups from `MOSI/SDA` and
 | `MOSI/SDA` | SDA | Pull up to `VDDIO` |
 | `CS/SCL` | SCL | Pull up to `VDDIO` |
 | `MISO/ASEL` | ground or `VDDIO` | Selects `0x1D` or `0x53` |
+
+No I2C image is published yet because physical I2C HIL evidence is still pending
+in issue #41. The text table above is the current wiring plan, not a verified
+fixture photograph or diagram.
 
 The workflow accepts declared bus rates of 100 kHz, 400 kHz, 1 MHz, or 3.4 MHz.
 Linux adapters do not provide a portable API for changing the controller clock,
@@ -127,10 +140,21 @@ Install only the selected adapter and run the command explicitly. These commands
 are not part of normal `pytest` discovery.
 
 ```bash
-python -m pip install --no-deps -e ./python
+python3 -m venv .venv-hil
+. .venv-hil/bin/activate
+export PIP_CONFIG_FILE=/dev/null
+export PIP_INDEX_URL=https://pypi.org/simple
+export PIP_EXTRA_INDEX_URL=
+python -m pip install --disable-pip-version-check \
+  --require-hashes --no-deps --only-binary=:all: \
+  -r requirements/python/hil-build.txt
+python -m pip install --disable-pip-version-check \
+  --no-build-isolation --no-deps -e ./python
 
 # SPI example: /dev/spidev0.0, Mode 0, 1 MHz
-python -m pip install spidev==3.8
+python -m pip install --disable-pip-version-check \
+  --require-hashes --no-build-isolation --no-deps \
+  -r requirements/python/hil-spi.txt
 python scripts/hil_runner.py \
   --transport spi \
   --spi-bus 0 \
@@ -140,7 +164,9 @@ python scripts/hil_runner.py \
   --report artifacts/hil-report.json
 
 # I2C example: /dev/i2c-1, address 0x1D
-python -m pip install smbus2==0.6.1
+python -m pip install --disable-pip-version-check \
+  --require-hashes --no-deps --only-binary=:all: \
+  -r requirements/python/hil-i2c.txt
 python scripts/hil_runner.py \
   --transport i2c \
   --i2c-bus 1 \
