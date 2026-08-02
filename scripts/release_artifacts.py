@@ -70,6 +70,7 @@ def _extract_tar(archive: Path, destination: Path) -> list[str]:
             target.parent.mkdir(parents=True, exist_ok=True)
             with source, target.open("wb") as output:
                 shutil.copyfileobj(source, output)
+            target.chmod(0o755 if member.mode & 0o111 else 0o644)
     return names
 
 

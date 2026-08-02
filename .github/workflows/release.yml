@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Existing release tag to verify (for example v0.1.0-alpha.2)"
+        description: "Existing release tag to verify (for example v0.1.0-alpha.3)"
         required: true
         type: string
 
@@ -297,7 +297,8 @@ jobs:
             -DCMAKE_BUILD_TYPE=Release \
             -DADXL355_BUILD_TESTS=ON \
             -DADXL355_BUILD_EXAMPLES=ON \
-            -DCMAKE_CXX_FLAGS='-Wall -Wextra -Wpedantic -Werror'
+            -DCMAKE_CXX_FLAGS='-Wall -Wextra -Wpedantic -Werror' \
+            -DCMAKE_PREFIX_PATH=${{ github.workspace }}/c/build
           cmake --build cpp/build --parallel 2
           ctest --test-dir cpp/build --output-on-failure
 

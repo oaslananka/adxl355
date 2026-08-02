@@ -76,7 +76,7 @@ exception rules, immutable action updates, and trusted publishing policy.
 ## Version-mismatch fixture
 
 `scripts/tests/test_release_preflight.py` copies the maintained version files to
-a temporary fixture, intentionally changes `node/package.json` from `0.1.0-alpha.2` to
+a temporary fixture, intentionally changes `node/package.json` from `0.1.0-alpha.3` to
 `0.1.1`, and verifies that preflight fails with a path-specific mismatch. The
 fixture runs in normal CI and in the release preflight job.
 

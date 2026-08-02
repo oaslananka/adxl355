@@ -10,6 +10,8 @@ from pathlib import Path
 
 from scripts.release_artifacts import (
     ArtifactError,
+    _extract_tar,
+    inspect_native,
     inspect_node,
     inspect_python,
     inspect_rust,
@@ -23,10 +25,13 @@ class ReleaseArtifactTests(unittest.TestCase):
         return directory
 
     @staticmethod
-    def add_tar_text(handle: tarfile.TarFile, name: str, text: str) -> None:
+    def add_tar_text(
+        handle: tarfile.TarFile, name: str, text: str, *, mode: int = 0o644
+    ) -> None:
         payload = text.encode()
         info = tarfile.TarInfo(name)
         info.size = len(payload)
+        info.mode = mode
         handle.addfile(info, io.BytesIO(payload))
 
     def make_python_artifacts(self, *, include_tests: bool = False) -> Path:
@@ -120,6 +125,57 @@ class ReleaseArtifactTests(unittest.TestCase):
         invalid_artifact = self.make_node_artifact(extra_file="package/src/device.ts")
         with self.assertRaisesRegex(ArtifactError, "unexpected file"):
             inspect_node(invalid_artifact, "0.1.0-alpha.2", smoke=False)
+
+    def test_tar_extraction_strips_privileged_bits_and_preserves_execution(self) -> None:
+        directory = self.make_directory()
+        archive = directory / "mode.tar.gz"
+        with tarfile.open(archive, "w:gz") as handle:
+            self.add_tar_text(
+                handle, "bin/tool", "#!/bin/sh\nexit 0\n", mode=0o6755
+            )
+        extracted = directory / "extracted"
+        extracted.mkdir()
+
+        _extract_tar(archive, extracted)
+
+        mode = (extracted / "bin/tool").stat().st_mode & 0o7777
+        self.assertEqual(mode, 0o755)
+
+    def make_native_artifact(self) -> Path:
+        directory = self.make_directory()
+        archive = directory / "adxl355-c-cpp-0.1.0-alpha.3.tar.gz"
+        with tarfile.open(archive, "w:gz") as handle:
+            for name in (
+                "include/adxl355/adxl355.h",
+                "include/adxl355/adxl355_version.h",
+                "include/adxl355-cpp/adxl355.hpp",
+                "lib/libadxl355.a",
+            ):
+                self.add_tar_text(handle, name, "fixture")
+            self.add_tar_text(
+                handle,
+                "bin/adxl355-c-basic-read",
+                "#!/bin/sh\nexit 0\n",
+                mode=0o4755,
+            )
+            self.add_tar_text(
+                handle,
+                "bin/adxl355-cpp-basic-read",
+                "#!/bin/sh\nexit 0\n",
+                mode=0o755,
+            )
+            self.add_tar_text(
+                handle,
+                "BUILD_INFO.txt",
+                "version=0.1.0-alpha.3\ncommit=fixture\n",
+            )
+        return directory
+
+    def test_native_artifact_preserves_safe_executable_intent_for_smoke(self) -> None:
+        report = inspect_native(
+            self.make_native_artifact(), "0.1.0-alpha.3", smoke=True
+        )
+        self.assertEqual(report["package"], "c-cpp")
 
     def test_archive_path_traversal_is_rejected(self) -> None:
         directory = self.make_node_artifact(extra_file="../escape.txt")

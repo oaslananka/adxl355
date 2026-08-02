@@ -74,7 +74,7 @@ class PublicDocumentationTests(unittest.TestCase):
         self.assertIn("buildable package metadata", readme)
         self.assertIn("not published by this repository", readme)
         self.assertIn("verification and packaging dry run", publishing)
-        self.assertIn("[0.1.0-alpha.2] - Unreleased", changelog)
+        self.assertIn("[0.1.0-alpha.3] - Unreleased", changelog)
         self.assertIn("[0.1.0-alpha.1]", changelog)
 
     def test_docs_do_not_contradict_hil_or_calibration_status(self) -> None:

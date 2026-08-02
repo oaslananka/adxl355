@@ -1,7 +1,7 @@
 {
   "$schema": "https://raw.githubusercontent.com/platformio/platformio-core/develop/platformio/assets/schema/library.json",
   "name": "ADXL355 C and C++ Driver",
-  "version": "0.1.0-alpha.2",
+  "version": "0.1.0-alpha.3",
   "description": "Thin Arduino/PlatformIO integration for the authoritative ADXL355 C core and C++ wrappers.",
   "keywords": ["adxl355", "accelerometer", "sensor", "spi", "arduino"],
   "homepage": "https://github.com/oaslananka/adxl355",

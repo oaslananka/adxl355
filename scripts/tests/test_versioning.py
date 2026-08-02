@@ -32,7 +32,7 @@ class VersioningTests(unittest.TestCase):
 
     def test_repository_version_file_is_canonical_alpha(self) -> None:
         version = load_version(REPO_ROOT)
-        self.assertEqual(version.semver, "0.1.0-alpha.2")
+        self.assertEqual(version.semver, "0.1.0-alpha.3")
 
     def test_sync_check_reports_manifest_drift(self) -> None:
         with tempfile.TemporaryDirectory() as temp:

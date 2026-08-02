@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import subprocess
 import tempfile
 import unittest
 from typing import Any, cast
@@ -12,6 +13,7 @@ from scripts.check_package_sizes import (
     ArtifactBudget,
     SizeBudgetError,
     evaluate,
+    load_budgets,
     resolve_artifact_directory,
     resolve_report_path,
 )
@@ -156,6 +158,28 @@ class PublicApiCompatibilityTests(unittest.TestCase):
 
 
 class PackageSizeBudgetTests(unittest.TestCase):
+    def test_current_go_module_archive_fits_reviewed_budget(self) -> None:
+        version = (REPO_ROOT / "VERSION").read_text(encoding="utf-8").strip()
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            archive = root / f"adxl355-go-{version}.tar.gz"
+            subprocess.run(
+                [
+                    "git",
+                    "archive",
+                    "--format=tar.gz",
+                    f"--prefix=adxl355-go-{version}/",
+                    f"--output={archive}",
+                    "HEAD:go",
+                ],
+                cwd=REPO_ROOT,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            report = evaluate(root, load_budgets("go"))
+        self.assertEqual(report["status"], "ok", report)
+
     def test_artifact_directory_resolves_inside_temporary_root(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             self.assertEqual(

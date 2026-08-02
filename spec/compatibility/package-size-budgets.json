@@ -3,8 +3,8 @@
     "go": [
       {
         "count": 1,
-        "max_bytes": 15000,
-        "measured_bytes": 7279,
+        "max_bytes": 22000,
+        "measured_bytes": 17388,
         "name": "go-module-archive",
         "pattern": "*.tar.gz"
       }
@@ -62,8 +62,8 @@
     ]
   },
   "measurement_basis": {
-    "commit": "dd06464ae30114e48a3af8249bf88d946e11532e",
-    "notes": "Initial clean-checkout package measurements after the Rust typed-error, native-platform, and C/Python calibration API merges. Budgets include reviewed alpha-development headroom; release jobs report actual and baseline deltas."
+    "commit": "04f9ea614fdffe11619d48df145b01fba23b085b",
+    "notes": "Clean-checkout release-gate measurement after adding maintained Go Linux SPI/I2C transports and bounded hardware examples. The 17,388-byte Go archive contains only tracked Go source/tests plus go.mod/go.sum; the 22,000-byte limit preserves reviewed alpha-development headroom."
   },
   "schema_version": 1
 }

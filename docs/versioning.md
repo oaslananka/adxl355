@@ -6,7 +6,7 @@ The repository root `VERSION` file is the only manually edited version source.
 For the current release candidate it contains:
 
 ```text
-0.1.0-alpha.2
+0.1.0-alpha.3
 ```
 
 Run the synchronizer after changing it:
@@ -23,11 +23,11 @@ declaration differs from `VERSION`.
 
 | Target | Current value | Rule |
 |---|---|---|
-| Root Git tag | `v0.1.0-alpha.2` | `v` + canonical SemVer |
-| Python distribution/runtime | `0.1.0a2` | PEP 440 mapping of `alpha.2` |
-| Rust and npm | `0.1.0-alpha.2` | canonical SemVer |
+| Root Git tag | `v0.1.0-alpha.3` | `v` + canonical SemVer |
+| Python distribution/runtime | `0.1.0a3` | PEP 440 mapping of `alpha.2` |
+| Rust and npm | `0.1.0-alpha.3` | canonical SemVer |
 | C/C++ CMake projects | `0.1.0` | numeric core; prerelease remains in the C version string and artifact metadata |
-| Go submodule tag | `go/v0.1.0-alpha.2` | module-directory prefix + canonical SemVer tag |
+| Go submodule tag | `go/v0.1.0-alpha.3` | module-directory prefix + canonical SemVer tag |
 
 The Go module path remains:
 
