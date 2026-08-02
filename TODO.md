@@ -60,7 +60,7 @@
 ### Go
 - [x] spidev/Linux implementation
 - [x] Bounded SPI example with real hardware on Raspberry Pi 5
-- [ ] Bounded I2C example with real hardware (#41)
+- [x] Bounded I2C example with real hardware on Raspberry Pi 5 (`0x1D`)
 - [x] Core device API with race-tested transport-contract coverage
 
 ### C++
@@ -76,7 +76,7 @@
 - [ ] Interrupt and FIFO detailed documentation
 - [x] Source-derived API reference docs for each maintained language
 - [x] Accessible, license-safe wiring diagram for the verified Raspberry Pi 5 SPI fixture
-- [ ] Add I2C setup media after physical I2C HIL evidence in issue #41
+- [x] Add accessible I2C setup media matching the physically verified `0x1D` fixture
 - [x] Architecture documentation
 - [x] Register map documentation
 - [x] Testing guide

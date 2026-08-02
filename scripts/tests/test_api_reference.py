@@ -14,6 +14,7 @@ README = REPO_ROOT / "README.md"
 HARDWARE = REPO_ROOT / "docs" / "hardware-testing.md"
 MEDIA_ROOT = REPO_ROOT / "docs" / "media"
 SPI_SVG = MEDIA_ROOT / "raspberry-pi-5-spi-adxl355.svg"
+I2C_SVG = MEDIA_ROOT / "raspberry-pi-5-i2c-adxl355.svg"
 C_HEADER = REPO_ROOT / "c" / "include" / "adxl355" / "adxl355.h"
 CI_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "ci.yml"
 
@@ -94,14 +95,42 @@ class ApiReferenceTests(unittest.TestCase):
         media_readme = (MEDIA_ROOT / "README.md").read_text(encoding="utf-8")
         self.assertIn("original, repository-authored", media_readme)
         self.assertIn("MIT license", media_readme)
-        self.assertIn("I2C media is intentionally not present yet", media_readme)
-        self.assertEqual(list(MEDIA_ROOT.glob("*i2c*.svg")), [])
+        self.assertIn("raspberry-pi-5-i2c-adxl355.svg", media_readme)
+        self.assertIn("address `0x1D`", media_readme)
+
+    def test_i2c_svg_is_accessible_local_and_matches_verified_fixture(self) -> None:
+        tree = ET.parse(I2C_SVG)
+        root = tree.getroot()
+        namespace = {"svg": "http://www.w3.org/2000/svg"}
+        title = root.find("svg:title", namespace)
+        description = root.find("svg:desc", namespace)
+        self.assertIsNotNone(title)
+        self.assertIsNotNone(description)
+        self.assertGreater(len((description.text or "").split()), 50)
+        rendered = I2C_SVG.read_text(encoding="utf-8")
+        for phrase in (
+            "Pin 1 · 3V3",
+            "Pin 6 · GND",
+            "Pin 3 · GPIO2 / SDA1",
+            "Pin 5 · GPIO3 / SCL1",
+            "Pin 9 · GND (mode strap)",
+            "Pin 14 · GND (address strap)",
+            "Pin 11 · GPIO17 (optional)",
+            "address 0x1D",
+            "100 kHz",
+        ):
+            self.assertIn(phrase, rendered)
+        self.assertNotIn("<image", rendered)
+        self.assertNotIn("http://www.raspberrypi", rendered.lower())
 
     def test_hardware_guide_has_image_alt_text_and_text_equivalent(self) -> None:
         text = HARDWARE.read_text(encoding="utf-8")
         self.assertIn("media/raspberry-pi-5-spi-adxl355.svg", text)
+        self.assertIn("media/raspberry-pi-5-i2c-adxl355.svg", text)
         self.assertRegex(text, r"!\[Verified Raspberry Pi 5 SPI wiring:")
-        self.assertIn("No I2C image is published yet", text)
+        self.assertRegex(text, r"!\[Verified Raspberry Pi 5 I2C wiring:")
+        self.assertIn("30734635341", text)
+        self.assertIn("Only address `0x1D` is physically verified", text)
         for signal in ("`SCLK/VSSIO`", "`MOSI/SDA`", "`MISO/ASEL`", "`CS/SCL`"):
             self.assertIn(signal, text)
         self.assertIn("requirements/python/hil-spi.txt", text)
