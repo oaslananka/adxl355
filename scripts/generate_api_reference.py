@@ -101,11 +101,20 @@ LANGUAGES: Final = (
     LanguageReference(
         "go",
         "Go API",
-        "Module `github.com/oaslananka/adxl355/go`",
-        ("go/adxl355/device.go", "go/adxl355/transport.go", "go/adxl355/types.go"),
-        "cd go && go doc ./adxl355",
-        "Transport-agnostic core lifecycle, range, power mode, raw/converted reads, temperature, status, and stateless conversions.",
-        "No maintained Linux SPI/I2C adapter and no public ODR, offset, calibration, self-test, FIFO, or interrupt methods.",
+        "Module `github.com/oaslananka/adxl355/go`; Linux adapters in `adxl355/linuxio`",
+        (
+            "go/adxl355/device.go",
+            "go/adxl355/transport.go",
+            "go/adxl355/types.go",
+            "go/adxl355/linuxio/types.go",
+            "go/adxl355/linuxio/transport_linux.go",
+            "go/adxl355/linuxio/transport_other.go",
+            "go/examples/linux_spi/main.go",
+            "go/examples/linux_i2c/main.go",
+        ),
+        "cd go && go doc ./adxl355 ./adxl355/linuxio",
+        "Core lifecycle, range, power mode, raw/converted reads, temperature, status, and stateless conversions, plus maintained 64-bit Linux amd64/arm64 spidev and i2c-dev transports with explicit descriptor ownership and bounded examples.",
+        "No public ODR, offset, calibration, self-test, FIFO, or interrupt methods. I2C adapter speed is externally configured and physical I2C evidence remains pending.",
     ),
 )
 

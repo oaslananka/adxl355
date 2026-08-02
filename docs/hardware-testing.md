@@ -360,6 +360,43 @@ release-candidate evidence because documentation and governance changes may move
 the candidate commit. A successful I2C run is still pending. Before publication,
 run both transports against the same final release-candidate SHA.
 
+### Go Linux SPI bounded example
+
+The maintained Go `adxl355/linuxio` spidev adapter and bounded example were
+physically verified on the Raspberry Pi 5 SPI fixture using code commit
+`08273bff4611a33f1b88dae6a08c92d5199eab28`. The ARM64 binary was built only from
+a `git archive` of that commit; its SHA-256 was
+`a74fd41821d3decc8a4e67d31411659487af83106b697b124975255f5749f2de`, and the
+same hash was checked on the fixture before execution.
+
+The public-safe invocation was:
+
+```bash
+go run ./examples/linux_spi \
+  --bus 0 --device 0 --speed-hz 1000000 \
+  --samples 32 --timeout 15s
+```
+
+The run established:
+
+- identity `0xAD/0x1D/0xED`, revision `0x01`;
+- temperature `28.0939 °C` after entering measurement mode and a bounded settle;
+- 32 nonzero XYZ samples, including 29 unique tuples; and
+- independent post-run `POWER_CTL=0x01`, proving standby restoration after the
+  bounded command closed its owned descriptor.
+
+An earlier pre-fix run exposed a real lifecycle defect: reading temperature before
+measurement returned a zero raw value and an implausible `233.2873 °C`, while the
+first acceleration frame was empty. The final implementation moves measurement
+before temperature, waits through a bounded settle interval, and preserves this
+ordering in a regression test whose mock returns zero temperature in standby.
+That rejected run is not accepted as evidence.
+
+This Go result is feature-specific SPI evidence. It is not a GitHub Actions HIL
+artifact and does not satisfy the separate final release-candidate requirement.
+The Go I2C example remains physically unverified until issue #41 provides an I2C
+fixture and evidence.
+
 A separate self-test response validation used the exact C/Python implementation
 from commit `12d6206393223439e14b8e36b97e567751e8f8bb` on the same Raspberry Pi 5
 SPI fixture at 1 MHz. Two independent 64-sample runs, each with eight discarded

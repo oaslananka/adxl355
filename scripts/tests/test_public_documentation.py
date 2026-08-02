@@ -48,7 +48,9 @@ class PublicDocumentationTests(unittest.TestCase):
     def test_quick_start_uses_reproducible_commands(self) -> None:
         text = README.read_text()
         self.assertIn("python -m pip install --no-deps -e ./python", text)
-        self.assertIn("PYTHONPATH=python/src python python/examples/basic_read.py", text)
+        self.assertIn(
+            "PYTHONPATH=python/src python python/examples/basic_read.py", text
+        )
         self.assertIn("npm ci --ignore-scripts", text)
         self.assertNotIn("npm install\n", text)
         self.assertIn("cmake -S c -B build/c", text)
@@ -81,7 +83,9 @@ class PublicDocumentationTests(unittest.TestCase):
         self.assertIn("manual-only", combined)
         self.assertIn("calibration procedure", combined.lower())
         self.assertIn("c and python expose", combined.lower())
-        self.assertIn("1 offset-register count = 16 raw acceleration lsb", combined.lower())
+        self.assertIn(
+            "1 offset-register count = 16 raw acceleration lsb", combined.lower()
+        )
         self.assertIn("not factory", combined.lower())
 
     def test_self_test_docs_define_sequence_restore_and_policy_boundary(self) -> None:
@@ -99,7 +103,9 @@ class PublicDocumentationTests(unittest.TestCase):
             "must not be presented as an analog devices production limit",
         ):
             self.assertIn(phrase, hardware)
-        self.assertIn("default configuration reports the measured response", python_readme)
+        self.assertIn(
+            "default configuration reports the measured response", python_readme
+        )
 
     def test_self_test_docs_record_rev_d_limits_and_physical_evidence(self) -> None:
         readme = " ".join(README.read_text().split())
@@ -167,6 +173,47 @@ class PublicDocumentationTests(unittest.TestCase):
         ):
             self.assertIn(phrase, text)
 
+    def test_go_linux_transports_are_documented_and_bounded(self) -> None:
+        readme = README.read_text()
+        testing = (REPO_ROOT / "docs" / "testing.md").read_text()
+        architecture = (REPO_ROOT / "docs" / "architecture.md").read_text()
+        todo = (REPO_ROOT / "TODO.md").read_text()
+        for phrase in (
+            "adxl355/linuxio",
+            "Linux amd64 and arm64",
+            "--samples 8 --timeout 10s",
+            "restore standby",
+            "Raspberry Pi 5 SPI bounded example pass; I2C pending",
+            "08273bff4611a33f1b88dae6a08c92d5199eab28",
+        ):
+            self.assertIn(phrase, readme)
+        for phrase in (
+            "SPI_IOC_MESSAGE(1)",
+            "I2C_RDWR",
+            "idempotent",
+            "errors.Is",
+            "does not claim to reconfigure",
+        ):
+            self.assertIn(phrase, architecture)
+        self.assertIn("GOOS=linux GOARCH=arm64 go build ./...", testing)
+        self.assertIn("linuxio.ErrUnsupported", testing)
+        self.assertIn("[x] spidev/Linux implementation", todo)
+        self.assertIn(
+            "[x] Bounded SPI example with real hardware on Raspberry Pi 5", todo
+        )
+        self.assertIn("[ ] Bounded I2C example with real hardware (#41)", todo)
+        hardware = (REPO_ROOT / "docs" / "hardware-testing.md").read_text()
+        for phrase in (
+            "Go Linux SPI bounded example",
+            "a74fd41821d3decc8a4e67d31411659487af83106b697b124975255f5749f2de",
+            "28.0939 °C",
+            "29 unique tuples",
+            "POWER_CTL=0x01",
+            "233.2873 °C",
+            "That rejected run is not accepted as evidence",
+            "Go I2C example remains physically unverified",
+        ):
+            self.assertIn(phrase, hardware)
 
     def test_calibration_docs_record_repeatable_physical_evidence(self) -> None:
         text = (REPO_ROOT / "docs" / "calibration.md").read_text()
@@ -177,7 +224,6 @@ class PublicDocumentationTests(unittest.TestCase):
         self.assertIn("42.37 raw LSB", normalized)
         self.assertIn("restored X/Y/Z offsets to zero", normalized)
         self.assertIn("it does not establish factory accuracy", normalized.lower())
-
 
 
 if __name__ == "__main__":

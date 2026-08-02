@@ -58,8 +58,9 @@
 - [x] Core device API with transport-contract tests
 
 ### Go
-- [ ] spidev/Linux implementation
-- [ ] Example with real hardware
+- [x] spidev/Linux implementation
+- [x] Bounded SPI example with real hardware on Raspberry Pi 5
+- [ ] Bounded I2C example with real hardware (#41)
 - [x] Core device API with race-tested transport-contract coverage
 
 ### C++

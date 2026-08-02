@@ -51,6 +51,30 @@ class PublicApiCompatibilityTests(unittest.TestCase):
             "member:ADXL355:async readRaw(): Promise<RawXYZ>",
             baseline["surfaces"]["node"],
         )
+        self.assertTrue(
+            any(
+                "linuxio/types.go:type SPIConfig struct" in entry
+                for entry in baseline["surfaces"]["go"]
+            )
+        )
+        self.assertTrue(
+            any(
+                "linuxio/transport_linux.go:func OpenSPI" in entry
+                for entry in baseline["surfaces"]["go"]
+            )
+        )
+        self.assertTrue(
+            any(
+                "device.go:func New(transport Transport) *Device" in entry
+                for entry in baseline["surfaces"]["go"]
+            )
+        )
+        self.assertTrue(
+            any(
+                "linuxio/types.go:func DefaultI2CConfig() I2CConfig" in entry
+                for entry in baseline["surfaces"]["go"]
+            )
+        )
 
     def test_additive_public_api_change_is_allowed(self) -> None:
         baseline = {"surfaces": {"python": ["signature:read()"]}}

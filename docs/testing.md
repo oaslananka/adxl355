@@ -130,17 +130,32 @@ npm test
 
 ```bash
 cd go
-go test ./...
+go mod verify
+go vet ./...
+go test -race ./...
+go test -covermode=atomic -coverprofile=coverage.out ./...
+go tool cover -func=coverage.out
+go build ./...
+GOOS=linux GOARCH=arm64 go build ./...
+GOOS=linux GOARCH=arm go build ./...
+GOOS=windows GOARCH=amd64 go build ./...
+GOOS=darwin GOARCH=arm64 go build ./...
 ```
 
 ### What's Tested
 
-- 5 raw decode vectors
-- Raw-to-g conversion
-- Raw-to-m/s² conversion
-- Device probe via mock transport
-- Set/get range via mock
-- Read raw via mock
+- shared raw decode, conversion, lifecycle, temperature, and transport-contract behavior;
+- Linux SPI Mode 0 framing, 100 kHz–10 MHz bounds, exact ioctl byte counts, open/configure cleanup, idempotent close, and errno preservation;
+- Linux I2C address/rate validation, adapter capability checks, combined `I2C_RDWR` register reads, exact message counts, and close ownership;
+- kernel ioctl structure sizes and request encoding on the supported 64-bit Linux ABI;
+- bounded example cancellation, data-ready timeout, output failure, sample limits, and standby restoration; and
+- non-Linux and unsupported Linux architecture stubs through cross-builds.
+
+The public Linux implementation is compiled only for Linux amd64 and arm64. Other
+platforms retain the portable `Transport` interface and receive an inspectable
+`linuxio.ErrUnsupported` from the maintained constructors. The I2C `BusHz` value
+is a declared external adapter setting; the package does not silently alter global
+kernel bus timing.
 
 ## Cross-Language State Contract Tests
 

@@ -62,6 +62,28 @@ type Transport interface {
 }
 ```
 
+### Go Linux device ownership
+
+The portable Go driver still depends only on the `Transport` interface. The
+separate `adxl355/linuxio` package provides maintained Linux amd64/arm64 adapters:
+
+- `OpenSPI` owns one `/dev/spidevB.D` descriptor, configures Mode 0, 8-bit words,
+  and a validated 100 kHz–10 MHz clock, and uses one full-duplex
+  `SPI_IOC_MESSAGE(1)` transaction per register operation.
+- `OpenI2C` owns one `/dev/i2c-N` descriptor, accepts only addresses `0x1D` or
+  `0x53`, verifies combined-I2C capability, and uses `I2C_RDWR` so the register
+  pointer write and payload read remain one combined transaction.
+- `Close` is caller-visible and idempotent. No hidden goroutine or finalizer owns
+  device lifetime. `OpError` preserves operation/path context and unwraps the
+  kernel errno or stable package sentinel for `errors.Is`/`errors.As`.
+- I2C adapter speed is global platform state. `I2CConfig.BusHz` validates and
+  records the expected external setting; it does not claim to reconfigure the
+  Linux controller.
+
+Unsupported operating systems and Linux architectures use the same public
+constructors but return `ErrUnsupported`, preserving portable core builds without
+pretending an unverified ioctl ABI is supported.
+
 ### Node.js: TypeScript Interface
 
 ```ts

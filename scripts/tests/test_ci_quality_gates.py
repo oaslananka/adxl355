@@ -109,6 +109,12 @@ class CiQualityGateTests(unittest.TestCase):
     def test_go_runs_format_vet_race_and_coverage_without_threshold(self) -> None:
         commands = self.commands(self.load_jobs()["go"])
         self.assertIn("gofmt -l", commands)
+        self.assertIn("go mod verify", commands)
+        self.assertIn("go build ./...", commands)
+        self.assertIn("GOOS=linux GOARCH=arm64 go build ./...", commands)
+        self.assertIn("GOOS=linux GOARCH=arm go build ./...", commands)
+        self.assertIn("GOOS=windows GOARCH=amd64 go build ./...", commands)
+        self.assertIn("GOOS=darwin GOARCH=arm64 go build ./...", commands)
         self.assertIn("go vet ./...", commands)
         self.assertIn("go test -race ./...", commands)
         self.assertIn("-coverprofile=coverage.out", commands)
