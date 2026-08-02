@@ -16,10 +16,33 @@ multiple local scanners that enforce the same policy with duplicate findings.
 | Release vulnerability policy | Grype through `anchore/scan-action` | Any high severity or critical result blocks the release bundle, whether or not a fix is already published |
 | Artifact integrity and provenance | SHA-256 checksums plus `actions/attest` | GitHub OIDC produces SLSA provenance and an SBOM attestation for the final release bundle |
 | Private disclosure | GitHub Security Advisories | Private vulnerability reporting with the response targets in `SECURITY.md` |
+| Project security health | OpenSSF Scorecard | Weekly, default-branch, and ruleset-change analysis; bounded SARIF is uploaded to code scanning and the intended public Scorecard API summary |
 
 CodeQL is the primary SAST result for repository-owned workflow policy. Sonar,
 Semgrep, DeepScan, and Socket may appear as supplementary hosted checks. Their
 presence does not justify adding another overlapping scanner workflow here.
+
+## OpenSSF project-health evidence
+
+The official OpenSSF Scorecard Action runs on `main`, a weekly schedule, manual
+dispatch, and branch-protection/ruleset changes. It uses only repository read,
+SARIF upload, and OIDC publication permissions. The bounded five-day SARIF
+artifact supports diagnosis; GitHub code scanning and the public Scorecard API
+are the durable review surfaces. Raw scan dumps are not committed.
+
+Scorecard is a project-health signal, not a replacement for CodeQL, dependency
+review, release scanning, or physical HIL. Findings are triaged only when they
+map to a reproducible repository setting or workflow gap. Numeric score changes
+alone do not create release blockers.
+
+For OSPS Baseline Level 1, live repository controls provide the principal
+evidence: public version control and licensing, documented contribution and
+security processes, protected `main`, required CI/security checks, dependency
+maintenance, immutable action pins, private vulnerability reporting, and
+checksummed/SBOM-attested release artifacts. OpenSSF Best Practices registration
+is an external maintainer-owned project record; its registration status is
+tracked in the implementation issue rather than represented by a repository
+metadata or audit file.
 
 ## Dependabot maintenance policy
 
