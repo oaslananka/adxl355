@@ -32,7 +32,9 @@ class FakeRange(IntEnum):
 class VerifyVectorsTests(unittest.TestCase):
     def test_range_mapping_uses_real_enum_members(self) -> None:
         mapping = build_range_map(FakeRange)
-        self.assertEqual(mapping, {"G2": FakeRange.G2, "G4": FakeRange.G4, "G8": FakeRange.G8})
+        self.assertEqual(
+            mapping, {"G2": FakeRange.G2, "G4": FakeRange.G4, "G8": FakeRange.G8}
+        )
 
     def test_command_plan_uses_active_python_and_isolated_builds(self) -> None:
         with tempfile.TemporaryDirectory(prefix="adxl355-vector-plan-") as temp:
@@ -61,15 +63,23 @@ class VerifyVectorsTests(unittest.TestCase):
         self.assertIn(str(build_root / "cpp"), cpp_commands[0])
 
         python_command = by_label["Python"].commands[0]
-        self.assertEqual(python_command.argv[:4], ("/active/python", "-B", "-m", "pytest"))
+        self.assertEqual(
+            python_command.argv[:4], ("/active/python", "-B", "-m", "pytest")
+        )
         self.assertIn(f"cache_dir={build_root / 'pytest-cache'}", python_command.argv)
         self.assertEqual(python_command.cwd, REPO_ROOT / "python")
+        self.assertEqual(
+            python_command.env,
+            {"PYTHONPATH": str(REPO_ROOT / "python" / "src")},
+        )
 
         rust_command = by_label["Rust"].commands[0]
         self.assertIn(str(build_root / "rust-target"), rust_command.argv)
 
         node_commands = [command.argv for command in by_label["Node.js"].commands]
-        self.assertEqual(by_label["Node.js"].commands[0].cwd, build_root / "node-workspace")
+        self.assertEqual(
+            by_label["Node.js"].commands[0].cwd, build_root / "node-workspace"
+        )
         self.assertEqual(node_commands[0], ("npm", "ci", "--ignore-scripts"))
         self.assertIn(("npm", "run", "build"), node_commands)
         self.assertIn(("npm", "test", "--", "--run"), node_commands)
