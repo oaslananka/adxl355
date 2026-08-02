@@ -43,3 +43,47 @@ class RestoreError(ADXL355Error):
     def __init__(self, failures: tuple[BaseException, ...]) -> None:
         super().__init__(f"Failed to restore {len(failures)} self-test state write(s)")
         self.failures = failures
+
+
+class FifoReadError(ADXL355Error):
+    """Base for FIFO marker, empty, overrun, and framing failures."""
+
+    def __init__(
+        self,
+        message: str,
+        partial_samples: tuple[object, ...] = (),
+        consumed_locations: int = 0,
+        consumption_indeterminate: bool = False,
+    ) -> None:
+        super().__init__(message)
+        self.partial_samples = partial_samples
+        self.consumed_locations = consumed_locations
+        self.consumption_indeterminate = consumption_indeterminate
+
+
+class FifoEmptyError(FifoReadError):
+    """FIFO had no complete sample or returned the empty/invalid marker."""
+
+
+class FifoOverrunError(FifoReadError):
+    """FIFO overrun status indicated that the oldest data was lost."""
+
+
+class FifoFormatError(FifoReadError):
+    """FIFO count, marker order, virtual bits, or payload length was malformed."""
+
+
+class FifoBusError(BusError):
+    """FIFO transfer failed after zero or more complete samples were consumed."""
+
+    def __init__(
+        self,
+        message: str,
+        partial_samples: tuple[object, ...] = (),
+        consumed_locations: int = 0,
+        consumption_indeterminate: bool = True,
+    ) -> None:
+        super().__init__(message)
+        self.partial_samples = partial_samples
+        self.consumed_locations = consumed_locations
+        self.consumption_indeterminate = consumption_indeterminate

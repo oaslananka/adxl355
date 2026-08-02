@@ -42,7 +42,26 @@ static int mock_read(void *ctx, uint8_t reg, uint8_t *data, size_t len)
         reported_len = mock->short_read_length;
     }
     size_t copy_len = reported_len < len ? reported_len : len;
-    if (mock->emulate_self_test && reg == ADXL355_REG_XDATA3 && copy_len == 9U) {
+    if (reg == ADXL355_REG_FIFO_DATA) {
+        static const uint8_t empty_sample[ADXL355_FIFO_BYTES_PER_SAMPLE] = {
+            0U, 0U, 3U, 0U, 0U, 2U, 0U, 0U, 2U
+        };
+        for (size_t i = 0U; i < copy_len; i++) {
+            const size_t source = mock->fifo_offset + i;
+            data[i] = source < mock->fifo_length
+                          ? mock->fifo_data[source]
+                          : empty_sample[i % ADXL355_FIFO_BYTES_PER_SAMPLE];
+        }
+        size_t consumed = copy_len;
+        const size_t remaining = mock->fifo_length - mock->fifo_offset;
+        if (consumed > remaining) {
+            consumed = remaining;
+        }
+        mock->fifo_offset += consumed;
+        const size_t remaining_locations =
+            (mock->fifo_length - mock->fifo_offset) / ADXL355_FIFO_BYTES_PER_LOCATION;
+        mock->regs[ADXL355_REG_FIFO_ENTRIES] = (uint8_t)remaining_locations;
+    } else if (mock->emulate_self_test && reg == ADXL355_REG_XDATA3 && copy_len == 9U) {
         const uint8_t mode =
             (uint8_t)(mock->regs[ADXL355_REG_SELF_TEST] & ADXL355_SELF_TEST_MASK);
         if (mode == ADXL355_SELF_TEST_MASK) {
@@ -138,6 +157,23 @@ void adxl355_mock_bus_set_self_test_xyz(adxl355_mock_bus_t *mock,
     mock->self_test_baseline = baseline;
     mock->self_test_stimulated = stimulated;
     mock->regs[ADXL355_REG_STATUS] = ADXL355_STATUS_DATA_RDY;
+}
+
+
+void adxl355_mock_bus_set_fifo_payload(adxl355_mock_bus_t *mock,
+                                       const uint8_t *payload,
+                                       size_t length,
+                                       uint8_t locations)
+{
+    if (length > ADXL355_MOCK_FIFO_MAX_BYTES) {
+        length = ADXL355_MOCK_FIFO_MAX_BYTES;
+    }
+    if (length > 0U && payload != NULL) {
+        memcpy(mock->fifo_data, payload, length);
+    }
+    mock->fifo_length = length;
+    mock->fifo_offset = 0U;
+    mock->regs[ADXL355_REG_FIFO_ENTRIES] = locations;
 }
 
 

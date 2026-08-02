@@ -25,6 +25,11 @@ from adxl355.errors import (
     DataReadyTimeoutError,
     DeviceNotFoundError,
     DeviceStateError,
+    FifoBusError,
+    FifoEmptyError,
+    FifoFormatError,
+    FifoOverrunError,
+    FifoReadError,
     InvalidConfigurationError,
     RestoreError,
     SelfTestThresholdError,
@@ -37,6 +42,7 @@ from adxl355.registers import (
     RANGE_SEL_MASK,
     SELF_TEST_MASK,
     STATUS_DATA_RDY,
+    STATUS_FIFO_OVR,
     Axis,
     PowerMode,
     Range,
@@ -45,6 +51,8 @@ from adxl355.registers import (
 from adxl355.transport import Transport
 from adxl355.types import (
     AccelXYZ,
+    FifoLocation,
+    FifoReadResult,
     RawXYZ,
     SelfTestConfig,
     SelfTestResult,
@@ -473,14 +481,115 @@ class ADXL355:
         return self._read_reg(Register.STATUS)
 
     def read_fifo_entries(self) -> int:
-        """Read the number of valid samples in the FIFO."""
+        """Read valid FIFO axis locations, not complete XYZ sample count.
+
+        Rev.D defines a range of 0..96 locations. A remainder of one or two
+        locations is valid but does not form a complete XYZ sample. Reserved bit
+        7 and values above 96 are rejected as :class:`FifoFormatError`.
+        """
         self._check_init()
-        return self._read_reg(Register.FIFO_ENTRIES)
+        raw = self._read_reg(Register.FIFO_ENTRIES)
+        locations = raw & 0x7F
+        if raw & 0x80 or locations > FIFO_MAX_LOCATIONS:
+            raise FifoFormatError(f"Invalid FIFO_ENTRIES value: 0x{raw:02X}")
+        return locations
+
+    def read_fifo_samples(self, max_samples: int) -> FifoReadResult:
+        """Read up to ``max_samples`` complete XYZ samples without blocking.
+
+        ``max_samples`` must be 1..32. STATUS is read first and therefore uses
+        the device's documented clear-on-read behavior. FIFO overrun aborts
+        without consuming data. Each sample is one sustained nine-byte read.
+        Format/empty failures expose the valid prefix and exact consumed-location
+        count. A FIFO_DATA bus failure marks consumption as indeterminate because
+        the hardware may have popped data before the backend reported failure.
+        """
+        self._check_init()
+        if isinstance(max_samples, bool) or not 1 <= max_samples <= FIFO_MAX_SAMPLES:
+            raise InvalidConfigurationError("max_samples must be in the range 1..32")
+
+        samples: list[RawXYZ] = []
+        consumed_locations = 0
+        try:
+            status = self._read_reg(Register.STATUS)
+            if status & STATUS_FIFO_OVR:
+                raise FifoOverrunError("FIFO overrun indicates lost oldest data")
+            available_locations = self.read_fifo_entries()
+            target = min(available_locations // 3, max_samples)
+            if target == 0:
+                raise FifoEmptyError("FIFO contains no complete XYZ sample")
+            for _ in range(target):
+                try:
+                    payload = self._read_exact(Register.FIFO_DATA, FIFO_BYTES_PER_SAMPLE)
+                except BusError as exc:
+                    raise FifoBusError(
+                        "FIFO_DATA transfer failed; hardware consumption is indeterminate",
+                        tuple(samples),
+                        consumed_locations,
+                        True,
+                    ) from exc
+                consumed_locations += 3
+                try:
+                    samples.append(decode_fifo_sample(payload))
+                except FifoEmptyError as exc:
+                    raise FifoEmptyError(str(exc), tuple(samples), consumed_locations) from exc
+                except FifoFormatError as exc:
+                    raise FifoFormatError(str(exc), tuple(samples), consumed_locations) from exc
+        except FifoBusError:
+            raise
+        except FifoReadError:
+            raise
+        except BusError as exc:
+            raise FifoBusError(
+                "FIFO status/count transfer failed",
+                tuple(samples),
+                consumed_locations,
+                False,
+            ) from exc
+
+        return FifoReadResult(
+            samples=tuple(samples),
+            available_locations=available_locations,
+            consumed_locations=consumed_locations,
+            remaining_locations=available_locations - consumed_locations,
+        )
 
 
 # ------------------------------------------------------------------
 # Stateless conversion functions
 # ------------------------------------------------------------------
+
+FIFO_MAX_LOCATIONS = 96
+FIFO_BYTES_PER_LOCATION = 3
+FIFO_BYTES_PER_SAMPLE = 9
+FIFO_MAX_SAMPLES = FIFO_MAX_LOCATIONS // 3
+
+
+def decode_fifo_location(payload: bytes) -> FifoLocation:
+    """Decode one exact three-byte FIFO axis location."""
+    if len(payload) != FIFO_BYTES_PER_LOCATION:
+        raise FifoFormatError(f"FIFO location must be exactly 3 bytes, got {len(payload)}")
+    if payload[2] & 0x0C:
+        raise FifoFormatError("FIFO virtual bits 3:2 must be zero")
+    if payload[2] & 0x02:
+        raise FifoEmptyError("FIFO location carries the empty/invalid marker")
+    return FifoLocation(
+        raw=_decode_raw20(payload[0], payload[1], payload[2]),
+        is_x_axis=bool(payload[2] & 0x01),
+    )
+
+
+def decode_fifo_sample(payload: bytes) -> RawXYZ:
+    """Decode one exact X/Y/Z FIFO sample with marker-order validation."""
+    if len(payload) != FIFO_BYTES_PER_SAMPLE:
+        raise FifoFormatError(f"FIFO sample must be exactly 9 bytes, got {len(payload)}")
+    axes = tuple(
+        decode_fifo_location(payload[offset : offset + FIFO_BYTES_PER_LOCATION])
+        for offset in range(0, FIFO_BYTES_PER_SAMPLE, FIFO_BYTES_PER_LOCATION)
+    )
+    if not axes[0].is_x_axis or axes[1].is_x_axis or axes[2].is_x_axis:
+        raise FifoFormatError("FIFO marker order must be X, Y, Z")
+    return RawXYZ(x=axes[0].raw, y=axes[1].raw, z=axes[2].raw)
 
 
 def _decode_raw20(b0: int, b1: int, b2: int) -> int:

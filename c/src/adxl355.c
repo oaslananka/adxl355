@@ -767,6 +767,142 @@ adxl355_status_t adxl355_read_status(adxl355_t *dev, uint8_t *status)
            : ADXL355_ERR_BUS;
 }
 
+adxl355_status_t adxl355_read_fifo_entries(adxl355_t *dev, uint8_t *locations)
+{
+    if (dev == NULL || locations == NULL) {
+        return ADXL355_ERR_NULL;
+    }
+    adxl355_status_t state = require_initialized(dev);
+    if (state != ADXL355_OK) {
+        return state;
+    }
+    uint8_t raw;
+    if (read_reg(dev, ADXL355_REG_FIFO_ENTRIES, &raw) != 0) {
+        return ADXL355_ERR_BUS;
+    }
+    const uint8_t count = (uint8_t)(raw & UINT8_C(0x7F));
+    if ((raw & UINT8_C(0x80)) != 0U || count > ADXL355_FIFO_MAX_LOCATIONS) {
+        return ADXL355_ERR_FIFO_FORMAT;
+    }
+    *locations = count;
+    return ADXL355_OK;
+}
+
+adxl355_status_t adxl355_decode_fifo_location(const uint8_t *payload,
+                                               size_t length,
+                                               adxl355_fifo_location_t *location)
+{
+    if (payload == NULL || location == NULL) {
+        return ADXL355_ERR_NULL;
+    }
+    if (length != ADXL355_FIFO_BYTES_PER_LOCATION) {
+        return ADXL355_ERR_INVALID_ARG;
+    }
+    if ((payload[2] & UINT8_C(0x0C)) != 0U) {
+        return ADXL355_ERR_FIFO_FORMAT;
+    }
+    if ((payload[2] & UINT8_C(0x02)) != 0U) {
+        return ADXL355_ERR_FIFO_EMPTY;
+    }
+    adxl355_fifo_location_t decoded;
+    decoded.raw = adxl355_decode_raw20(payload[0], payload[1], payload[2]);
+    decoded.is_x_axis = (payload[2] & UINT8_C(0x01)) != 0U;
+    decoded.empty = false;
+    *location = decoded;
+    return ADXL355_OK;
+}
+
+adxl355_status_t adxl355_decode_fifo_sample(const uint8_t *payload,
+                                             size_t length,
+                                             adxl355_raw_xyz_t *sample)
+{
+    if (payload == NULL || sample == NULL) {
+        return ADXL355_ERR_NULL;
+    }
+    if (length != ADXL355_FIFO_BYTES_PER_SAMPLE) {
+        return ADXL355_ERR_INVALID_ARG;
+    }
+    adxl355_fifo_location_t axes[ADXL355_FIFO_LOCATIONS_PER_SAMPLE];
+    for (size_t axis = 0U; axis < ADXL355_FIFO_LOCATIONS_PER_SAMPLE; axis++) {
+        adxl355_status_t status = adxl355_decode_fifo_location(
+            &payload[axis * ADXL355_FIFO_BYTES_PER_LOCATION],
+            ADXL355_FIFO_BYTES_PER_LOCATION,
+            &axes[axis]);
+        if (status != ADXL355_OK) {
+            return status;
+        }
+    }
+    if (!axes[0].is_x_axis || axes[1].is_x_axis || axes[2].is_x_axis) {
+        return ADXL355_ERR_FIFO_FORMAT;
+    }
+    adxl355_raw_xyz_t decoded = {axes[0].raw, axes[1].raw, axes[2].raw};
+    *sample = decoded;
+    return ADXL355_OK;
+}
+
+adxl355_status_t adxl355_read_fifo_samples(adxl355_t *dev,
+                                            adxl355_raw_xyz_t *samples,
+                                            size_t capacity,
+                                            adxl355_fifo_read_result_t *result)
+{
+    if (dev == NULL || samples == NULL || result == NULL) {
+        return ADXL355_ERR_NULL;
+    }
+    memset(result, 0, sizeof(*result));
+    adxl355_status_t state = require_initialized(dev);
+    if (state != ADXL355_OK) {
+        return state;
+    }
+    if (capacity == 0U || capacity > ADXL355_FIFO_MAX_SAMPLES) {
+        return ADXL355_ERR_INVALID_ARG;
+    }
+
+    uint8_t status_reg;
+    if (read_reg(dev, ADXL355_REG_STATUS, &status_reg) != 0) {
+        return ADXL355_ERR_BUS;
+    }
+    if ((status_reg & ADXL355_STATUS_FIFO_OVR) != 0U) {
+        return ADXL355_ERR_FIFO_OVERRUN;
+    }
+
+    uint8_t locations;
+    adxl355_status_t status = adxl355_read_fifo_entries(dev, &locations);
+    if (status != ADXL355_OK) {
+        return status;
+    }
+    result->available_locations = locations;
+    result->remaining_locations = locations;
+    if (locations == 0U) {
+        return ADXL355_ERR_FIFO_EMPTY;
+    }
+
+    size_t available_samples = (size_t)locations / ADXL355_FIFO_LOCATIONS_PER_SAMPLE;
+    if (available_samples == 0U) {
+        return ADXL355_ERR_FIFO_EMPTY;
+    }
+    size_t target_samples = available_samples < capacity ? available_samples : capacity;
+    uint8_t payload[ADXL355_FIFO_BYTES_PER_SAMPLE];
+    for (size_t index = 0U; index < target_samples; index++) {
+        if (read_exact(dev, ADXL355_REG_FIFO_DATA, payload,
+                       ADXL355_FIFO_BYTES_PER_SAMPLE) != 0) {
+            result->consumption_indeterminate = true;
+            return ADXL355_ERR_BUS;
+        }
+        result->consumed_locations = (uint8_t)(
+            result->consumed_locations + ADXL355_FIFO_LOCATIONS_PER_SAMPLE);
+        result->remaining_locations = (uint8_t)(
+            result->available_locations - result->consumed_locations);
+        status = adxl355_decode_fifo_sample(payload,
+                                            ADXL355_FIFO_BYTES_PER_SAMPLE,
+                                            &samples[index]);
+        if (status != ADXL355_OK) {
+            return status;
+        }
+        result->samples_read++;
+    }
+    return ADXL355_OK;
+}
+
 /* ---------------------------------------------------------------------------
  * Utility / conversion functions
  * --------------------------------------------------------------------------- */
@@ -840,7 +976,10 @@ const char *adxl355_status_string(adxl355_status_t status)
         case ADXL355_ERR_UNSUPPORTED: return "ADXL355_ERR_UNSUPPORTED";
         case ADXL355_ERR_STATE:       return "ADXL355_ERR_STATE";
         case ADXL355_ERR_THRESHOLD:   return "ADXL355_ERR_THRESHOLD";
-        case ADXL355_ERR_RESTORE:     return "ADXL355_ERR_RESTORE";
+        case ADXL355_ERR_RESTORE:      return "ADXL355_ERR_RESTORE";
+        case ADXL355_ERR_FIFO_EMPTY:   return "ADXL355_ERR_FIFO_EMPTY";
+        case ADXL355_ERR_FIFO_OVERRUN: return "ADXL355_ERR_FIFO_OVERRUN";
+        case ADXL355_ERR_FIFO_FORMAT:  return "ADXL355_ERR_FIFO_FORMAT";
         default:                     return "ADXL355_UNKNOWN";
     }
 }

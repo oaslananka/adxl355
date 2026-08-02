@@ -1,5 +1,6 @@
 #include "adxl355/adxl355.h"
 #include "test_mock_bus.h"
+#include "fifo_vectors.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -1348,6 +1349,154 @@ static void test_self_test_target_and_restore_failures(void)
     TEST_END();
 }
 
+
+static void prepare_fifo_fixture(adxl355_mock_bus_t *mock,
+                                 adxl355_t *dev,
+                                 adxl355_bus_t *bus)
+{
+    adxl355_mock_bus_init(mock);
+    adxl355_mock_bus_set_identity_ok(mock);
+    *bus = adxl355_mock_bus_get_interface(mock);
+    (void)adxl355_init(dev, bus);
+    (void)adxl355_probe(dev);
+}
+
+static void test_fifo_shared_decode_vectors(void)
+{
+    TEST_START("fifo_shared_decode_vectors");
+    for (size_t i = 0U; i < FIFO_VALID_VECTOR_COUNT; i++) {
+        adxl355_raw_xyz_t sample = {INT32_C(99), INT32_C(99), INT32_C(99)};
+        adxl355_status_t status = adxl355_decode_fifo_sample(
+            FIFO_VALID_VECTORS[i].bytes, ADXL355_FIFO_BYTES_PER_SAMPLE, &sample);
+        TEST_ASSERT(status == ADXL355_OK, FIFO_VALID_VECTORS[i].name);
+        TEST_ASSERT(sample.x == FIFO_VALID_VECTORS[i].x,
+                    "FIFO x must match shared vector");
+        TEST_ASSERT(sample.y == FIFO_VALID_VECTORS[i].y,
+                    "FIFO y must match shared vector");
+        TEST_ASSERT(sample.z == FIFO_VALID_VECTORS[i].z,
+                    "FIFO z must match shared vector");
+    }
+    for (size_t i = 0U; i < FIFO_INVALID_VECTOR_COUNT; i++) {
+        adxl355_raw_xyz_t sample = {INT32_C(11), INT32_C(22), INT32_C(33)};
+        adxl355_status_t expected = ADXL355_ERR_FIFO_FORMAT;
+        if (FIFO_INVALID_VECTORS[i].expected_error == FIFO_VECTOR_ERROR_LENGTH) {
+            expected = ADXL355_ERR_INVALID_ARG;
+        } else if (FIFO_INVALID_VECTORS[i].expected_error == FIFO_VECTOR_ERROR_EMPTY) {
+            expected = ADXL355_ERR_FIFO_EMPTY;
+        }
+        adxl355_status_t status = adxl355_decode_fifo_sample(
+            FIFO_INVALID_VECTORS[i].bytes,
+            FIFO_INVALID_VECTORS[i].length,
+            &sample);
+        TEST_ASSERT(status == expected, FIFO_INVALID_VECTORS[i].name);
+        TEST_ASSERT(sample.x == 11 && sample.y == 22 && sample.z == 33,
+                    "failed FIFO decode must not modify output");
+    }
+    TEST_END();
+}
+
+static void test_fifo_read_bounded_and_partial_semantics(void)
+{
+    TEST_START("fifo_read_bounded_and_partial_semantics");
+    adxl355_mock_bus_t mock;
+    adxl355_bus_t bus;
+    adxl355_t dev;
+    prepare_fifo_fixture(&mock, &dev, &bus);
+
+    uint8_t payload[18];
+    memcpy(payload, FIFO_VALID_VECTORS[1].bytes, 9U);
+    memcpy(&payload[9], FIFO_VALID_VECTORS[2].bytes, 9U);
+    adxl355_mock_bus_set_fifo_payload(&mock, payload, sizeof(payload), 6U);
+
+    adxl355_raw_xyz_t samples[2];
+    adxl355_fifo_read_result_t result;
+    TEST_ASSERT(adxl355_read_fifo_samples(&dev, samples, 1U, &result) == ADXL355_OK,
+                "bounded FIFO read should succeed");
+    TEST_ASSERT(result.available_locations == 6U && result.consumed_locations == 3U &&
+                    result.remaining_locations == 3U && result.samples_read == 1U,
+                "bounded FIFO metadata should preserve remaining locations");
+    TEST_ASSERT(samples[0].x == 1 && samples[0].y == -1 && samples[0].z == 262144,
+                "first bounded sample should decode");
+
+    TEST_ASSERT(adxl355_read_fifo_samples(&dev, samples, 2U, &result) == ADXL355_OK,
+                "second bounded read should consume remaining sample");
+    TEST_ASSERT(result.available_locations == 3U && result.samples_read == 1U &&
+                    result.remaining_locations == 0U,
+                "second read should report one remaining sample");
+
+    prepare_fifo_fixture(&mock, &dev, &bus);
+    uint8_t partial_payload[18];
+    memcpy(partial_payload, FIFO_VALID_VECTORS[0].bytes, 9U);
+    memcpy(&partial_payload[9], FIFO_INVALID_VECTORS[2].bytes, 9U);
+    adxl355_mock_bus_set_fifo_payload(&mock, partial_payload, sizeof(partial_payload), 6U);
+    TEST_ASSERT(adxl355_read_fifo_samples(&dev, samples, 2U, &result) ==
+                    ADXL355_ERR_FIFO_EMPTY,
+                "empty marker after one sample should fail");
+    TEST_ASSERT(result.samples_read == 1U && result.consumed_locations == 6U &&
+                    result.remaining_locations == 0U,
+                "partial FIFO result should retain valid prefix and physical consumption");
+    TEST_END();
+}
+
+static void test_fifo_read_errors_and_transport_lengths(void)
+{
+    TEST_START("fifo_read_errors_and_transport_lengths");
+    adxl355_mock_bus_t mock;
+    adxl355_bus_t bus;
+    adxl355_t dev;
+    adxl355_raw_xyz_t samples[1];
+    adxl355_fifo_read_result_t result;
+
+    prepare_fifo_fixture(&mock, &dev, &bus);
+    TEST_ASSERT(adxl355_read_fifo_samples(&dev, samples, 1U, &result) ==
+                    ADXL355_ERR_FIFO_EMPTY,
+                "zero FIFO entries should be empty");
+
+    prepare_fifo_fixture(&mock, &dev, &bus);
+    mock.regs[ADXL355_REG_STATUS] = ADXL355_STATUS_FIFO_OVR;
+    adxl355_mock_bus_set_fifo_payload(&mock, FIFO_VALID_VECTORS[0].bytes, 9U, 3U);
+    TEST_ASSERT(adxl355_read_fifo_samples(&dev, samples, 1U, &result) ==
+                    ADXL355_ERR_FIFO_OVERRUN,
+                "overrun should abort before FIFO_DATA read");
+    TEST_ASSERT(mock.fifo_offset == 0U && result.consumed_locations == 0U,
+                "overrun must not consume FIFO data");
+
+    prepare_fifo_fixture(&mock, &dev, &bus);
+    adxl355_mock_bus_set_fifo_payload(&mock, FIFO_VALID_VECTORS[0].bytes, 9U, 4U);
+    TEST_ASSERT(adxl355_read_fifo_samples(&dev, samples, 1U, &result) == ADXL355_OK,
+                "one trailing location should remain valid and unread");
+    TEST_ASSERT(result.samples_read == 1U && result.remaining_locations == 1U,
+                "valid FIFO remainder should be reported");
+    mock.regs[ADXL355_REG_FIFO_ENTRIES] = 0x80U;
+    uint8_t locations = 99U;
+    TEST_ASSERT(adxl355_read_fifo_entries(&dev, &locations) == ADXL355_ERR_FIFO_FORMAT,
+                "reserved FIFO_ENTRIES bit should be rejected");
+    TEST_ASSERT(locations == 99U, "failed FIFO count read must not modify output");
+
+    prepare_fifo_fixture(&mock, &dev, &bus);
+    adxl355_mock_bus_set_fifo_payload(&mock, FIFO_VALID_VECTORS[0].bytes, 9U, 3U);
+    mock.short_read_reg = ADXL355_REG_FIFO_DATA;
+    mock.short_read_length = 8U;
+    TEST_ASSERT(adxl355_read_fifo_samples(&dev, samples, 1U, &result) == ADXL355_ERR_BUS,
+                "truncated FIFO transfer should normalize to bus error");
+    TEST_ASSERT(result.samples_read == 0U, "truncated transfer has no decoded prefix");
+    TEST_ASSERT(result.consumption_indeterminate,
+                "failed FIFO_DATA transfer must mark consumption indeterminate");
+
+    prepare_fifo_fixture(&mock, &dev, &bus);
+    adxl355_mock_bus_set_fifo_payload(&mock, FIFO_VALID_VECTORS[0].bytes, 9U, 3U);
+    mock.short_read_reg = ADXL355_REG_FIFO_DATA;
+    mock.short_read_length = 10U;
+    TEST_ASSERT(adxl355_read_fifo_samples(&dev, samples, 1U, &result) == ADXL355_ERR_BUS,
+                "overlong FIFO transfer should normalize to bus error");
+    TEST_ASSERT(result.consumption_indeterminate,
+                "overlong FIFO_DATA transfer must mark consumption indeterminate");
+    TEST_ASSERT(adxl355_read_fifo_samples(&dev, samples, 0U, &result) ==
+                    ADXL355_ERR_INVALID_ARG,
+                "zero capacity should be rejected");
+    TEST_END();
+}
+
 int main(void)
 {
     printf("ADXL355 C Test Suite\n");
@@ -1396,6 +1545,9 @@ int main(void)
     test_read_status();
     test_read_status_data_rdy();
     test_read_fifo_entries();
+    test_fifo_shared_decode_vectors();
+    test_fifo_read_bounded_and_partial_semantics();
+    test_fifo_read_errors_and_transport_lengths();
     test_filter_register_odr();
     test_filter_hpf_preserved();
     test_bus_error_probe();
