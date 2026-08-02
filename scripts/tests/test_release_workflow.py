@@ -120,6 +120,16 @@ class ReleaseWorkflowTests(unittest.TestCase):
         )
         self.assertIn("adxl355-driver-${VERSION}.crate", rust_commands)
 
+    def test_c_cpp_release_job_reuses_the_verified_c_core_build(self) -> None:
+        jobs = self.load_release()["jobs"]
+        commands = "\n".join(
+            str(step.get("run", ""))
+            for step in jobs["c-cpp-package"]["steps"]
+        )
+        self.assertIn(
+            "-DCMAKE_PREFIX_PATH=${{ github.workspace }}/c/build", commands
+        )
+
     def test_release_enforces_and_uploads_package_size_evidence(self) -> None:
         text = RELEASE_WORKFLOW.read_text()
         for family in ("python", "rust", "node", "go", "native", "release"):

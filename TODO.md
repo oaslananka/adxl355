@@ -1,6 +1,6 @@
 # TODO
 
-## v0.1.0-alpha.2 readiness
+## v0.1.0-alpha.3 readiness
 
 ### General
 - [x] Verify register addresses and bit fields against official ADXL355 Rev.D datasheet

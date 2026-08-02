@@ -73,8 +73,8 @@ stored Cargo registry token to the default workflow.
 ```bash
 cd go
 # Tag the release
-git tag go/v0.1.0-alpha.2
-git push origin go/v0.1.0-alpha.2
+git tag go/v0.1.0-alpha.3
+git push origin go/v0.1.0-alpha.3
 # The Go module proxy will pick up the new version automatically
 ```
 

@@ -5,10 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.1.0-alpha.2] - Unreleased
+## [0.1.0-alpha.3] - Unreleased
 
 ### Fixed
 
+- Corrected the C/C++ release job to expose the already-built C core through `CMAKE_PREFIX_PATH` before configuring the C++ package.
+- Preserved safe executable intent while extracting native release artifacts so packaged smoke binaries run, while stripping setuid, setgid, and sticky permission bits.
+- Refreshed the reviewed Go module archive baseline to 17,388 bytes after verifying that the growth consists only of maintained Linux SPI/I2C adapters, bounded examples, tests, and module metadata.
 - Hardened release artifact extraction by rejecting links and special archive
   members and copying only validated regular files and directories.
 - Updated the Python build backend to `setuptools==83.0.0` to resolve
@@ -59,6 +62,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Breaking (Python metadata):** The public `adxl355.__version__` value and Python distribution version advance from `0.1.0a2` to `0.1.0a3` for the corrected prerelease.
+- The immutable `v0.1.0-alpha.2` and `go/v0.1.0-alpha.2` tags are retained as failed release-gate evidence and were not published as a GitHub release; `0.1.0-alpha.3` supersedes that candidate.
 - **Breaking (Rust):** Transport implementations now expose an associated backend error type, and driver methods return generic structured errors that preserve transport and restore causes.
 - Updated core GitHub Actions to their reviewed Node.js 24 major releases,
   standardized checkout on `v7.0.1`, and documented the HIL runner minimum.
