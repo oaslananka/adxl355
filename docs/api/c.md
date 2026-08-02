@@ -6,9 +6,9 @@
 
 ## Capability boundary
 
-Core lifecycle, range, ODR, raw/converted reads, temperature, status, signed offsets, calibration helpers, and bounded self-test response.
+Core lifecycle, range, ODR, bounded FIFO count/decode/read, raw/converted reads, temperature, status, signed offsets, calibration helpers, and bounded self-test response.
 
-**Not exposed:** No public FIFO sample decoder, interrupt configuration API, or Linux bus adapter.
+**Not exposed:** No public interrupt configuration API or maintained Linux bus adapter.
 
 ## Authoritative sources
 
@@ -30,9 +30,13 @@ The declarations below are generated from the same normalized public API surface
 
 ```text
 adxl355_status_t adxl355_calculate_offset(int32_t measured_raw, int32_t expected_raw, int16_t current_offset, bool saturate, int16_t *offset);
+adxl355_status_t adxl355_decode_fifo_location(const uint8_t *payload, size_t length, adxl355_fifo_location_t *location);
+adxl355_status_t adxl355_decode_fifo_sample(const uint8_t *payload, size_t length, adxl355_raw_xyz_t *sample);
 adxl355_status_t adxl355_get_range(adxl355_t *dev, adxl355_range_t *range);
 adxl355_status_t adxl355_init(adxl355_t *dev, const adxl355_bus_t *bus);
 adxl355_status_t adxl355_probe(adxl355_t *dev);
+adxl355_status_t adxl355_read_fifo_entries(adxl355_t *dev, uint8_t *locations);
+adxl355_status_t adxl355_read_fifo_samples(adxl355_t *dev, adxl355_raw_xyz_t *samples, size_t capacity, adxl355_fifo_read_result_t *result);
 adxl355_status_t adxl355_read_g(adxl355_t *dev, adxl355_float_xyz_t *out);
 adxl355_status_t adxl355_read_mps2(adxl355_t *dev, adxl355_float_xyz_t *out);
 adxl355_status_t adxl355_read_offset(adxl355_t *dev, adxl355_axis_t axis, int16_t *offset);
@@ -81,6 +85,9 @@ typedef enum { ADXL355_OK = 0, ADXL355_ERR_NULL = -1, ADXL355_ERR_BUS = -2, ADXL
 typedef enum { ADXL355_OK = 0, ADXL355_ERR_NULL = -1, ADXL355_ERR_BUS = -2, ADXL355_ERR_TIMEOUT = -3, ADXL355_ERR_INVALID_ARG = -4, ADXL355_ERR_BAD_DEVICE = -5, ADXL355_ERR_NOT_READY = -6, ADXL355_ERR_UNSUPPORTED = -7, ADXL355_ERR_STATE = -8 } adxl355_status_t;
 typedef enum { ADXL355_OK = 0, ADXL355_ERR_NULL = -1, ADXL355_ERR_BUS = -2, ADXL355_ERR_TIMEOUT = -3, ADXL355_ERR_INVALID_ARG = -4, ADXL355_ERR_BAD_DEVICE = -5, ADXL355_ERR_NOT_READY = -6, ADXL355_ERR_UNSUPPORTED = -7, ADXL355_ERR_STATE = -8, ADXL355_ERR_THRESHOLD = -9 } adxl355_status_t;
 typedef enum { ADXL355_OK = 0, ADXL355_ERR_NULL = -1, ADXL355_ERR_BUS = -2, ADXL355_ERR_TIMEOUT = -3, ADXL355_ERR_INVALID_ARG = -4, ADXL355_ERR_BAD_DEVICE = -5, ADXL355_ERR_NOT_READY = -6, ADXL355_ERR_UNSUPPORTED = -7, ADXL355_ERR_STATE = -8, ADXL355_ERR_THRESHOLD = -9, ADXL355_ERR_RESTORE = -10 } adxl355_status_t;
+typedef enum { ADXL355_OK = 0, ADXL355_ERR_NULL = -1, ADXL355_ERR_BUS = -2, ADXL355_ERR_TIMEOUT = -3, ADXL355_ERR_INVALID_ARG = -4, ADXL355_ERR_BAD_DEVICE = -5, ADXL355_ERR_NOT_READY = -6, ADXL355_ERR_UNSUPPORTED = -7, ADXL355_ERR_STATE = -8, ADXL355_ERR_THRESHOLD = -9, ADXL355_ERR_RESTORE = -10, ADXL355_ERR_FIFO_EMPTY = -11 } adxl355_status_t;
+typedef enum { ADXL355_OK = 0, ADXL355_ERR_NULL = -1, ADXL355_ERR_BUS = -2, ADXL355_ERR_TIMEOUT = -3, ADXL355_ERR_INVALID_ARG = -4, ADXL355_ERR_BAD_DEVICE = -5, ADXL355_ERR_NOT_READY = -6, ADXL355_ERR_UNSUPPORTED = -7, ADXL355_ERR_STATE = -8, ADXL355_ERR_THRESHOLD = -9, ADXL355_ERR_RESTORE = -10, ADXL355_ERR_FIFO_EMPTY = -11, ADXL355_ERR_FIFO_OVERRUN = -12 } adxl355_status_t;
+typedef enum { ADXL355_OK = 0, ADXL355_ERR_NULL = -1, ADXL355_ERR_BUS = -2, ADXL355_ERR_TIMEOUT = -3, ADXL355_ERR_INVALID_ARG = -4, ADXL355_ERR_BAD_DEVICE = -5, ADXL355_ERR_NOT_READY = -6, ADXL355_ERR_UNSUPPORTED = -7, ADXL355_ERR_STATE = -8, ADXL355_ERR_THRESHOLD = -9, ADXL355_ERR_RESTORE = -10, ADXL355_ERR_FIFO_EMPTY = -11, ADXL355_ERR_FIFO_OVERRUN = -12, ADXL355_ERR_FIFO_FORMAT = -13 } adxl355_status_t;
 typedef enum { ADXL355_POWER_STANDBY = 1 } adxl355_power_mode_t;
 typedef enum { ADXL355_POWER_STANDBY = 1, ADXL355_POWER_MEASUREMENT = 0 } adxl355_power_mode_t;
 typedef enum { ADXL355_RANGE_2G = 0x01 } adxl355_range_t;
@@ -91,6 +98,8 @@ typedef struct { adxl355_float_xyz_t baseline_g;
 typedef struct { adxl355_float_xyz_t min_abs_delta_g;
 typedef struct { float x;
 typedef struct { int (*read)(void *ctx, uint8_t reg, uint8_t *data, size_t len);
+typedef struct { int32_t raw;
 typedef struct { int32_t x;
 typedef struct { uint16_t sample_count;
+typedef struct { uint8_t available_locations;
 ```

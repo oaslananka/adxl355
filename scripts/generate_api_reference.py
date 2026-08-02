@@ -49,8 +49,8 @@ LANGUAGES: Final = (
             "c/include/adxl355/adxl355_version.h",
         ),
         "cmake -S c -B build/c && cmake --build build/c",
-        "Core lifecycle, range, ODR, raw/converted reads, temperature, status, signed offsets, calibration helpers, and bounded self-test response.",
-        "No public FIFO sample decoder, interrupt configuration API, or Linux bus adapter.",
+        "Core lifecycle, range, ODR, bounded FIFO count/decode/read, raw/converted reads, temperature, status, signed offsets, calibration helpers, and bounded self-test response.",
+        "No public interrupt configuration API or maintained Linux bus adapter.",
     ),
     LanguageReference(
         "cpp",
@@ -77,8 +77,8 @@ LANGUAGES: Final = (
             "python/src/adxl355/transport.py",
         ),
         "PYTHONPATH=python/src python -m pydoc adxl355",
-        "Core lifecycle, range, ODR, FIFO entry count, raw/converted reads, temperature, status, signed offsets, calibration helpers, bounded self-test response, and Linux SPI/I2C adapters.",
-        "No public FIFO sample decoder or interrupt/continuous-acquisition API.",
+        "Core lifecycle, range, ODR, bounded FIFO count/decode/read with typed partial-progress errors, raw/converted reads, temperature, status, signed offsets, calibration helpers, bounded self-test response, and Linux SPI/I2C adapters.",
+        "No public interrupt configuration or background continuous-acquisition API.",
     ),
     LanguageReference(
         "rust",

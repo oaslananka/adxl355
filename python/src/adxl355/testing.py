@@ -41,6 +41,8 @@ class MockTransport:
         self._matching_writes = 0
         self._self_test_baseline: RawXYZ | None = None
         self._self_test_stimulated: RawXYZ | None = None
+        self._fifo_data = b""
+        self._fifo_offset = 0
         self.call_count = 0
         self.calls: list[dict[str, object]] = []
 
@@ -52,7 +54,15 @@ class MockTransport:
         if self._force_error is not None:
             raise self._force_error
         self._log_call(False, reg, length)
-        if (
+        if reg == Register.FIFO_DATA:
+            remaining = self._fifo_data[self._fifo_offset :]
+            empty_sample = bytes((0, 0, 3, 0, 0, 2, 0, 0, 2))
+            data = (remaining + empty_sample * ((length // 9) + 2))[:length]
+            consumed = min(length, len(remaining))
+            self._fifo_offset += consumed
+            locations_left = max(0, (len(self._fifo_data) - self._fifo_offset) // 3)
+            self._regs[Register.FIFO_ENTRIES] = locations_left
+        elif (
             reg == Register.XDATA3
             and length == 9
             and self._self_test_baseline is not None
@@ -181,6 +191,18 @@ class MockTransport:
         self._self_test_baseline = baseline
         self._self_test_stimulated = stimulated
         self._regs[Register.STATUS] = STATUS_DATA_RDY
+
+    def set_fifo_payload(self, payload: bytes, locations: int | None = None) -> None:
+        """Set sustained FIFO bytes and the reported axis-location count."""
+        if locations is None:
+            if len(payload) % 3:
+                raise ValueError("FIFO payload length must be a multiple of 3")
+            locations = len(payload) // 3
+        if not 0 <= locations <= 0xFF:
+            raise ValueError("locations must fit in one register byte")
+        self._fifo_data = bytes(payload)
+        self._fifo_offset = 0
+        self._regs[Register.FIFO_ENTRIES] = locations
 
     def inject_error(self, error: Exception) -> None:
         """Make all subsequent bus calls raise the given error."""

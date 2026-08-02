@@ -29,6 +29,7 @@ typedef struct {
 
 /** Maximum number of logged calls. */
 #define ADXL355_MOCK_MAX_CALLS 256
+#define ADXL355_MOCK_FIFO_MAX_BYTES (ADXL355_FIFO_MAX_LOCATIONS * ADXL355_FIFO_BYTES_PER_LOCATION)
 
 typedef struct {
     uint8_t  regs[ADXL355_MOCK_NUM_REGS];       /**< Simulated register file. */
@@ -45,6 +46,9 @@ typedef struct {
     bool     emulate_self_test;                  /**< Return dynamic XYZ data from SELF_TEST bits. */
     adxl355_raw_xyz_t self_test_baseline;        /**< Raw XYZ with ST1/ST2 disabled. */
     adxl355_raw_xyz_t self_test_stimulated;      /**< Raw XYZ with ST1/ST2 enabled. */
+    uint8_t  fifo_data[ADXL355_MOCK_FIFO_MAX_BYTES]; /**< Sustained FIFO_DATA payload. */
+    size_t   fifo_length;                          /**< Configured FIFO payload bytes. */
+    size_t   fifo_offset;                          /**< Bytes already popped. */
     adxl355_mock_call_t calls[ADXL355_MOCK_MAX_CALLS]; /**< Call history. */
     void    *delay_ctx;                          /**< Context for delay callback (unused). */
 } adxl355_mock_bus_t;
@@ -63,6 +67,13 @@ void adxl355_mock_bus_set_xyz_raw(adxl355_mock_bus_t *mock,
 void adxl355_mock_bus_set_self_test_xyz(adxl355_mock_bus_t *mock,
                                         adxl355_raw_xyz_t baseline,
                                         adxl355_raw_xyz_t stimulated);
+
+
+/** Configure sustained FIFO bytes and FIFO_ENTRIES axis-location count. */
+void adxl355_mock_bus_set_fifo_payload(adxl355_mock_bus_t *mock,
+                                       const uint8_t *payload,
+                                       size_t length,
+                                       uint8_t locations);
 
 /** Return the adxl355_bus_t interface wrapping this mock. */
 adxl355_bus_t adxl355_mock_bus_get_interface(adxl355_mock_bus_t *mock);

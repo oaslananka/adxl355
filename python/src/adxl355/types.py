@@ -22,6 +22,26 @@ class AccelXYZ:
 
 
 @dataclass(frozen=True)
+class FifoLocation:
+    """One decoded FIFO axis location."""
+
+    raw: int
+    is_x_axis: bool
+    empty: bool = False
+
+
+@dataclass(frozen=True)
+class FifoReadResult:
+    """Complete samples and bounded FIFO consumption metadata."""
+
+    samples: tuple[RawXYZ, ...]
+    available_locations: int
+    consumed_locations: int
+    remaining_locations: int
+    consumption_indeterminate: bool = False
+
+
+@dataclass(frozen=True)
 class SelfTestThresholds:
     """Caller-owned absolute response windows in g for one fixture policy."""
 

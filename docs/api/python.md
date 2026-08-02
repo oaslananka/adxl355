@@ -6,9 +6,9 @@
 
 ## Capability boundary
 
-Core lifecycle, range, ODR, FIFO entry count, raw/converted reads, temperature, status, signed offsets, calibration helpers, bounded self-test response, and Linux SPI/I2C adapters.
+Core lifecycle, range, ODR, bounded FIFO count/decode/read with typed partial-progress errors, raw/converted reads, temperature, status, signed offsets, calibration helpers, bounded self-test response, and Linux SPI/I2C adapters.
 
-**Not exposed:** No public FIFO sample decoder or interrupt/continuous-acquisition API.
+**Not exposed:** No public interrupt configuration or background continuous-acquisition API.
 
 ## Authoritative sources
 
@@ -99,6 +99,13 @@ DataNotReadyError:type
 DataReadyTimeoutError:type
 DeviceNotFoundError:type
 DeviceStateError:type
+FifoBusError:type
+FifoEmptyError:type
+FifoFormatError:type
+FifoLocation:type
+FifoOverrunError:type
+FifoReadError:type
+FifoReadResult:type
 InvalidConfigurationError:type
 ODR:EnumType
 PowerMode:EnumType
@@ -117,6 +124,8 @@ SelfTestThresholds:type
 Transport:_ProtocolMeta
 __version__:str
 calculate_offset:function
+decode_fifo_location:function
+decode_fifo_sample:function
 ```
 
 ### Method
@@ -127,6 +136,7 @@ ADXL355.probe(self) -> 'bool'
 ADXL355.read_acceleration_g(self) -> 'AccelXYZ'
 ADXL355.read_acceleration_mps2(self) -> 'AccelXYZ'
 ADXL355.read_fifo_entries(self) -> 'int'
+ADXL355.read_fifo_samples(self, max_samples: 'int') -> 'FifoReadResult'
 ADXL355.read_offset(self, axis: 'Axis') -> 'int'
 ADXL355.read_raw(self) -> 'RawXYZ'
 ADXL355.read_status(self) -> 'int'
@@ -149,6 +159,13 @@ Transport.write_register(self, reg: int, data: bytes) -> None
 ADXL355(transport: 'Transport') -> 'None'
 AccelXYZ(x: float, y: float, z: float) -> None
 Axis(*values)
+FifoBusError(message: str, partial_samples: tuple[object, ...] = (), consumed_locations: int = 0, consumption_indeterminate: bool = True) -> None
+FifoEmptyError(message: str, partial_samples: tuple[object, ...] = (), consumed_locations: int = 0, consumption_indeterminate: bool = False) -> None
+FifoFormatError(message: str, partial_samples: tuple[object, ...] = (), consumed_locations: int = 0, consumption_indeterminate: bool = False) -> None
+FifoLocation(raw: int, is_x_axis: bool, empty: bool = False) -> None
+FifoOverrunError(message: str, partial_samples: tuple[object, ...] = (), consumed_locations: int = 0, consumption_indeterminate: bool = False) -> None
+FifoReadError(message: str, partial_samples: tuple[object, ...] = (), consumed_locations: int = 0, consumption_indeterminate: bool = False) -> None
+FifoReadResult(samples: tuple[adxl355.types.RawXYZ, ...], available_locations: int, consumed_locations: int, remaining_locations: int, consumption_indeterminate: bool = False) -> None
 ODR(*values)
 PowerMode(*values)
 Range(*values)
@@ -161,6 +178,8 @@ SelfTestThresholdError(result: object) -> None
 SelfTestThresholds(min_abs_delta_g: adxl355.types.AccelXYZ, max_abs_delta_g: adxl355.types.AccelXYZ) -> None
 Transport(*args, **kwargs)
 calculate_offset(measured_raw: 'int', expected_raw: 'int', current_offset: 'int' = 0, *, saturate: 'bool' = False) -> 'int'
+decode_fifo_location(payload: 'bytes') -> 'FifoLocation'
+decode_fifo_sample(payload: 'bytes') -> 'RawXYZ'
 ```
 
 ### Value

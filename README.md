@@ -18,11 +18,11 @@ range and power-mode control, raw XYZ reads, acceleration conversion,
 temperature, status, and stateless decode/conversion helpers. Feature coverage
 outside that core is intentionally language-specific.
 
-| Language | Core device API | ODR configuration | FIFO entry count | Self-test response | Linux SPI adapter | Linux I2C adapter | embedded-hal SPI/I2C | Packaging dry run | Physical HIL evidence |
+| Language | Core device API | ODR configuration | FIFO support | Self-test response | Linux SPI adapter | Linux I2C adapter | embedded-hal SPI/I2C | Packaging dry run | Physical HIL evidence |
 |---|---|---|---|---|---|---|---|---|---|
-| C | Yes | Yes | No public method | Yes, bounded measured response | Example only | No | No | Yes, CMake install/export | Raspberry Pi 5 SPI response pass |
+| C | Yes | Yes | Bounded count/decode/read, caller storage | Yes, bounded measured response | Example only | No | No | Yes, CMake install/export | Raspberry Pi 5 SPI response pass |
 | C++ | Yes, C wrapper | Yes | No public method | No public wrapper | User `BusInterface` | User `BusInterface` | Arduino SPI compile fixture | Yes, CMake install/export plus PlatformIO pack | No language-specific physical pass |
-| Python | Yes | Yes | Yes, count only | Yes, bounded measured response | Yes, `spidev` | Yes, `smbus2` | No | Yes, sdist/wheel | Raspberry Pi 5 SPI and I2C feature passes |
+| Python | Yes | Yes | Bounded count/decode/read, typed partial results | Yes, bounded measured response | Yes, `spidev` | Yes, `smbus2` | No | Yes, sdist/wheel | Raspberry Pi 5 SPI and I2C feature passes |
 | Rust | Yes | No | No public method | No public method | No Linux-specific adapter | No Linux-specific adapter | Yes | Yes, `cargo package` | No language-specific physical pass |
 | Node.js | Yes | No | No public method | No public method | User `Transport` | User `Transport` | No | Yes, `npm pack` | No language-specific physical pass |
 | Go | Yes | No | No public method | No public method | Yes, `adxl355/linuxio` on Linux amd64/arm64 | Yes, `adxl355/linuxio` on Linux amd64/arm64 | No | Module/build and cross-build checks | Raspberry Pi 5 SPI and I2C bounded example passes |
@@ -39,6 +39,8 @@ Linux device adapter for that language. The repository contains buildable packag
 - C/Python signed hardware-offset APIs and deterministic raw-LSB calibration helpers.
 - C/Python electrostatic self-test response APIs with bounded `DATA_RDY` polling,
   exact register restoration, and optional caller-owned thresholds.
+- C/Python FIFO contracts with shared marker/empty/framing vectors, bounded complete
+  XYZ reads, caller-owned storage in C, and typed partial-progress errors in Python.
 - C++ ODR configuration, an owning exception API, a stack-owned `Status`/`Result<T>` no-exception API, and a hash-locked Arduino Uno PlatformIO compile fixture.
 - Mock-based tests in all six languages and a required zero-skip vector gate.
 - CI quality gates for sanitizers, lint/type analysis, package smoke tests,
@@ -51,10 +53,11 @@ Linux device adapter for that language. The repository contains buildable packag
 ## Explicitly not claimed
 
 Register constants document the chip, but **Register presence does not imply a public API**. `FIFO_DATA`, offset registers, and `SELF_TEST` are represented in
-the register map. Full FIFO sample decoding and interrupt configuration are not
-implemented consistently as public driver methods. Signed offset programming,
-calibration helpers, and electrostatic self-test response measurement are
-implemented only in C and Python. The self-test APIs report measured response;
+the register map. Bounded FIFO count/decode/read methods are implemented only in
+C and Python; C++, Rust, Node.js, and Go do not expose them. Interrupt
+configuration and background acquisition are not implemented consistently as
+public driver methods. Signed offset programming, calibration helpers, and
+electrostatic self-test response measurement are implemented only in C and Python. The self-test APIs report measured response;
 they do not apply undocumented factory acceptance limits or imply parity in the
 other languages. The Arduino Uno fixture proves package and exception-free AVR
 compilation only; it is not physical Arduino hardware evidence and does not imply

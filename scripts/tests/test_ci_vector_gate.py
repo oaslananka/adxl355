@@ -40,6 +40,10 @@ class VectorGateWorkflowTests(unittest.TestCase):
             step.get("run", "") for step in job["steps"] if isinstance(step, dict)
         )
         self.assertIn("python scripts/verify_vectors.py --ci", commands)
+        self.assertIn(
+            "spec/generate_fifo_vectors_header.py",
+            (REPO_ROOT / "scripts/verify_vectors.py").read_text(),
+        )
 
     def test_vector_gate_installs_all_required_toolchains(self) -> None:
         job = self.load_ci()["jobs"]["consistency"]

@@ -26,8 +26,11 @@ typedef enum {
     ADXL355_ERR_NOT_READY   = -6,  /**< A coherent sample was unavailable. */
     ADXL355_ERR_UNSUPPORTED = -7,  /**< The requested operation is not implemented. */
     ADXL355_ERR_STATE       = -8,  /**< Probe or another required state transition is missing. */
-    ADXL355_ERR_THRESHOLD   = -9,  /**< Caller-owned self-test thresholds were violated. */
-    ADXL355_ERR_RESTORE     = -10  /**< Exact register restoration failed. */
+    ADXL355_ERR_THRESHOLD    = -9,  /**< Caller-owned self-test thresholds were violated. */
+    ADXL355_ERR_RESTORE      = -10, /**< Exact register restoration failed. */
+    ADXL355_ERR_FIFO_EMPTY   = -11, /**< FIFO was empty or returned an empty marker. */
+    ADXL355_ERR_FIFO_OVERRUN = -12, /**< FIFO overrun status was observed before reading. */
+    ADXL355_ERR_FIFO_FORMAT  = -13  /**< FIFO count, marker, or virtual bits were malformed. */
 } adxl355_status_t;
 
 /* ---------------------------------------------------------------------------
@@ -120,6 +123,22 @@ typedef struct {
     bool thresholds_passed;
 } adxl355_self_test_result_t;
 
+/** One decoded 24-bit FIFO location. */
+typedef struct {
+    int32_t raw;       /**< Signed 20-bit acceleration value. */
+    bool is_x_axis;    /**< True when the FIFO x-axis marker is set. */
+    bool empty;        /**< True when the FIFO empty/invalid marker is set. */
+} adxl355_fifo_location_t;
+
+/** Metadata for one bounded FIFO read. */
+typedef struct {
+    uint8_t available_locations; /**< Valid FIFO locations reported before reading. */
+    uint8_t consumed_locations;  /**< Locations physically popped by completed reads. */
+    uint8_t remaining_locations; /**< Reported locations not consumed by this call. */
+    uint8_t samples_read;        /**< Complete XYZ samples decoded into caller storage. */
+    bool consumption_indeterminate; /**< True if a FIFO_DATA transfer failed mid-transaction. */
+} adxl355_fifo_read_result_t;
+
 /**
  * Transport abstraction – function-pointer bus interface.
  *
@@ -179,6 +198,14 @@ typedef struct {
 
 /** Standard gravity in m/s². */
 #define ADXL355_STANDARD_GRAVITY_M_S2  9.80665f
+
+
+/** FIFO contains 96 axis locations, or 32 complete XYZ samples. */
+#define ADXL355_FIFO_MAX_LOCATIONS       96U
+#define ADXL355_FIFO_LOCATIONS_PER_SAMPLE 3U
+#define ADXL355_FIFO_BYTES_PER_LOCATION   3U
+#define ADXL355_FIFO_BYTES_PER_SAMPLE     9U
+#define ADXL355_FIFO_MAX_SAMPLES     (ADXL355_FIFO_MAX_LOCATIONS / ADXL355_FIFO_LOCATIONS_PER_SAMPLE)
 
 /* ---------------------------------------------------------------------------
  * Core API
@@ -405,6 +432,76 @@ adxl355_status_t adxl355_read_temperature_c(adxl355_t *dev, float *out);
  * @return ADXL355_OK or error code.
  */
 adxl355_status_t adxl355_read_status(adxl355_t *dev, uint8_t *status);
+
+/**
+ * Read and validate the FIFO location count.
+ *
+ * FIFO_ENTRIES counts axis locations, not complete XYZ samples. Valid values are
+ * 0..96. A remainder of one or two locations is valid but does not form a
+ * complete sample. Reserved bit 7 or values above 96 return FIFO_FORMAT.
+ *
+ * @param dev Initialised and probed device handle.
+ * @param[out] locations Valid FIFO axis locations.
+ * @return ADXL355_OK, ADXL355_ERR_FIFO_FORMAT, or another driver error.
+ */
+adxl355_status_t adxl355_read_fifo_entries(adxl355_t *dev, uint8_t *locations);
+
+/**
+ * Decode one 24-bit FIFO location.
+ *
+ * Bits 23:4 contain signed 20-bit acceleration, bits 3:2 must be virtual zeros,
+ * bit 1 is the empty/invalid marker, and bit 0 marks x-axis data.
+ *
+ * @param payload Three bytes, most significant byte first.
+ * @param length Payload length; must equal ADXL355_FIFO_BYTES_PER_LOCATION.
+ * @param[out] location Decoded location; modified only on success.
+ * @return ADXL355_OK, ADXL355_ERR_INVALID_ARG, ADXL355_ERR_FIFO_EMPTY, or
+ *         ADXL355_ERR_FIFO_FORMAT.
+ */
+adxl355_status_t adxl355_decode_fifo_location(const uint8_t *payload,
+                                               size_t length,
+                                               adxl355_fifo_location_t *location);
+
+/**
+ * Decode one complete FIFO XYZ sample from exactly nine bytes.
+ *
+ * The first location must carry the x-axis marker; y and z must not. Any empty
+ * marker, nonzero virtual bit, wrong marker order, truncated payload, or overlong
+ * payload is rejected.
+ *
+ * @param payload Nine FIFO bytes in sustained-read order.
+ * @param length Payload length; must equal ADXL355_FIFO_BYTES_PER_SAMPLE.
+ * @param[out] sample Decoded signed XYZ sample; modified only on success.
+ * @return ADXL355_OK, ADXL355_ERR_INVALID_ARG, ADXL355_ERR_FIFO_EMPTY, or
+ *         ADXL355_ERR_FIFO_FORMAT.
+ */
+adxl355_status_t adxl355_decode_fifo_sample(const uint8_t *payload,
+                                             size_t length,
+                                             adxl355_raw_xyz_t *sample);
+
+/**
+ * Read a bounded number of complete FIFO XYZ samples without allocation.
+ *
+ * The driver reads STATUS first; FIFO_OVR aborts without consuming data. It then
+ * validates FIFO_ENTRIES and reads up to min(available samples, capacity), one
+ * sustained nine-byte transaction per sample. `result` is zeroed before work and
+ * records every exactly completed sample transaction. On a later format/empty
+ * error, decoded samples remain in caller storage and `samples_read` reports the
+ * valid prefix. A FIFO_DATA bus error sets `consumption_indeterminate` because the
+ * hardware may have popped locations before the transport reported failure; reset
+ * or flush before trusting FIFO alignment. No rollback of popped data is possible.
+ *
+ * @param dev Initialised and probed device handle.
+ * @param[out] samples Caller-owned sample array.
+ * @param capacity Number of array elements; must be 1..32.
+ * @param[out] result Bounded read metadata, including partial progress on error.
+ * @return ADXL355_OK, ADXL355_ERR_FIFO_EMPTY, ADXL355_ERR_FIFO_OVERRUN,
+ *         ADXL355_ERR_FIFO_FORMAT, ADXL355_ERR_BUS, or an argument/state error.
+ */
+adxl355_status_t adxl355_read_fifo_samples(adxl355_t *dev,
+                                            adxl355_raw_xyz_t *samples,
+                                            size_t capacity,
+                                            adxl355_fifo_read_result_t *result);
 
 /* ---------------------------------------------------------------------------
  * Utility / conversion functions (stateless, reentrant)

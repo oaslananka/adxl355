@@ -111,7 +111,9 @@ def build_language_checks(
                     ),
                     repo_root,
                 ),
-                CommandSpec(("cmake", "--build", str(c_build), "--parallel"), repo_root),
+                CommandSpec(
+                    ("cmake", "--build", str(c_build), "--parallel"), repo_root
+                ),
                 CommandSpec(
                     ("ctest", "--test-dir", str(c_build), "--output-on-failure"),
                     repo_root,
@@ -134,7 +136,9 @@ def build_language_checks(
                     ),
                     repo_root,
                 ),
-                CommandSpec(("cmake", "--build", str(cpp_build), "--parallel"), repo_root),
+                CommandSpec(
+                    ("cmake", "--build", str(cpp_build), "--parallel"), repo_root
+                ),
                 CommandSpec(
                     ("ctest", "--test-dir", str(cpp_build), "--output-on-failure"),
                     repo_root,
@@ -184,9 +188,7 @@ def build_language_checks(
         ),
         LanguageCheck(
             "Go",
-            (
-                CommandSpec(("go", "test", "./..."), repo_root / "go"),
-            ),
+            (CommandSpec(("go", "test", "./..."), repo_root / "go"),),
         ),
     )
 
@@ -199,6 +201,10 @@ def build_spec_check(repo_root: Path, python_executable: str) -> LanguageCheck:
         (
             CommandSpec(
                 (python_executable, "spec/validate_spec.py"),
+                repo_root,
+            ),
+            CommandSpec(
+                (python_executable, "spec/generate_fifo_vectors_header.py", "--check"),
                 repo_root,
             ),
             CommandSpec(
@@ -222,6 +228,7 @@ def verify_python_vectors(
     try:
         from adxl355.device import (  # type: ignore[import-untyped]
             _decode_raw20,
+            decode_fifo_sample,
             raw_to_g,
             raw_to_mps2,
         )
@@ -237,7 +244,9 @@ def verify_python_vectors(
     raw_vectors = vectors.get("raw_decode")
     conversion = vectors.get("acceleration_conversion")
     if not isinstance(raw_vectors, list) or not isinstance(conversion, dict):
-        return VectorResult(0, 1, ("Malformed raw_decode or acceleration_conversion data",))
+        return VectorResult(
+            0, 1, ("Malformed raw_decode or acceleration_conversion data",)
+        )
 
     tolerance_g = float(conversion["tolerance_g"])
     tolerance_mps2 = float(conversion["tolerance_mps2"])
@@ -281,6 +290,30 @@ def verify_python_vectors(
             messages.append(
                 f"mps2/{vector['name']}: got {actual_mps2}, expected {expected_mps2}"
             )
+
+    fifo_vectors = vectors.get("fifo")
+    if not isinstance(fifo_vectors, dict):
+        failed += 1
+        messages.append("Malformed or missing fifo vector data")
+    else:
+        for vector in fifo_vectors.get("valid_samples", []):
+            try:
+                actual = decode_fifo_sample(bytes(vector["bytes"]))
+                expected = vector["raw"]
+                if (actual.x, actual.y, actual.z) == (
+                    expected["x"],
+                    expected["y"],
+                    expected["z"],
+                ):
+                    passed += 1
+                else:
+                    failed += 1
+                    messages.append(
+                        f"fifo/{vector['name']}: got {(actual.x, actual.y, actual.z)}"
+                    )
+            except Exception as exc:
+                failed += 1
+                messages.append(f"fifo/{vector['name']}: {exc}")
 
     return VectorResult(passed, failed, tuple(messages))
 
@@ -409,8 +442,12 @@ def _run_with_build_root(args: argparse.Namespace, build_root: Path) -> int:
     vectors = load_vectors()
     raw_count = len(vectors["raw_decode"])
     conversion_count = len(vectors["acceleration_conversion"]["vectors"])
+    fifo_count = len(vectors.get("fifo", {}).get("valid_samples", []))
     print(f"Spec: {VECTORS_PATH}")
-    print(f"Vectors: {raw_count} decode + {conversion_count} acceleration conversion")
+    print(
+        f"Vectors: {raw_count} decode + {conversion_count} acceleration conversion "
+        f"+ {fifo_count} FIFO sample"
+    )
     print(f"Build root: {build_root}")
     print(f"Mode: {'required CI' if args.ci else 'local (missing tools may skip)'}")
 
@@ -431,17 +468,19 @@ def _run_with_build_root(args: argparse.Namespace, build_root: Path) -> int:
     )
     for check in checks:
         print(f"\n── {check.label} ──")
-        results.append(
-            run_language_check(check, ci_mode=args.ci, timeout=args.timeout)
-        )
+        results.append(run_language_check(check, ci_mode=args.ci, timeout=args.timeout))
 
     _print_summary(results)
     failures = [result for result in results if result.status == "FAIL"]
     skipped = [result for result in results if result.status == "SKIP"]
     if failures or (args.ci and skipped):
-        print(f"\nVerification failed: {len(failures)} failure(s), {len(skipped)} skip(s)")
+        print(
+            f"\nVerification failed: {len(failures)} failure(s), {len(skipped)} skip(s)"
+        )
         return 1
-    print(f"\nVerification passed: {len(results) - len(skipped)} check(s), {len(skipped)} skip(s)")
+    print(
+        f"\nVerification passed: {len(results) - len(skipped)} check(s), {len(skipped)} skip(s)"
+    )
     return 0
 
 

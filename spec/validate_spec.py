@@ -373,7 +373,97 @@ class SpecValidator:
         if not math.isclose(float(value), expected, rel_tol=0.0, abs_tol=1e-9):
             self.error(f"{prefix}: expected_c does not match nominal formula")
 
+    def _validate_fifo_vector_bytes(
+        self, value: object, prefix: str
+    ) -> list[int] | None:
+        if not isinstance(value, list) or not all(
+            isinstance(byte, int) and not isinstance(byte, bool) and 0 <= byte <= 0xFF
+            for byte in value
+        ):
+            self.error(f"{prefix}: bytes must be a list of byte values")
+            return None
+        return value
+
+    def _validate_fifo_vectors(self, data: dict) -> None:
+        fifo = data.get("fifo")
+        prefix = "test_vectors.json: fifo"
+        if not isinstance(fifo, dict):
+            self.error(f"{prefix}: missing object")
+            return
+        expected_constants = {
+            "max_locations": 96,
+            "locations_per_sample": 3,
+            "bytes_per_location": 3,
+        }
+        for key, expected in expected_constants.items():
+            if fifo.get(key) != expected:
+                self.error(f"{prefix}: {key} must be {expected}")
+
+        valid = fifo.get("valid_samples")
+        invalid = fifo.get("invalid_samples")
+        if not isinstance(valid, list) or not valid:
+            self.error(f"{prefix}: valid_samples must be non-empty")
+            valid = []
+        if not isinstance(invalid, list) or not invalid:
+            self.error(f"{prefix}: invalid_samples must be non-empty")
+            invalid = []
+
+        for index, vector in enumerate(valid):
+            item = f"{prefix}: valid_samples[{index}]"
+            if not isinstance(vector, dict):
+                self.error(f"{item}: must be an object")
+                continue
+            payload = self._validate_fifo_vector_bytes(vector.get("bytes"), item)
+            raw = vector.get("raw")
+            if payload is None:
+                continue
+            if len(payload) != 9:
+                self.error(f"{item}: valid sample must contain exactly 9 bytes")
+                continue
+            if not isinstance(raw, dict) or set(raw) != {"x", "y", "z"}:
+                self.error(f"{item}: raw must contain x, y, and z")
+                continue
+            markers = [payload[2] & 1, payload[5] & 1, payload[8] & 1]
+            if markers != [1, 0, 0]:
+                self.error(f"{item}: marker order must be X, Y, Z")
+            for offset, axis in zip((0, 3, 6), ("x", "y", "z")):
+                if payload[offset + 2] & 0x0E:
+                    self.error(f"{item}: valid location has nonzero control bits")
+                decoded = (
+                    (payload[offset] << 12)
+                    | (payload[offset + 1] << 4)
+                    | (payload[offset + 2] >> 4)
+                )
+                if decoded & 0x80000:
+                    decoded -= 0x100000
+                if raw.get(axis) != decoded:
+                    self.error(f"{item}: raw {axis} should be {decoded}")
+
+        required_errors = {"length", "empty", "format"}
+        seen_errors: set[str] = set()
+        seen_lengths: set[int] = set()
+        for index, vector in enumerate(invalid):
+            item = f"{prefix}: invalid_samples[{index}]"
+            if not isinstance(vector, dict):
+                self.error(f"{item}: must be an object")
+                continue
+            payload = self._validate_fifo_vector_bytes(vector.get("bytes"), item)
+            error = vector.get("error")
+            if error not in required_errors:
+                self.error(f"{item}: error must be length, empty, or format")
+            else:
+                seen_errors.add(error)
+            if payload is not None:
+                seen_lengths.add(len(payload))
+        if seen_errors != required_errors:
+            self.error(
+                f"{prefix}: invalid vectors must cover {sorted(required_errors)}"
+            )
+        if not {8, 9, 10}.issubset(seen_lengths):
+            self.error(f"{prefix}: invalid vectors must cover lengths 8, 9, and 10")
+
     def _validate_test_vectors(self, data: dict):
+        self._validate_fifo_vectors(data)
         temperature = data.get("temperature_conversion")
         if not isinstance(temperature, dict):
             self.error("test_vectors.json: missing temperature_conversion object")

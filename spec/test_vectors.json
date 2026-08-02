@@ -4,39 +4,59 @@
   "raw_decode": [
     {
       "name": "zero",
-      "bytes": [0, 0, 0],
+      "bytes": [
+        0,
+        0,
+        0
+      ],
       "raw": 0,
       "description": "All zeros should decode to 0"
     },
     {
       "name": "positive_one",
-      "bytes": [0, 0, 16],
+      "bytes": [
+        0,
+        0,
+        16
+      ],
       "raw": 1,
       "description": "LSB set to 1 (bit 4 of LSB byte = raw bit 0)"
     },
     {
       "name": "positive_max",
-      "bytes": [127, 255, 240],
+      "bytes": [
+        127,
+        255,
+        240
+      ],
       "raw": 524287,
       "description": "Maximum positive value: 0x7FFFF"
     },
     {
       "name": "negative_min",
-      "bytes": [128, 0, 0],
+      "bytes": [
+        128,
+        0,
+        0
+      ],
       "raw": -524288,
       "description": "Minimum negative value: 0x80000 (two's complement)"
     },
     {
       "name": "negative_one",
-      "bytes": [255, 255, 240],
+      "bytes": [
+        255,
+        255,
+        240
+      ],
       "raw": -1,
       "description": "All 20 bits set: 0xFFFFF = -1 in two's complement"
     }
   ],
   "acceleration_conversion": {
     "description": "Raw to g conversion test vectors",
-    "tolerance_g": 1e-6,
-    "tolerance_mps2": 1e-5,
+    "tolerance_g": 1e-06,
+    "tolerance_mps2": 1e-05,
     "vectors": [
       {
         "name": "zero_raw_2g",
@@ -51,7 +71,7 @@
         "range": "G2",
         "expected_g": 0.999999,
         "expected_mps2": 9.80664019335,
-        "description": "Reset default RANGE[1:0]=0b01 (±2g): raw value representing approximately 1g"
+        "description": "Reset default RANGE[1:0]=0b01 (\u00b12g): raw value representing approximately 1g"
       },
       {
         "name": "positive_max_2g",
@@ -59,7 +79,7 @@
         "range": "G2",
         "expected_g": 2.0447193,
         "expected_mps2": 20.0518465233,
-        "description": "524287 * 3.9e-6 g/LSB for ±2g"
+        "description": "524287 * 3.9e-6 g/LSB for \u00b12g"
       },
       {
         "name": "negative_min_2g",
@@ -115,6 +135,193 @@
         "temp1": 255,
         "expected_raw": 4095,
         "expected_c": -219.1988950276243
+      }
+    ]
+  },
+  "fifo": {
+    "description": "ADXL355 Rev.D FIFO locations are 24-bit words containing signed 20-bit acceleration, two virtual zero bits, an empty flag, and an x-axis marker.",
+    "max_locations": 96,
+    "locations_per_sample": 3,
+    "bytes_per_location": 3,
+    "valid_samples": [
+      {
+        "name": "zero_xyz",
+        "bytes": [
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "raw": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        }
+      },
+      {
+        "name": "mixed_signs",
+        "bytes": [
+          0,
+          0,
+          17,
+          255,
+          255,
+          240,
+          64,
+          0,
+          0
+        ],
+        "raw": {
+          "x": 1,
+          "y": -1,
+          "z": 262144
+        }
+      },
+      {
+        "name": "signed_boundaries",
+        "bytes": [
+          127,
+          255,
+          241,
+          128,
+          0,
+          0,
+          255,
+          255,
+          240
+        ],
+        "raw": {
+          "x": 524287,
+          "y": -524288,
+          "z": -1
+        }
+      }
+    ],
+    "invalid_samples": [
+      {
+        "name": "truncated",
+        "bytes": [
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "error": "length"
+      },
+      {
+        "name": "overlong",
+        "bytes": [
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "error": "length"
+      },
+      {
+        "name": "empty_x",
+        "bytes": [
+          0,
+          0,
+          3,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "error": "empty"
+      },
+      {
+        "name": "empty_y",
+        "bytes": [
+          0,
+          0,
+          1,
+          0,
+          0,
+          2,
+          0,
+          0,
+          0
+        ],
+        "error": "empty"
+      },
+      {
+        "name": "missing_x_marker",
+        "bytes": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "error": "format"
+      },
+      {
+        "name": "unexpected_y_marker",
+        "bytes": [
+          0,
+          0,
+          1,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0
+        ],
+        "error": "format"
+      },
+      {
+        "name": "unexpected_z_marker",
+        "bytes": [
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1
+        ],
+        "error": "format"
+      },
+      {
+        "name": "nonzero_virtual_bits",
+        "bytes": [
+          0,
+          0,
+          5,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "error": "format"
       }
     ]
   }

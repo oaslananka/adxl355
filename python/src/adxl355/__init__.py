@@ -8,7 +8,7 @@ from adxl355.constants import (
     SCALE_8G_G_PER_LSB,
     STANDARD_GRAVITY_M_S2,
 )
-from adxl355.device import ADXL355
+from adxl355.device import ADXL355, decode_fifo_location, decode_fifo_sample
 from adxl355.errors import (
     ADXL355Error,
     BusError,
@@ -16,17 +16,32 @@ from adxl355.errors import (
     DataReadyTimeoutError,
     DeviceNotFoundError,
     DeviceStateError,
+    FifoBusError,
+    FifoEmptyError,
+    FifoFormatError,
+    FifoOverrunError,
+    FifoReadError,
     InvalidConfigurationError,
     RestoreError,
     SelfTestThresholdError,
 )
 from adxl355.registers import ODR, Axis, PowerMode, Range, Register
 from adxl355.transport import Transport
-from adxl355.types import AccelXYZ, RawXYZ, SelfTestConfig, SelfTestResult, SelfTestThresholds
+from adxl355.types import (
+    AccelXYZ,
+    FifoLocation,
+    FifoReadResult,
+    RawXYZ,
+    SelfTestConfig,
+    SelfTestResult,
+    SelfTestThresholds,
+)
 
 __all__ = [
     "__version__",
     "ADXL355",
+    "decode_fifo_location",
+    "decode_fifo_sample",
     "Axis",
     "calculate_offset",
     "Register",
@@ -34,6 +49,8 @@ __all__ = [
     "PowerMode",
     "ODR",
     "RawXYZ",
+    "FifoLocation",
+    "FifoReadResult",
     "SelfTestConfig",
     "SelfTestResult",
     "SelfTestThresholds",
@@ -41,6 +58,11 @@ __all__ = [
     "Transport",
     "ADXL355Error",
     "BusError",
+    "FifoReadError",
+    "FifoBusError",
+    "FifoEmptyError",
+    "FifoOverrunError",
+    "FifoFormatError",
     "DataReadyTimeoutError",
     "DeviceNotFoundError",
     "DeviceStateError",

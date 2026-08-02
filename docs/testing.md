@@ -439,3 +439,22 @@ explicit `SKIP` entries, or retain build output with:
 ```bash
 python scripts/verify_vectors.py --build-root /tmp/adxl355-vector-debug
 ```
+
+
+## FIFO contract verification
+
+`spec/test_vectors.json` is authoritative for FIFO sample bytes and expected
+signed XYZ values. `spec/generate_fifo_vectors_header.py` generates the C fixture
+header; required consistency runs it with `--check` so JSON/header drift fails CI.
+The C and Python suites consume the same vectors and cover:
+
+- signed 20-bit zero, positive, negative, and boundary values;
+- X/Y/Z marker ordering and virtual-bit validation;
+- empty/invalid markers and FIFO overrun status;
+- zero, truncated, exact, and overlong transport lengths;
+- bounded caller capacity and partial-progress reporting after a later failure;
+- C's no-dynamic-allocation core requirement.
+
+These are deterministic protocol tests. They do not replace later physical FIFO
+validation with controlled ODR, watermark, fill level, overflow, and ordering
+observations.
