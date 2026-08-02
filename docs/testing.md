@@ -194,6 +194,45 @@ Run the native package smoke locally with:
 ./scripts/smoke_cmake_packages.sh
 ```
 
+## Bounded fuzzing
+
+The required `Fuzz smoke` job runs only on a GitHub-hosted Ubuntu runner. It never
+uses the Raspberry Pi HIL runner, registry credentials, Doppler configuration, or
+production secrets. `Cross-language Consistency` depends on this job, so a fuzz
+failure blocks merge through the existing stable required check.
+
+The C target uses Clang libFuzzer with AddressSanitizer and
+UndefinedBehaviorSanitizer. It mutates raw decode inputs and exact, zero, partial,
+overlong, and failed transport responses across probe, raw XYZ, temperature,
+configuration, offset, and reset paths. Pull-request execution is bounded to
+10,000 runs or 30 seconds, a two-second per-input timeout, 1,024 MiB RSS, and
+1,024-byte inputs.
+
+The Python target uses a fixed seed to mutate raw 20-bit decode, exact-length
+transport responses, and release archive member/path classification. It requires
+both accepted and rejected paths in every CI run and writes one minimal JSON
+reproducer only when an unexpected failure occurs.
+
+Local deterministic commands:
+
+```bash
+# Python and release-tool boundary mutations
+PYTHONPATH=python/src python scripts/fuzz_python_boundaries.py   --iterations 10000 --seed 355 --artifact-dir artifacts/fuzz
+
+# Clang/libFuzzer target
+cmake -S c -B build/fuzz   -DCMAKE_C_COMPILER=clang   -DADXL355_BUILD_FUZZERS=ON   -DADXL355_ENABLE_SANITIZERS=ON   -DADXL355_WARNINGS_AS_ERRORS=ON
+cmake --build build/fuzz --target fuzz_adxl355
+build/fuzz/fuzz/fuzz_adxl355   -runs=10000 -max_total_time=30 -timeout=2 -rss_limit_mb=1024   -max_len=1024 scripts/fuzz_corpus/raw
+```
+
+The small committed corpus contains only reviewed seed inputs. Generated corpora,
+coverage profiles, and raw service dumps are not committed. A confirmed crash is
+reduced to the smallest useful reproducer, fixed, and preserved as a normal
+regression test. CI uploads crash reproducers only on failure and retains them for
+five days. Continuous-service enrollment such as OSS-Fuzz remains a separate
+maintainer decision after target ownership and signal quality are stable.
+
+
 ### Required status-check lifecycle
 
 The active `main` ruleset requires the repository-owned C, C++, Python, Rust,

@@ -31,6 +31,7 @@ class VectorGateWorkflowTests(unittest.TestCase):
                 "rust",
                 "node",
                 "go",
+                "fuzz",
             },
         )
         commands = "\n".join(
@@ -57,7 +58,9 @@ class VectorGateWorkflowTests(unittest.TestCase):
     def test_vector_gate_pins_new_dependencies(self) -> None:
         job = self.load_ci()["jobs"]["consistency"]
         uses = [step.get("uses", "") for step in job["steps"] if isinstance(step, dict)]
-        rust_actions = [value for value in uses if value.startswith("dtolnay/rust-toolchain@")]
+        rust_actions = [
+            value for value in uses if value.startswith("dtolnay/rust-toolchain@")
+        ]
         self.assertGreaterEqual(len(rust_actions), 1)
         for rust_action in rust_actions:
             self.assertRegex(rust_action, r"@[0-9a-f]{40}$")
