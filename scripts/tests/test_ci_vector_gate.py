@@ -18,7 +18,21 @@ class VectorGateWorkflowTests(unittest.TestCase):
     def test_required_consistency_job_runs_strict_vector_verifier(self) -> None:
         ci = self.load_ci()
         job = ci["jobs"]["consistency"]
-        self.assertEqual(set(job["needs"]), {"c", "cpp", "python", "rust", "node", "go"})
+        self.assertEqual(
+            set(job["needs"]),
+            {
+                "c",
+                "cpp",
+                "native-clang",
+                "native-macos",
+                "native-windows",
+                "native-arm",
+                "python",
+                "rust",
+                "node",
+                "go",
+            },
+        )
         commands = "\n".join(
             step.get("run", "") for step in job["steps"] if isinstance(step, dict)
         )
