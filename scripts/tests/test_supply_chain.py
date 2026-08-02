@@ -70,11 +70,19 @@ class SupplyChainTests(unittest.TestCase):
         self.assertIn('requires-python = ">=3.10"', pyproject)
         self.assertIn('python_version = "3.10"', pyproject)
 
+
+    def test_codeql_write_permission_is_scoped_to_analysis_job(self) -> None:
+        workflow = load_yaml(CODEQL)
+        self.assertEqual(workflow["permissions"], {"contents": "read", "packages": "read"})
+        self.assertEqual(
+            workflow["jobs"]["analyze"]["permissions"],
+            {"contents": "read", "packages": "read", "security-events": "write"},
+        )
+
     def test_codeql_is_primary_sast_for_supported_languages(self) -> None:
         workflow = load_yaml(CODEQL)
         permissions = workflow["permissions"]
         self.assertEqual(permissions["contents"], "read")
-        self.assertEqual(permissions["security-events"], "write")
         self.assertEqual(permissions["packages"], "read")
         triggers = workflow["on"]
         self.assertIn("pull_request", triggers)
@@ -82,6 +90,7 @@ class SupplyChainTests(unittest.TestCase):
         self.assertIn("schedule", triggers)
 
         job = workflow["jobs"]["analyze"]
+        self.assertEqual(job["permissions"]["security-events"], "write")
         matrix = job["strategy"]["matrix"]["include"]
         self.assertEqual(
             {entry["language"] for entry in matrix},
