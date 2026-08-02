@@ -96,10 +96,25 @@ class PublicDocumentationTests(unittest.TestCase):
             "st1+st2",
             "restore every saved register",
             "fixture-specific",
-            "must not be presented as analog devices production limits",
+            "must not be presented as an analog devices production limit",
         ):
             self.assertIn(phrase, hardware)
         self.assertIn("default configuration reports the measured response", python_readme)
+
+    def test_self_test_docs_record_rev_d_limits_and_physical_evidence(self) -> None:
+        readme = " ".join(README.read_text().split())
+        hardware = " ".join(
+            (REPO_ROOT / "docs" / "hardware-testing.md").read_text().split()
+        )
+        todo = (REPO_ROOT / "TODO.md").read_text()
+        self.assertIn("12d6206393223439e14b8e36b97e567751e8f8bb", readme)
+        self.assertIn("0.34236", hardware)
+        self.assertIn("0.33908", hardware)
+        self.assertIn("1.41865", hardware)
+        self.assertIn("X/Y `0.10–0.60 g`", hardware)
+        self.assertIn("Z `0.50–3.00 g`", hardware)
+        self.assertIn("raw temporary JSON report is not stored", hardware)
+        self.assertIn("[x] Self-test API hardware testing on Raspberry Pi 5 SPI", todo)
 
     def test_support_policy_matches_package_metadata_and_ci(self) -> None:
         contributing = CONTRIBUTING.read_text()

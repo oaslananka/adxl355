@@ -40,7 +40,7 @@ def self_test_fixture() -> tuple[ADXL355, MockTransport]:
     transport.set_register(Register.FILTER, 0xA5)
     transport.set_self_test_xyz(
         RawXYZ(100, -200, 300),
-        RawXYZ(25741, -25841, 128505),
+        RawXYZ(77023, -77123, 384915),
     )
     device = ADXL355(transport)
     device.probe()
@@ -112,10 +112,10 @@ def test_self_test_measures_typical_response_and_restores_exact_state() -> None:
     result = device.run_self_test(small_config())
 
     assert result.samples == 4
-    assert result.delta_g.x == pytest.approx(0.1000, abs=2e-5)
-    assert result.delta_g.y == pytest.approx(-0.1000, abs=2e-5)
-    assert result.delta_g.z == pytest.approx(0.5, abs=2e-5)
-    assert result.abs_delta_g.y == pytest.approx(0.1000, abs=2e-5)
+    assert result.delta_g.x == pytest.approx(0.3, abs=2e-5)
+    assert result.delta_g.y == pytest.approx(-0.3, abs=2e-5)
+    assert result.delta_g.z == pytest.approx(1.5, abs=2e-5)
+    assert result.abs_delta_g.y == pytest.approx(0.3, abs=2e-5)
     assert result.thresholds_evaluated is False
     assert result.thresholds_passed is True
     assert_restored(transport)
@@ -130,16 +130,16 @@ def test_self_test_measures_typical_response_and_restores_exact_state() -> None:
 def test_caller_threshold_policy_passes_or_returns_measured_failure() -> None:
     device, transport = self_test_fixture()
     thresholds = SelfTestThresholds(
-        min_abs_delta_g=AccelXYZ(0.08, 0.08, 0.40),
-        max_abs_delta_g=AccelXYZ(0.12, 0.12, 0.60),
+        min_abs_delta_g=AccelXYZ(0.10, 0.10, 0.50),
+        max_abs_delta_g=AccelXYZ(0.60, 0.60, 3.00),
     )
     result = device.run_self_test(small_config(thresholds))
     assert result.thresholds_evaluated is True
     assert result.thresholds_passed is True
 
     failing = SelfTestThresholds(
-        min_abs_delta_g=AccelXYZ(0.11, 0.08, 0.40),
-        max_abs_delta_g=AccelXYZ(0.12, 0.12, 0.60),
+        min_abs_delta_g=AccelXYZ(0.31, 0.10, 0.50),
+        max_abs_delta_g=AccelXYZ(0.60, 0.60, 3.00),
     )
     with pytest.raises(SelfTestThresholdError) as captured:
         device.run_self_test(small_config(failing))
@@ -147,7 +147,7 @@ def test_caller_threshold_policy_passes_or_returns_measured_failure() -> None:
     assert isinstance(failed_result, SelfTestResult)
     assert failed_result.thresholds_evaluated is True
     assert failed_result.thresholds_passed is False
-    assert failed_result.abs_delta_g.x > 0.09
+    assert failed_result.abs_delta_g.x > 0.29
     assert_restored(transport)
 
 

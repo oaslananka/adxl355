@@ -58,10 +58,16 @@ other languages.
 ## Hardware validation status
 
 The manual HIL workflow has a successful Raspberry Pi 5 SPI result on `main`
-([run 30725059679](https://github.com/oaslananka/adxl355/actions/runs/30725059679)): the ADXL355 returned revision `0x01` and 32 unique samples. I2C
-physical evidence is still pending. Both SPI and I2C must be rerun against the
-final release-candidate commit before publication. Wiring, runner setup, supported
-bus settings, diagnostics, and evidence requirements are documented in
+([run 30725059679](https://github.com/oaslananka/adxl355/actions/runs/30725059679)): the ADXL355 returned revision `0x01` and 32 unique samples. The C/Python
+self-test implementation was also exercised over SPI on code commit
+`12d6206393223439e14b8e36b97e567751e8f8bb`: two independent 64-sample runs
+measured approximately 0.342 g X, 0.339 g Y, and 1.419 g Z response, and a third
+run passed the Rev.D min/max windows. Every run restored `SELF_TEST`, `RANGE`,
+`FILTER`, and `POWER_CTL` exactly. This is feature evidence, not final
+release-candidate HIL evidence. I2C physical evidence is still pending. Both SPI
+and I2C must be rerun against the final release-candidate commit before
+publication. Wiring, runner setup, supported bus settings, diagnostics, and
+evidence requirements are documented in
 [`docs/hardware-testing.md`](docs/hardware-testing.md).
 
 ## Device lifecycle contract

@@ -1139,7 +1139,7 @@ static void prepare_self_test_fixture(adxl355_mock_bus_t *mock,
     mock->regs[ADXL355_REG_FILTER] = UINT8_C(0xA5);
     mock->regs[ADXL355_REG_POWER_CTL] = UINT8_C(0x04);
     adxl355_raw_xyz_t baseline = {100, -200, 300};
-    adxl355_raw_xyz_t stimulated = {25741, -25841, 128505};
+    adxl355_raw_xyz_t stimulated = {77023, -77123, 384915};
     adxl355_mock_bus_set_self_test_xyz(mock, baseline, stimulated);
     *bus = adxl355_mock_bus_get_interface(mock);
     TEST_ASSERT(adxl355_init(dev, bus) == ADXL355_OK, "self-test fixture init should succeed");
@@ -1216,13 +1216,13 @@ static void test_self_test_measures_typical_response_and_restores_state(void)
     TEST_ASSERT(adxl355_run_self_test(&dev, &config, &result) == ADXL355_OK,
                 "self-test measurement should succeed");
     TEST_ASSERT(result.samples == config.sample_count, "result should record sample count");
-    TEST_ASSERT(approx_eq(result.delta_g.x, 0.1000f, 0.00002f),
-                "X response should measure approximately 0.1 g");
-    TEST_ASSERT(approx_eq(result.delta_g.y, -0.1000f, 0.00002f),
+    TEST_ASSERT(approx_eq(result.delta_g.x, 0.2999997f, 0.00002f),
+                "X response should measure the 0.3 g typical fixture value");
+    TEST_ASSERT(approx_eq(result.delta_g.y, -0.2999997f, 0.00002f),
                 "Y signed response should be preserved");
-    TEST_ASSERT(approx_eq(result.delta_g.z, 0.4999995f, 0.00002f),
-                "Z response should measure approximately 0.5 g");
-    TEST_ASSERT(approx_eq(result.abs_delta_g.y, 0.1000f, 0.00002f),
+    TEST_ASSERT(approx_eq(result.delta_g.z, 1.4999985f, 0.00002f),
+                "Z response should measure the 1.5 g typical fixture value");
+    TEST_ASSERT(approx_eq(result.abs_delta_g.y, 0.2999997f, 0.00002f),
                 "absolute response should be available for policy checks");
     TEST_ASSERT(!result.thresholds_evaluated && result.thresholds_passed,
                 "default run should report measurement without normative thresholds");
@@ -1257,21 +1257,21 @@ static void test_self_test_threshold_policy(void)
     prepare_self_test_fixture(&mock, &dev, &bus);
     adxl355_self_test_config_t config = small_self_test_config();
     config.enforce_thresholds = true;
-    config.thresholds.min_abs_delta_g = (adxl355_float_xyz_t){0.08f, 0.08f, 0.40f};
-    config.thresholds.max_abs_delta_g = (adxl355_float_xyz_t){0.12f, 0.12f, 0.60f};
+    config.thresholds.min_abs_delta_g = (adxl355_float_xyz_t){0.10f, 0.10f, 0.50f};
+    config.thresholds.max_abs_delta_g = (adxl355_float_xyz_t){0.60f, 0.60f, 3.00f};
     adxl355_self_test_result_t result;
     TEST_ASSERT(adxl355_run_self_test(&dev, &config, &result) == ADXL355_OK,
                 "caller fixture policy should pass representative response");
     TEST_ASSERT(result.thresholds_evaluated && result.thresholds_passed,
                 "passing caller thresholds should be recorded");
 
-    config.thresholds.min_abs_delta_g.x = 0.11f;
-    config.thresholds.max_abs_delta_g.x = 0.12f;
+    config.thresholds.min_abs_delta_g.x = 0.31f;
+    config.thresholds.max_abs_delta_g.x = 0.60f;
     TEST_ASSERT(adxl355_run_self_test(&dev, &config, &result) == ADXL355_ERR_THRESHOLD,
                 "caller threshold violation should be distinct");
     TEST_ASSERT(result.thresholds_evaluated && !result.thresholds_passed,
                 "failed result should remain populated");
-    TEST_ASSERT(result.abs_delta_g.x > 0.09f,
+    TEST_ASSERT(result.abs_delta_g.x > 0.29f,
                 "threshold failure should retain measured response");
     TEST_ASSERT(mock.regs[ADXL355_REG_SELF_TEST] == 0U,
                 "threshold failure should still restore self-test register");
