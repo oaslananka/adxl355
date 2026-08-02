@@ -183,7 +183,8 @@ class PublicDocumentationTests(unittest.TestCase):
             "Linux amd64 and arm64",
             "--samples 8 --timeout 10s",
             "restore standby",
-            "I2C remains pending",
+            "Raspberry Pi 5 SPI bounded example pass; I2C pending",
+            "08273bff4611a33f1b88dae6a08c92d5199eab28",
         ):
             self.assertIn(phrase, readme)
         for phrase in (
@@ -197,6 +198,22 @@ class PublicDocumentationTests(unittest.TestCase):
         self.assertIn("GOOS=linux GOARCH=arm64 go build ./...", testing)
         self.assertIn("linuxio.ErrUnsupported", testing)
         self.assertIn("[x] spidev/Linux implementation", todo)
+        self.assertIn(
+            "[x] Bounded SPI example with real hardware on Raspberry Pi 5", todo
+        )
+        self.assertIn("[ ] Bounded I2C example with real hardware (#41)", todo)
+        hardware = (REPO_ROOT / "docs" / "hardware-testing.md").read_text()
+        for phrase in (
+            "Go Linux SPI bounded example",
+            "a74fd41821d3decc8a4e67d31411659487af83106b697b124975255f5749f2de",
+            "28.0939 °C",
+            "29 unique tuples",
+            "POWER_CTL=0x01",
+            "233.2873 °C",
+            "That rejected run is not accepted as evidence",
+            "Go I2C example remains physically unverified",
+        ):
+            self.assertIn(phrase, hardware)
 
     def test_calibration_docs_record_repeatable_physical_evidence(self) -> None:
         text = (REPO_ROOT / "docs" / "calibration.md").read_text()
