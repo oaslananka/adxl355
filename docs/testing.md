@@ -242,6 +242,56 @@ Run the Windows package consumer smoke locally from PowerShell with:
 ./scripts/smoke_cmake_packages.ps1
 ```
 
+## Public API compatibility baseline
+
+`spec/compatibility/public-api.json` is generated from the maintained C/C++
+headers, Python exports and signatures, Rust public declarations, TypeScript
+exports, and Go exported declarations. The required `Cross-language Consistency`
+job verifies that every baseline declaration still exists with the same
+normalized signature. Additive API entries do not fail the check.
+
+Refresh the baseline only after reviewing the generated diff:
+
+```bash
+python scripts/check_public_api.py --write
+python scripts/check_public_api.py
+```
+
+An additive baseline expansion needs normal tests and documentation. Removing or
+changing a baseline declaration requires an intentional baseline edit and a
+changed `CHANGELOG.md` entry with an explicit `**Breaking (<surface>):**`
+marker. Pull-request CI compares the new baseline with the base commit and rejects
+a removal/signature change without that evidence. Do not edit declarations in
+the JSON by hand to hide a compatibility failure.
+
+The source-based extractors are compatibility tripwires, not full language ABI
+proofs. C/C++ binary ABI, Python behavioral compatibility, Rust SemVer legality,
+TypeScript structural typing, and Go module compatibility still require the
+language-specific package and consumer tests. New language features that cannot
+be normalized safely must document that limitation and add an independent
+consumer fixture before baseline coverage is weakened.
+
+## Package and release size budgets
+
+`spec/compatibility/package-size-budgets.json` records reviewed compressed-size
+budgets for Python wheel/sdist, Rust crate, npm tarball, Go module archive,
+native C/C++ archive, and the aggregate release bundle. Release jobs write a
+`SIZE_REPORT.json` beside each package; the final bundle writes
+`RELEASE_SIZE_REPORT.json`. Missing, duplicate, or oversized artifacts fail the
+release gate.
+
+Measure a local artifact directory without enforcing a budget:
+
+```bash
+python scripts/check_package_sizes.py --directory /path/to/artifacts --measure
+```
+
+A budget increase requires a clean-checkout before/after measurement, an
+explanation of the added package content, and review of whether generated files,
+tests, maps, debug symbols, or unrelated assets leaked into the archive. Do not
+raise a limit merely to make CI green. Size budgets are regression signals, not
+claims about memory use, runtime allocation, or embedded flash/RAM suitability.
+
 ## Hardware-in-the-Loop Tests
 
 Physical validation is implemented as the explicit CLI

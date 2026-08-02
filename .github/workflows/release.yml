@@ -111,6 +111,8 @@ jobs:
           python scripts/release_artifacts.py python \
             --directory "$OUT" \
             --version "$PYTHON_VERSION" > "$OUT/VERIFY.json"
+          python scripts/check_package_sizes.py \
+            --family python --directory "$OUT" --report "$OUT/SIZE_REPORT.json"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: package-python-${{ needs.preflight.outputs.version }}-${{ needs.preflight.outputs.short_sha }}
@@ -150,6 +152,8 @@ jobs:
           python3 ../scripts/release_artifacts.py rust \
             --directory "$OUT" \
             --version "$VERSION" > "$OUT/VERIFY.json"
+          python3 ../scripts/check_package_sizes.py \
+            --family rust --directory "$OUT" --report "$OUT/SIZE_REPORT.json"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: package-rust-${{ needs.preflight.outputs.version }}-${{ needs.preflight.outputs.short_sha }}
@@ -193,6 +197,8 @@ jobs:
           python3 ../scripts/release_artifacts.py node \
             --directory "$OUT" \
             --version "${{ needs.preflight.outputs.version }}" > "$OUT/VERIFY.json"
+          python3 ../scripts/check_package_sizes.py \
+            --family node --directory "$OUT" --report "$OUT/SIZE_REPORT.json"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: package-node-${{ needs.preflight.outputs.version }}-${{ needs.preflight.outputs.short_sha }}
@@ -240,6 +246,8 @@ jobs:
           python3 scripts/release_artifacts.py go \
             --directory "$OUT" \
             --version "$VERSION" > "$OUT/VERIFY.json"
+          python3 scripts/check_package_sizes.py \
+            --family go --directory "$OUT" --report "$OUT/SIZE_REPORT.json"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: package-go-${{ needs.preflight.outputs.version }}-${{ needs.preflight.outputs.short_sha }}
@@ -302,6 +310,8 @@ jobs:
           python3 scripts/release_artifacts.py native \
             --directory "$OUT" \
             --version "$VERSION" > "$OUT/VERIFY.json"
+          python3 scripts/check_package_sizes.py \
+            --family native --directory "$OUT" --report "$OUT/SIZE_REPORT.json"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: package-c-cpp-${{ needs.preflight.outputs.version }}-${{ needs.preflight.outputs.short_sha }}
@@ -420,6 +430,8 @@ jobs:
           bundle="adxl355-release-${VERSION}-${SHORT_SHA}.tar.gz"
           tar -czf "$bundle"             release-artifacts             RELEASE_SHA256SUMS             release-metadata.json             release.spdx.json             release-vulnerabilities.json
           sha256sum -- "$bundle" > RELEASE_BUNDLE_SHA256SUMS
+          python "$GITHUB_WORKSPACE/scripts/check_package_sizes.py" \
+            --family release --directory "$ROOT" --report "$ROOT/RELEASE_SIZE_REPORT.json"
 
       - name: Attest SLSA build provenance
         id: provenance
@@ -442,6 +454,7 @@ jobs:
             ${{ runner.temp }}/release-artifacts
             ${{ runner.temp }}/RELEASE_SHA256SUMS
             ${{ runner.temp }}/RELEASE_BUNDLE_SHA256SUMS
+            ${{ runner.temp }}/RELEASE_SIZE_REPORT.json
             ${{ runner.temp }}/release-metadata.json
             ${{ runner.temp }}/SBOM_INPUT.json
             ${{ runner.temp }}/SBOM_PREPARE.json

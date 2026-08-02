@@ -1,0 +1,69 @@
+{
+  "families": {
+    "go": [
+      {
+        "count": 1,
+        "max_bytes": 15000,
+        "measured_bytes": 7279,
+        "name": "go-module-archive",
+        "pattern": "*.tar.gz"
+      }
+    ],
+    "native": [
+      {
+        "count": 1,
+        "max_bytes": 40000,
+        "measured_bytes": 19817,
+        "name": "native-c-cpp-archive",
+        "pattern": "*.tar.gz"
+      }
+    ],
+    "node": [
+      {
+        "count": 1,
+        "max_bytes": 25000,
+        "measured_bytes": 11521,
+        "name": "node-tarball",
+        "pattern": "*.tgz"
+      }
+    ],
+    "python": [
+      {
+        "count": 1,
+        "max_bytes": 25000,
+        "measured_bytes": 15855,
+        "name": "python-wheel",
+        "pattern": "*.whl"
+      },
+      {
+        "count": 1,
+        "max_bytes": 25000,
+        "measured_bytes": 13297,
+        "name": "python-sdist",
+        "pattern": "*.tar.gz"
+      }
+    ],
+    "release": [
+      {
+        "count": 1,
+        "max_bytes": 1000000,
+        "name": "aggregate-release-bundle",
+        "pattern": "adxl355-release-*.tar.gz"
+      }
+    ],
+    "rust": [
+      {
+        "count": 1,
+        "max_bytes": 20000,
+        "measured_bytes": 10605,
+        "name": "rust-crate",
+        "pattern": "*.crate"
+      }
+    ]
+  },
+  "measurement_basis": {
+    "commit": "dd06464ae30114e48a3af8249bf88d946e11532e",
+    "notes": "Initial clean-checkout package measurements after the Rust typed-error, native-platform, and C/Python calibration API merges. Budgets include reviewed alpha-development headroom; release jobs report actual and baseline deltas."
+  },
+  "schema_version": 1
+}

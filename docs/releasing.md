@@ -47,6 +47,11 @@ Each package job checks out the preflight SHA explicitly, performs a clean-tree
 check, builds without publishing, inspects archive contents, installs or consumes
 the built artifact in a clean temporary environment, generates SHA-256 checksums,
 and uploads an inspectable artifact.
+Each package job also enforces the reviewed compressed-size budget and uploads a
+machine-readable `SIZE_REPORT.json`. The final bundle is checked separately and
+publishes `RELEASE_SIZE_REPORT.json`. A size-limit change is a reviewed release
+policy change, not an automatic response to a failing build; see
+[`testing.md`](testing.md) for measurement and update rules.
 
 The final job downloads every verified package artifact, creates aggregate
 checksums and metadata, generates an SPDX JSON SBOM, and scans that SBOM with
