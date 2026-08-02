@@ -178,6 +178,35 @@ class ReleaseWorkflowTests(unittest.TestCase):
         release = self.load_release()
         self.assertFalse(release["concurrency"]["cancel-in-progress"])
 
+    def test_registry_publish_jobs_use_current_tooling_for_old_tags(self) -> None:
+        jobs = self.load_release()["jobs"]
+        for job_name in ("publish-python", "publish-node"):
+            checkouts = [
+                step
+                for step in jobs[job_name]["steps"]
+                if str(step.get("uses", "")).startswith("actions/checkout@")
+            ]
+            self.assertEqual(len(checkouts), 1)
+            self.assertEqual(checkouts[0]["with"]["ref"], "${{ github.sha }}")
+            self.assertFalse(checkouts[0]["with"]["persist-credentials"])
+
+        rust_checkouts = [
+            step
+            for step in jobs["publish-rust"]["steps"]
+            if str(step.get("uses", "")).startswith("actions/checkout@")
+        ]
+        self.assertEqual(len(rust_checkouts), 2)
+        self.assertEqual(
+            rust_checkouts[0]["with"]["ref"],
+            "${{ needs.preflight.outputs.release_sha }}",
+        )
+        self.assertEqual(rust_checkouts[1]["with"]["ref"], "${{ github.sha }}")
+        self.assertEqual(rust_checkouts[1]["with"]["path"], ".release-tooling")
+        rust_commands = "\n".join(
+            str(step.get("run", "")) for step in jobs["publish-rust"]["steps"]
+        )
+        self.assertIn(".release-tooling/scripts/registry_release.py", rust_commands)
+
     def test_registry_publish_jobs_reuse_verified_artifacts_with_oidc(self) -> None:
         release = self.load_release()
         jobs = release["jobs"]
