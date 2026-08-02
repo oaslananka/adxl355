@@ -1,11 +1,13 @@
 # Publishing Guide
 
-> **Current state:** The repository provides a verification and packaging dry run.
-> It does not publish to PyPI, npm, crates.io, GitHub Releases, or a Go proxy.
-> Registry publication requires an explicit maintainer decision after version,
-> physical HIL, security, and release-evidence gates are satisfied. A Raspberry
-> Pi 5 SPI integration run has passed; I2C and final-candidate reruns remain
-> required before publication.
+> **Current state:** [`v0.1.0-alpha.3`](https://github.com/oaslananka/adxl355/releases/tag/v0.1.0-alpha.3)
+> is published as a GitHub prerelease from exact commit
+> `71de69b8727a9f8eef254de586d9bce7bc8fa8ac`. Final SPI run `30736413982` and
+> I2C run `30736668298` passed on that commit, and the release includes permanent
+> sanitized HIL reports, checksums, an SPDX 2.3 SBOM, a Grype report, and verified
+> provenance/SBOM attestations. PyPI, npm, and crates.io remain unpublished; the
+> Go module tag is `go/v0.1.0-alpha.3`. External registry publication still
+> requires a separate maintainer decision and trusted-publishing configuration.
 
 ## Automated release verification
 

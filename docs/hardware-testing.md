@@ -378,9 +378,15 @@ integration run also succeeded on `main` commit
 - samples: 32 captured and 32 unique;
 - artifact: `adxl355-hil-i2c-30734635341` with 30-day retention.
 
-These results prove both physical bus paths, but they are not yet the final paired
-release evidence because repository changes may move the candidate commit. Before
-publication, run SPI and I2C against the same final release-candidate SHA.
+These runs remain useful feature evidence. The final paired release evidence for
+[`v0.1.0-alpha.3`](https://github.com/oaslananka/adxl355/releases/tag/v0.1.0-alpha.3)
+was produced on exact commit `71de69b8727a9f8eef254de586d9bce7bc8fa8ac`:
+SPI run `30736413982` and I2C run `30736668298`. Both captured 32/32 unique
+samples, verified identity `0xAD/0x1D/0xED` and revision `0x01`, measured
+29.1989 °C, and passed standby/±2 g/default-ODR restoration. The release stores
+permanent sanitized reports as `hil-spi-30736413982.json` and
+`hil-i2c-30736668298.json`. The I2C release fixture was strapped to address
+`0x1D`; address `0x53` was not physically validated for this prerelease.
 
 ### Go Linux SPI bounded example
 
