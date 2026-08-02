@@ -6,9 +6,9 @@ These compact references are generated from repository public declarations. They
 
 | Language | Reference | Public declarations | Capability summary |
 |---|---|---:|---|
-| C | [c.md](c.md) | 68 | Core lifecycle, range, ODR, bounded FIFO count/decode/read, raw/converted reads, temperature, status, signed offsets, calibration helpers, and bounded self-test response. |
+| C | [c.md](c.md) | 74 | Core lifecycle, range, ODR, bounded FIFO count/decode/read, raw/converted reads, temperature, status, signed offsets, calibration helpers, bounded self-test response, and internal-clock dedicated-DRDY/INT1/INT2 configuration. |
 | C++ | [cpp.md](cpp.md) | 77 | Owning exception and stack-owned no-exception wrappers over the C core for probe, reset, range, ODR, power mode, raw/converted reads, temperature, status, and stateless conversions; thin Arduino SPI compile integration. |
-| Python | [python.md](python.md) | 140 | Core lifecycle, range, ODR, bounded FIFO count/decode/read with typed partial-progress errors, raw/converted reads, temperature, status, signed offsets, calibration helpers, bounded self-test response, and Linux SPI/I2C adapters. |
+| Python | [python.md](python.md) | 149 | Core lifecycle, range, ODR, bounded FIFO count/decode/read with typed partial-progress errors, raw/converted reads, temperature, status, signed offsets, calibration helpers, bounded self-test response, internal-clock dedicated-DRDY/INT1/INT2 configuration, and Linux SPI/I2C adapters. |
 | Rust | [rust.md](rust.md) | 107 | Core lifecycle, range, power mode, raw/converted reads, temperature, status, stateless conversions, and optional embedded-hal SPI/I2C adapters. |
 | Node.js / TypeScript | [node.md](node.md) | 77 | Typed core lifecycle plus optional maintained Linux SPI/I2C subpath adapters with explicit close ownership and bounded exact-length operations. |
 | Go | [go.md](go.md) | 123 | Core lifecycle, range, power mode, raw/converted reads, temperature, status, and stateless conversions, plus maintained 64-bit Linux amd64/arm64 spidev and i2c-dev transports with explicit descriptor ownership and bounded examples. |

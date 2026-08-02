@@ -34,6 +34,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added C/Python internal-clock data-ready configuration that separates the always-active-high dedicated DRDY output from DATA_RDY routing to INT1/INT2, preserves unrelated register state, rejects external pin-multiplexing modes, and performs exact rollback on failure.
+- Added a finite Linux Python libgpiod v2 DRDY reference with blocking rising-edge waits, kernel monotonic timestamps, GPIO sequence-gap accounting, bounded sample/deadline controls, explicit timeout/overrun/transport errors, and safe standby/resource cleanup. Physical GPIO17 evidence remains pending.
 - Added optional Node.js Linux SPI and I2C subpath adapters with exact native
   dependencies, explicit resource ownership, one-message SPI framing, exact I2C
   byte-count checks, core-only installation smoke tests, and bounded examples.

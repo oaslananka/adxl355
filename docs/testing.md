@@ -65,6 +65,8 @@ PYTHONPATH=python/src python -m pytest python/tests -v
 - Status register
 - Software reset
 - Invalid configuration handling
+- Dedicated DRDY versus DATA_RDY-to-INT1/INT2 configuration, internal-sync rejection, unrelated-bit preservation, exact rollback, and no STATUS clear during configuration
+- Bounded libgpiod event acquisition with kernel timestamps, sequence-gap accounting, timeout, overrun, transport failure, and cleanup behavior using fake event sources
 
 ## Rust Tests
 
@@ -184,6 +186,35 @@ the C core mapping through both the owning exception wrapper and the stack-owned
 no-exception wrapper. Tests additionally inject native read/write failures and
 require the stable driver-level bus error/status rather than an index exception,
 panic, or fabricated numeric result.
+
+## Data-ready and continuous-acquisition verification
+
+C sanitizer tests and Python unit tests verify the same internal-clock contract:
+
+- dedicated DRDY enable is independent from `DATA_RDY` routing to INT1/INT2;
+- dedicated DRDY remains active high while `RANGE.INT_POL` controls only INT1/INT2;
+- `SYNC` external-clock/synchronization modes are rejected before any write;
+- unrelated `INT_MAP`, `RANGE`, and `POWER_CTL` bits survive configuration;
+- measurement mode is restored, target failures roll back exact saved bytes, and
+  rollback failures use a distinct restore error; and
+- configuration never reads `STATUS` and therefore does not clear DATA_RDY.
+
+The Linux acquisition tests inject a fake libgpiod v2 request and event source.
+They require blocking `wait_edge_events`, rising-edge detection, monotonic kernel
+timestamps, line sequence numbers, finite sample/deadline bounds, no `while True`
+or sleep-based GPIO polling, explicit missed-event and FIFO-overrun reporting,
+partial-result transport errors, and unconditional GPIO/bus closure. The physical
+GPIO17/DRDY run is separate HIL evidence and is not inferred from these tests.
+
+Local deterministic commands:
+
+```bash
+PYTHONPATH=python/src python -m pytest \
+  python/tests/test_data_ready.py python/tests/test_drdy_acquisition.py -v
+cmake -S c -B build/c-drdy -DADXL355_BUILD_TESTS=ON \
+  -DADXL355_ENABLE_SANITIZERS=ON -DADXL355_WARNINGS_AS_ERRORS=ON
+cmake --build build/c-drdy && ctest --test-dir build/c-drdy --output-on-failure
+```
 
 ## Generated API references
 

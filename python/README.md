@@ -16,8 +16,56 @@ print(device.read_acceleration_g())
 ```
 
 Install optional Linux adapters with `adxl355[spi]` or `adxl355[i2c]`.
+Add `adxl355[gpio]` only for the Linux libgpiod v2 DRDY reference. The core
+package remains dependency-free when no extra is selected.
 See the repository root documentation for lifecycle, hardware wiring, and
 cross-language behavior details.
+
+
+## Data-ready routing and bounded GPIO acquisition
+
+```python
+from adxl355 import ADXL355, DataReadyConfig, InterruptPolarity
+
+# Dedicated DRDY is a separate always-active-high output. INT polarity applies
+# only when DATA_RDY is routed through INT1 or INT2.
+device.configure_data_ready(
+    DataReadyConfig(
+        dedicated_drdy_enabled=True,
+        route_to_int1=False,
+        route_to_int2=False,
+        interrupt_polarity=InterruptPolarity.ACTIVE_LOW,
+    )
+)
+print(device.get_data_ready_config())
+```
+
+The maintained configuration API accepts only internal synchronization
+(`SYNC` timing bits equal zero). External clock/synchronization modes multiplex
+DRDY or INT2 differently and raise `UnsupportedConfigurationError`. The method
+preserves unrelated `INT_MAP`, `RANGE`, and `POWER_CTL` bits, changes state in
+standby, restores measurement mode, and attempts exact rollback after a failed
+write. It does not read `STATUS`, so configuration itself does not clear a
+pending `DATA_RDY` condition.
+
+The repository's Linux reference uses the official libgpiod v2 Python binding and
+blocking rising-edge waits rather than GPIO polling:
+
+```bash
+python -m pip install -e 'python[i2c,gpio]'
+PYTHONPATH=python/src python python/examples/linux_drdy.py \
+  --transport i2c --bus 1 --address 0x1D \
+  --gpio-chip /dev/gpiochip0 --gpio-line 17 \
+  --samples 32 --timeout-s 5 --max-missed-events 0
+```
+
+Every sample carries the kernel monotonic edge timestamp and GPIO line sequence
+number. Sequence gaps, overall timeout, GPIO source failure, sensor bus failure,
+and `STATUS.FIFO_OVR` are distinct and retain completed samples. The example is
+finite, restores standby/±2 g/default ODR/default DRDY routing, and closes both
+GPIO and bus resources. It is a reference command, not a background service.
+Physical GPIO17/DRDY evidence remains pending until the optional wire is confirmed
+on the dedicated fixture.
 
 ## Hardware offset calibration
 

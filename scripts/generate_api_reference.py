@@ -49,8 +49,8 @@ LANGUAGES: Final = (
             "c/include/adxl355/adxl355_version.h",
         ),
         "cmake -S c -B build/c && cmake --build build/c",
-        "Core lifecycle, range, ODR, bounded FIFO count/decode/read, raw/converted reads, temperature, status, signed offsets, calibration helpers, and bounded self-test response.",
-        "No public interrupt configuration API or maintained Linux bus adapter.",
+        "Core lifecycle, range, ODR, bounded FIFO count/decode/read, raw/converted reads, temperature, status, signed offsets, calibration helpers, bounded self-test response, and internal-clock dedicated-DRDY/INT1/INT2 configuration.",
+        "No maintained Linux bus/GPIO adapter or background acquisition API; GPIO ownership remains outside the portable C core.",
     ),
     LanguageReference(
         "cpp",
@@ -77,8 +77,8 @@ LANGUAGES: Final = (
             "python/src/adxl355/transport.py",
         ),
         "PYTHONPATH=python/src python -m pydoc adxl355",
-        "Core lifecycle, range, ODR, bounded FIFO count/decode/read with typed partial-progress errors, raw/converted reads, temperature, status, signed offsets, calibration helpers, bounded self-test response, and Linux SPI/I2C adapters.",
-        "No public interrupt configuration or background continuous-acquisition API.",
+        "Core lifecycle, range, ODR, bounded FIFO count/decode/read with typed partial-progress errors, raw/converted reads, temperature, status, signed offsets, calibration helpers, bounded self-test response, internal-clock dedicated-DRDY/INT1/INT2 configuration, and Linux SPI/I2C adapters.",
+        "No background daemon API. The repository provides a finite Linux libgpiod reference example; external synchronization pin-multiplexing modes are intentionally unsupported.",
     ),
     LanguageReference(
         "rust",

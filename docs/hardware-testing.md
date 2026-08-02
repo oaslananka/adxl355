@@ -72,6 +72,7 @@ For I2C, tie **`SCLK/VSSIO` to ground** and use pull-ups from `MOSI/SDA` and
 | `MOSI/SDA` | SDA | Pull up to `VDDIO` |
 | `CS/SCL` | SCL | Pull up to `VDDIO` |
 | `MISO/ASEL` | ground or `VDDIO` | Selects `0x1D` or `0x53` |
+| `DRDY` | GPIO17 / physical pin 11 | Optional dedicated active-high rising-edge input for the bounded libgpiod example |
 
 ![Verified Raspberry Pi 5 I2C wiring: physical pin 1 to 3.3 V, pin 6 to GND,
 pin 3 GPIO2/SDA1 to MOSI/SDA, pin 5 GPIO3/SCL1 to CS/SCL, pin 9 GND to
@@ -93,6 +94,42 @@ Linux adapters do not provide a portable API for changing the controller clock,
 so configure the bus speed in the host platform and pass the matching declared
 value to the workflow. Test both `0x1D` and `0x53` when the product fixture
 supports changing the strap.
+
+## Dedicated DRDY GPIO fixture
+
+The dedicated `DRDY` output is separate from routing the `DATA_RDY` condition to
+`INT1` or `INT2`. Rev.D defines dedicated DRDY as active high; `RANGE.INT_POL`
+controls only INT1/INT2. `POWER_CTL.DRDY_OFF=1` forces dedicated DRDY low. The
+maintained C/Python configuration API supports internal synchronization only,
+because external clock/synchronization modes multiplex DRDY or INT2 differently.
+
+The optional Raspberry Pi fixture maps ADXL355 `DRDY` to GPIO17 (physical pin
+11). Request it as a normal input with rising-edge detection, disabled bias, and
+a monotonic event clock. Do not set `active_low`, do not poll the line in a busy
+loop, and do not use INT1/INT2 polarity settings to describe the dedicated pin.
+Power down before adding or moving the wire.
+
+The repository reference command is finite and Linux-only:
+
+```bash
+python -m pip install -e 'python[i2c,gpio]'
+PYTHONPATH=python/src python python/examples/linux_drdy.py \
+  --transport i2c --bus 1 --address 0x1D \
+  --gpio-chip /dev/gpiochip0 --gpio-line 17 \
+  --samples 32 --timeout-s 5 --max-missed-events 0
+```
+
+For a reproducible fixture run, record the exact commit, Python and libgpiod
+versions, bus settings, GPIO chip/offset, requested sample count, actual sample
+count, first/last kernel timestamps, line-sequence gaps, FIFO overrun count, and
+independent post-run readback of standby, ±2 g, default ODR, `INT_MAP`, and
+`DRDY_OFF`. Use a separate `/tmp` checkout and an outer process timeout. Do not
+record the host name, private address, environment, credentials, or raw device
+paths beyond the public fixture mapping.
+
+Unit tests prove the bounded event/lifecycle contract with fake GPIO requests;
+they do not prove the wire. Physical GPIO17/DRDY evidence is pending until the
+optional line is confirmed and the exact-commit command succeeds.
 
 ## What the runner verifies
 
