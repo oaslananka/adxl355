@@ -20,7 +20,7 @@ pub use device::raw_to_g;
 pub use device::raw_to_mps2;
 pub use device::Adxl355;
 pub use device::Transport;
-pub use error::Error;
+pub use error::{Error, StateRequirement};
 pub use registers::Odr;
 pub use registers::PowerMode;
 pub use registers::Range;

@@ -1,7 +1,12 @@
 //! Shared transport contract scenarios from spec/transport_contract.json.
 
 use adxl355::registers;
-use adxl355::{Adxl355, Error, Range};
+use adxl355::{Adxl355, Error, Range, Transport};
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum BusError {
+    Injected,
+}
 
 struct ContractBus {
     regs: [u8; 128],
@@ -29,10 +34,11 @@ impl ContractBus {
     }
 }
 
-impl adxl355::device::Transport for ContractBus {
-    fn read_register(&mut self, reg: u8, len: u8) -> Result<Vec<u8>, Error> {
+impl Transport for ContractBus {
+    type Error = BusError;
+    fn read_register(&mut self, reg: u8, len: u8) -> Result<Vec<u8>, Self::Error> {
         if self.fail_read_reg == Some(reg) {
-            return Err(Error::InvalidArgument);
+            return Err(BusError::Injected);
         }
         let actual_len = if self.short_reg == Some(reg) {
             self.short_len
@@ -43,9 +49,9 @@ impl adxl355::device::Transport for ContractBus {
         Ok(self.regs[start..start + actual_len].to_vec())
     }
 
-    fn write_register(&mut self, reg: u8, data: &[u8]) -> Result<(), Error> {
+    fn write_register(&mut self, reg: u8, data: &[u8]) -> Result<(), Self::Error> {
         if self.fail_write_reg == Some(reg) {
-            return Err(Error::InvalidArgument);
+            return Err(BusError::Injected);
         }
         let start = reg as usize;
         self.regs[start..start + data.len()].copy_from_slice(data);
@@ -60,7 +66,14 @@ fn tr_1_zero_is_bus_error() {
     let mut bus = ContractBus::new();
     bus.short_reg = Some(registers::reg::DEVID_AD);
     bus.short_len = 0;
-    assert_eq!(Adxl355::new(bus).probe(), Err(Error::Bus));
+    assert_eq!(
+        Adxl355::new(bus).probe(),
+        Err(Error::InvalidResponseLength {
+            register: registers::reg::DEVID_AD,
+            expected: 1,
+            actual: 0,
+        })
+    );
 }
 
 #[test]
@@ -68,42 +81,69 @@ fn tr_1_overlong_is_bus_error() {
     let mut bus = ContractBus::new();
     bus.short_reg = Some(registers::reg::DEVID_AD);
     bus.short_len = 2;
-    assert_eq!(Adxl355::new(bus).probe(), Err(Error::Bus));
+    assert_eq!(
+        Adxl355::new(bus).probe(),
+        Err(Error::InvalidResponseLength {
+            register: registers::reg::DEVID_AD,
+            expected: 1,
+            actual: 2,
+        })
+    );
 }
 
 #[test]
-fn tr_2_zero_and_truncated_are_bus_errors() {
+fn tr_2_zero_and_truncated_are_length_errors() {
     for returned in [0, 1] {
         let mut bus = ContractBus::new();
         bus.short_reg = Some(registers::reg::TEMP2);
         bus.short_len = returned;
         let mut device = Adxl355::new(bus);
         device.probe().unwrap();
-        assert_eq!(device.read_temperature_raw(), Err(Error::Bus));
+        assert_eq!(
+            device.read_temperature_raw(),
+            Err(Error::InvalidResponseLength {
+                register: registers::reg::TEMP2,
+                expected: 2,
+                actual: returned,
+            })
+        );
     }
 }
 
 #[test]
-fn tr_9_zero_and_truncated_are_bus_errors() {
+fn tr_9_zero_and_truncated_are_length_errors() {
     for returned in [0, 8] {
         let mut bus = ContractBus::new();
         bus.short_reg = Some(registers::reg::XDATA3);
         bus.short_len = returned;
         let mut device = Adxl355::new(bus);
         device.probe().unwrap();
-        assert_eq!(device.read_raw(), Err(Error::Bus));
+        assert_eq!(
+            device.read_raw(),
+            Err(Error::InvalidResponseLength {
+                register: registers::reg::XDATA3,
+                expected: 9,
+                actual: returned,
+            })
+        );
     }
 }
 
 #[test]
-fn transport_errors_are_normalized_to_bus() {
+fn transport_errors_preserve_backend_cause() {
     let mut bus = ContractBus::new();
     bus.fail_read_reg = Some(registers::reg::DEVID_AD);
-    assert_eq!(Adxl355::new(bus).probe(), Err(Error::Bus));
+    assert_eq!(
+        Adxl355::new(bus).probe(),
+        Err(Error::Transport(BusError::Injected))
+    );
 
     let mut bus = ContractBus::new();
     bus.fail_write_reg = Some(registers::reg::RANGE);
     let mut device = Adxl355::new(bus);
     device.probe().unwrap();
-    assert_eq!(device.set_range(Range::G4), Err(Error::Bus));
+    assert_eq!(
+        device.set_range(Range::G4),
+        Err(Error::Transport(BusError::Injected))
+    );
 }
