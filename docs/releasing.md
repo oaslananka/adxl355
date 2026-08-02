@@ -1,7 +1,11 @@
 # Release gate
 
-The release workflow is a **verification and packaging dry run**. It does not
-publish to PyPI, crates.io, npm, GitHub Releases, or any Go proxy.
+The release workflow always performs verification, packaging, aggregate scanning,
+and attestation before any registry operation. Protected PyPI, npm, and crates.io
+publication jobs are present but run only when the repository variable
+`REGISTRY_PUBLISHING_ENABLED` equals `true`. They require approval through the
+`release` environment and GitHub OIDC; no stored registry credential is used. The
+Go module continues to publish through an immutable `go/v...` tag.
 
 ## Preconditions
 
@@ -48,7 +52,9 @@ prevents artifact generation.
 Each package job checks out the preflight SHA explicitly, performs a clean-tree
 check, builds without publishing, inspects archive contents, installs or consumes
 the built artifact in a clean temporary environment, generates SHA-256 checksums,
-and uploads an inspectable artifact.
+and uploads an inspectable artifact. Optional publication jobs download these exact
+artifacts only after the final bundle succeeds. Registry preflight treats an exact
+existing digest as an idempotent success and rejects partial or changed releases.
 Each package job also enforces the reviewed compressed-size budget and uploads a
 machine-readable `SIZE_REPORT.json`. The final bundle is checked separately and
 publishes `RELEASE_SIZE_REPORT.json`. A size-limit change is a reviewed release
@@ -60,8 +66,10 @@ checksums and metadata, generates an SPDX JSON SBOM, and scans that SBOM with
 Grype. A high severity or critical vulnerability blocks bundle creation even when
 no upstream fix is available. It then creates a final compressed release bundle,
 records its SHA-256 digest, and uses GitHub OIDC to persist SLSA provenance and an
-SBOM attestation. Only that final job receives `id-token`, `attestations`, and
-`artifact-metadata` write permissions.
+SBOM attestation. Only that final job receives `attestations` and
+`artifact-metadata` write permissions. The three optional registry jobs separately
+receive only `contents: read` and `id-token: write`, run on GitHub-hosted runners,
+and are protected by the `release` environment.
 
 Verify a downloaded final bundle with:
 

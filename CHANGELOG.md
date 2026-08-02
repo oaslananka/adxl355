@@ -34,6 +34,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added protected, opt-in PyPI, npm, and crates.io publication jobs that reuse
+  verified release artifacts, authenticate with GitHub OIDC, reject partial or
+  changed immutable releases, and support idempotent recovery after a registry
+  succeeds while another fails.
 - Added C/Python internal-clock data-ready configuration that separates the always-active-high dedicated DRDY output from DATA_RDY routing to INT1/INT2, preserves unrelated register state, rejects external pin-multiplexing modes, and performs exact rollback on failure.
 - Added a finite Linux Python libgpiod v2 DRDY reference with blocking rising-edge waits, kernel monotonic timestamps, GPIO sequence-gap accounting, bounded sample/deadline controls, explicit timeout/overrun/transport errors, and safe standby/resource cleanup. Raspberry Pi 5 I2C + dedicated GPIO17/DRDY evidence passed at commit `002173d0c8dae8b15261b6d00cf011011cf8db7c` with 32/32 unique samples, zero sequence gaps, zero FIFO overruns, and verified safe restoration.
 - Added optional Node.js Linux SPI and I2C subpath adapters with exact native

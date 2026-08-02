@@ -17,6 +17,9 @@
 - [x] Pin external GitHub Actions to immutable commit SHAs
 - [x] Add release SBOM, high-severity vulnerability gate, checksums, and OIDC attestations
 - [x] Publish the verified GitHub prerelease with paired same-SHA SPI/I2C HIL evidence
+- [x] Add protected OIDC publication jobs with immutable registry digest verification
+- [ ] Bind PyPI/npm/crates.io trusted publishers and complete first-release bootstrap
+- [ ] Remove unused legacy registry token secrets after OIDC publication succeeds
 - [x] Enable vulnerability alerts, Dependabot security updates, push protection, and private reporting
 - [x] Fix copyright holder name in LICENSE
 
