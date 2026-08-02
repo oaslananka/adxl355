@@ -35,6 +35,9 @@ class MockTransport:
         self._force_error: Optional[Exception] = None
         self._short_read_reg: Optional[int] = None
         self._short_read_length = 0
+        self.fail_write_reg: Optional[int] = None
+        self.fail_write_occurrence = 0
+        self._matching_writes = 0
         self.call_count = 0
         self.calls: list[dict[str, object]] = []
 
@@ -59,6 +62,13 @@ class MockTransport:
     def write_register(self, reg: int, data: bytes) -> None:
         if self._force_error is not None:
             raise self._force_error
+        if self.fail_write_reg == reg:
+            self._matching_writes += 1
+            if (
+                self.fail_write_occurrence == 0
+                or self._matching_writes == self.fail_write_occurrence
+            ):
+                raise RuntimeError(f"injected write failure at register 0x{reg:02X}")
         self._log_call(True, reg, len(data))
         for i, b in enumerate(data):
             if reg + i < self.NUM_REGS:
@@ -77,17 +87,37 @@ class MockTransport:
 
     def _log_call(self, is_write: bool, reg: int, length: int) -> None:
         if self.call_count < self.MAX_CALL_LOG:
-            self.calls.append({
-                "is_write": is_write,
-                "reg": reg,
-                "length": length,
-            })
+            self.calls.append(
+                {
+                    "is_write": is_write,
+                    "reg": reg,
+                    "length": length,
+                }
+            )
         self.call_count += 1
 
     def set_register(self, reg: int, value: int) -> None:
         """Set a specific register value."""
         if 0 <= reg < self.NUM_REGS:
             self._regs[reg] = value & 0xFF
+
+    def register(self, reg: int) -> int:
+        """Return one register value for test assertions."""
+        return self._regs[reg]
+
+    def inject_write_error(self, reg: int, occurrence: int = 0) -> None:
+        """Fail every matching write, or one 1-based matching occurrence."""
+        if occurrence < 0:
+            raise ValueError("occurrence must be non-negative")
+        self.fail_write_reg = reg
+        self.fail_write_occurrence = occurrence
+        self._matching_writes = 0
+
+    def clear_write_error(self) -> None:
+        """Restore normal writes after a targeted failure injection."""
+        self.fail_write_reg = None
+        self.fail_write_occurrence = 0
+        self._matching_writes = 0
 
     def set_identity_ok(self) -> None:
         """Pre-set identity registers so probe() succeeds."""

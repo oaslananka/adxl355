@@ -10,36 +10,15 @@ from adxl355.registers import Register
 from adxl355.testing import MockTransport
 
 
-class OffsetTransport(MockTransport):
-    def __init__(self) -> None:
-        super().__init__()
-        self.fail_write_reg: int | None = None
-        self.fail_write_occurrence = 0
-        self._matching_writes = 0
-
-    def write_register(self, reg: int, data: bytes) -> None:
-        if self.fail_write_reg == reg:
-            self._matching_writes += 1
-            if (
-                self.fail_write_occurrence == 0
-                or self._matching_writes == self.fail_write_occurrence
-            ):
-                raise BusError(f"injected write failure at register 0x{reg:02X}")
-        super().write_register(reg, data)
-
-    def register(self, reg: int) -> int:
-        return self._regs[reg]
-
-
-def probed_device() -> tuple[ADXL355, OffsetTransport]:
-    transport = OffsetTransport()
+def probed_device() -> tuple[ADXL355, MockTransport]:
+    transport = MockTransport()
     transport.set_identity_ok()
     device = ADXL355(transport)
     device.probe()
     return device, transport
 
 
-def write_calls(transport: OffsetTransport) -> list[dict[str, object]]:
+def write_calls(transport: MockTransport) -> list[dict[str, object]]:
     return [call for call in transport.calls if call["is_write"]]
 
 
@@ -111,8 +90,7 @@ def test_offset_write_failures_preserve_safe_state(
 ) -> None:
     device, transport = probed_device()
     transport.set_register(Register.POWER_CTL, PowerMode.MEASUREMENT)
-    transport.fail_write_reg = fail_reg
-    transport.fail_write_occurrence = occurrence
+    transport.inject_write_error(fail_reg, occurrence=occurrence)
 
     with pytest.raises(BusError):
         device.write_offset(Axis.Z, 100)
@@ -123,7 +101,7 @@ def test_offset_write_failures_preserve_safe_state(
 
 
 def test_offset_validation_and_pre_probe_contract() -> None:
-    transport = OffsetTransport()
+    transport = MockTransport()
     device = ADXL355(transport)
     with pytest.raises(DeviceStateError):
         device.read_offset(Axis.X)
