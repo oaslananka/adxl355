@@ -19,9 +19,6 @@ DOCS = (
 
 
 class PublicDocumentationTests(unittest.TestCase):
-    def test_ruleset_validation_failure(self) -> None:
-        self.fail("intentional required-check failure for issue #43")
-
     def test_readme_does_not_overstate_maturity_or_unsupported_apis(self) -> None:
         text = README.read_text().lower()
         self.assertNotIn("production-ready", text)
