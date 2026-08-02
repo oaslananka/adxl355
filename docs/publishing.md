@@ -2,14 +2,18 @@
 
 > **Current state (2026-08-02):** [`v0.1.0-alpha.3`](https://github.com/oaslananka/adxl355/releases/tag/v0.1.0-alpha.3)
 > is published as a GitHub prerelease from exact commit
-> `71de69b8727a9f8eef254de586d9bce7bc8fa8ac`. PyPI `adxl355`, npm
-> `@oaslananka/adxl355`, and crates.io `adxl355-driver` were re-checked and were
-> not yet published. The repository release workflow contains protected OIDC
-> publication jobs, but they remain disabled until all registry-side publisher
-> bindings and first-release ownership prerequisites are complete.
-> PyPI, npm, and crates.io remain unpublished. Final SPI run `30736413982`
-> and I2C run `30736668298` passed on the release commit with device revision
-> `0x01`; permanent sanitized reports remain attached to the GitHub release.
+> `71de69b8727a9f8eef254de586d9bce7bc8fa8ac`. Matching package versions are
+> public as PyPI `adxl355==0.1.0a3`, npm `@oaslananka/adxl355@0.1.0-alpha.3`,
+> and crates.io `adxl355-driver@0.1.0-alpha.3`. Release Gate run
+> `30748595754` published the verified Python wheel and sdist through PyPI
+> Trusted Publishing; their public SHA-256 digests match the workflow artifacts
+> byte-for-byte. npm and crates.io were bootstrap-published from the same release
+> tag and were subsequently verified idempotently by the workflow. TestPyPI is
+> not published and is not part of the production release workflow.
+> Final SPI run `30736413982` and I2C run `30736668298` passed on the release
+> commit with device revision `0x01`; permanent sanitized reports remain attached
+> to the GitHub release. `REGISTRY_PUBLISHING_ENABLED` is returned to `false`
+> after each controlled publication attempt.
 
 ## Automated release verification and publication boundary
 
@@ -62,20 +66,22 @@ protection or any registry binding drifts.
 ### PyPI: `adxl355`
 
 PyPI supports a pending Trusted Publisher for a project that does not yet exist.
-Create the pending publisher with the exact binding above. No PyPI password or API
-token belongs in GitHub secrets. After the binding exists, the protected workflow
-can create the first project release through
-`pypa/gh-action-pypi-publish` using GitHub OIDC.
+That bootstrap path was used for `adxl355`; no PyPI password or API token was added
+to GitHub. Release Gate run `30748595754` exchanged GitHub OIDC through
+`pypa/gh-action-pypi-publish` and created `adxl355==0.1.0a3` from the previously
+verified wheel and sdist.
 
-The Python metadata publishes direct links to the repository, documentation,
-changelog, security policy, and issue tracker. After the first release, verify the
-page at `https://pypi.org/project/adxl355/` and install the exact version in a clean
-environment.
+Independent verification downloaded both public files, matched their SHA-256
+values to the workflow artifacts, installed the exact version in a clean virtual
+environment, and imported `adxl355`. The production page is
+`https://pypi.org/project/adxl355/`. TestPyPI is a separate registry and remains
+outside this workflow.
 
 ### npm: `@oaslananka/adxl355`
 
 npm requires the package to exist before a Trusted Publisher can be attached. The
-first package reservation/publication is therefore a one-time maintainer bootstrap:
+first package reservation/publication for `0.1.0-alpha.3` used a one-time
+maintainer bootstrap. The maintained sequence is:
 
 1. re-check that the `oaslananka` scope is controlled by the maintainer account;
 2. publish the already-verified `.tgz` with a short-lived, least-privilege npm
@@ -92,11 +98,12 @@ and license. Verify the first release at
 ### crates.io: `adxl355-driver`
 
 crates.io also requires an initial crate release before Trusted Publishing can be
-configured. Use the same one-time bootstrap pattern with the exact verified
-`.crate`, then configure the binding above, enable trusted-publishing-only mode,
-and revoke the bootstrap credential. Subsequent workflow runs obtain an ephemeral
-token through `rust-lang/crates-io-auth-action`; the action revokes that token in
-its post step.
+configured. That initial crate release, `adxl355-driver@0.1.0-alpha.3`, was
+bootstrap-published from the exact
+verified `.crate`. Configure the binding above, enable trusted-publishing-only
+mode, and keep the bootstrap credential revoked. Subsequent new-version workflow
+runs obtain an ephemeral token through `rust-lang/crates-io-auth-action`; the
+action revokes that token in its post step.
 
 The crate README links to the repository, changelog, security policy, and license.
 Verify the first release at `https://crates.io/crates/adxl355-driver` and confirm
@@ -113,10 +120,12 @@ REGISTRY_PUBLISHING_ENABLED=true
 
 Create the next immutable release tag from a commit that already contains this
 workflow, then let the tag-triggered release run reach the protected publication
-jobs and approve the `release` environment. The existing `v0.1.0-alpha.3` tag
-predates these jobs and must not be moved or recreated. Keep the variable `false`
-while any package binding is absent; otherwise the corresponding publish job must
-fail rather than silently fall back to a token.
+jobs and approve the `release` environment. The existing `v0.1.0-alpha.3` tag was
+never moved or recreated; a controlled manual verification run used that immutable
+tag to complete the PyPI bootstrap while npm and crates.io were safely recognized
+as already published. Keep the variable `false` outside an approved release
+attempt; a missing or drifting publisher binding must fail rather than silently
+fall back to a token.
 
 ## Idempotent retry and partial-publication recovery
 

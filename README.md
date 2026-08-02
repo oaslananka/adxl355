@@ -28,7 +28,7 @@ outside that core is intentionally language-specific.
 | Go | Yes | No | No public method | No public method | No public method | Yes, `adxl355/linuxio` on Linux amd64/arm64 | Yes, `adxl355/linuxio` on Linux amd64/arm64 | No | Module/build and cross-build checks | Raspberry Pi 5 SPI and I2C bounded example passes |
 
 “User transport” means the driver exposes a bus contract but does not ship a
-Linux device adapter for that language. The repository contains buildable package metadata and verification artifacts, but packages are not published by this repository to PyPI, crates.io, npm, or a Go proxy. Intended distribution names are `adxl355` (PyPI), `adxl355-driver` (crates.io, imported as `adxl355`), and `@oaslananka/adxl355` (npm).
+Linux device adapter for that language. The verified `0.1.0-alpha.3` release is available as `adxl355` on PyPI, `adxl355-driver` on crates.io (imported as `adxl355`), and `@oaslananka/adxl355` on npm. The nested Go module is discoverable through its immutable `go/v0.1.0-alpha.3` tag. Current `main` may contain additional unreleased work beyond those immutable package artifacts.
 
 ## Implemented and verified
 

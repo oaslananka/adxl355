@@ -160,11 +160,14 @@ class PublicDocumentationTests(unittest.TestCase):
         readme = README.read_text()
         publishing = (REPO_ROOT / "docs" / "publishing.md").read_text()
         changelog = (REPO_ROOT / "CHANGELOG.md").read_text()
-        self.assertIn("buildable package metadata", readme)
-        self.assertIn("not published by this repository", readme)
+        self.assertIn("available as `adxl355` on PyPI", readme)
+        self.assertIn("Current `main` may contain additional unreleased work", readme)
         self.assertIn("v0.1.0-alpha.3", publishing)
         self.assertIn("GitHub prerelease", publishing)
-        self.assertIn("PyPI, npm, and crates.io remain unpublished", publishing)
+        self.assertIn("PyPI `adxl355==0.1.0a3`", publishing)
+        self.assertIn("Release Gate run", publishing)
+        self.assertIn("TestPyPI is", publishing)
+        self.assertIn("not published and is not part", publishing)
         self.assertNotIn(
             "does not publish to PyPI, npm, crates.io, GitHub Releases", publishing
         )
