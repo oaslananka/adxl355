@@ -8,4 +8,4 @@ pyproject-hooks==1.2.0
 ruff==0.15.22
 setuptools==83.0.0
 typing-extensions==4.16.0
-wheel==0.45.1
+wheel==0.47.0
