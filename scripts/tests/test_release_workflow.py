@@ -116,5 +116,13 @@ class ReleaseWorkflowTests(unittest.TestCase):
 
 
 
+    def test_release_enforces_and_uploads_package_size_evidence(self) -> None:
+        text = RELEASE_WORKFLOW.read_text()
+        for family in ("python", "rust", "node", "go", "native", "release"):
+            self.assertIn(f"--family {family}", text)
+        self.assertGreaterEqual(text.count("SIZE_REPORT.json"), len(PACKAGE_JOBS))
+        self.assertIn("RELEASE_SIZE_REPORT.json", text)
+
+
 if __name__ == "__main__":
     unittest.main()
