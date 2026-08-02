@@ -2,7 +2,7 @@
 
 Example I2C run on the maintained Raspberry Pi fixture::
 
-    python examples/linux_drdy.py --transport i2c --bus 1 --address 0x1D \
+    PYTHONPATH=src python -m examples.linux_drdy --transport i2c --bus 1 --address 0x1D \
         --gpio-chip /dev/gpiochip0 --gpio-line 17 --samples 32 --timeout-s 5
 
 The portable ADXL355 core configures the sensor. GPIO ownership, blocking edge

@@ -53,7 +53,8 @@ blocking rising-edge waits rather than GPIO polling:
 
 ```bash
 python -m pip install -e 'python[i2c,gpio]'
-PYTHONPATH=python/src python python/examples/linux_drdy.py \
+cd python
+PYTHONPATH=src python -m examples.linux_drdy \
   --transport i2c --bus 1 --address 0x1D \
   --gpio-chip /dev/gpiochip0 --gpio-line 17 \
   --samples 32 --timeout-s 5 --max-missed-events 0

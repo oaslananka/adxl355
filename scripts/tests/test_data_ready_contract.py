@@ -110,6 +110,10 @@ class DataReadyContractTests(unittest.TestCase):
         self.assertNotIn("time.sleep", combined)
         self.assertIn("sample_count <= 4096", acquisition)
         self.assertIn("timeout_s <= 3600.0", acquisition)
+        self.assertIn(
+            "PYTHONPATH=src python -m examples.linux_drdy",
+            (REPO_ROOT / "docs/hardware-testing.md").read_text(),
+        )
 
     def test_gpio_extra_is_linux_scoped_and_core_remains_dependency_free(self) -> None:
         with (REPO_ROOT / "python/pyproject.toml").open("rb") as handle:
