@@ -7,6 +7,11 @@ publication jobs are present but run only when the repository variable
 `release` environment and GitHub OIDC; no stored registry credential is used. The
 Go module continues to publish through an immutable `go/v...` tag.
 
+The `v0.1.0-alpha.3` artifacts are public on PyPI, npm, and crates.io. Controlled
+Release Gate run `30748595754` performed the first PyPI OIDC publication and
+verified the already-published exact npm and crates.io artifacts. TestPyPI is not
+part of this production workflow.
+
 ## Preconditions
 
 A release tag must:
