@@ -37,24 +37,6 @@ updates:
       python-dependencies:
         patterns: ["*"]
 
-  - package-ecosystem: pip
-    directory: /requirements/python
-    schedule:
-      interval: weekly
-      day: monday
-      time: "06:25"
-      timezone: Europe/Istanbul
-    open-pull-requests-limit: 1
-    rebase-strategy: auto
-    cooldown:
-      default-days: 7
-    labels: [dependencies, area/ci, area/security]
-    commit-message:
-      prefix: "deps(python-locks)"
-    groups:
-      python-tool-locks:
-        patterns: ["*"]
-
   - package-ecosystem: cargo
     directory: /rust
     schedule:

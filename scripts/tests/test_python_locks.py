@@ -10,6 +10,7 @@ import yaml  # type: ignore[import-untyped]
 from scripts.generate_python_locks import (
     LOCK_ROOT,
     LockError,
+    latest_report,
     parse_input,
     parse_lock,
     verify,
@@ -95,18 +96,47 @@ class PythonLockTests(unittest.TestCase):
         }.items():
             self.assertEqual(packages[name][0], version)
 
-    def test_lock_update_path_is_rate_limited(self) -> None:
+    def test_custom_locks_use_generator_not_dependabot(self) -> None:
         data = cast(dict[str, Any], yaml.safe_load(DEPENDABOT.read_text()))
-        entry = next(
-            update
-            for update in data["updates"]
-            if update["package-ecosystem"] == "pip"
-            and update["directory"] == "/requirements/python"
+        pip_entries = [
+            update for update in data["updates"] if update["package-ecosystem"] == "pip"
+        ]
+        self.assertEqual([entry["directory"] for entry in pip_entries], ["/python"])
+        package_entry = pip_entries[0]
+        self.assertEqual(package_entry["schedule"]["interval"], "weekly")
+        self.assertEqual(package_entry["open-pull-requests-limit"], 2)
+        self.assertEqual(package_entry["cooldown"], {"default-days": 7})
+        self.assertNotIn("/requirements/python", DEPENDABOT.read_text())
+
+    def test_latest_report_is_read_only_grouped_and_deduplicated(self) -> None:
+        seen: list[str] = []
+
+        def lookup(requirement: object) -> str:
+            normalized_name = getattr(requirement, "normalized_name")
+            version = getattr(requirement, "version")
+            seen.append(normalized_name)
+            if normalized_name == "pytest":
+                return "99.0.0"
+            return version
+
+        before = {
+            path: path.read_bytes()
+            for path in sorted(LOCK_ROOT.glob("*"))
+            if path.is_file()
+        }
+        report = latest_report(lookup)
+        after = {path: path.read_bytes() for path in before}
+        self.assertEqual(before, after)
+        self.assertEqual(report["status"], "outdated")
+        outdated = report["outdated"]
+        self.assertTrue(isinstance(outdated, list))
+        pytest_entries = [entry for entry in outdated if entry["package"] == "pytest"]
+        self.assertEqual(
+            {entry["group"] for entry in pytest_entries}, {"ci-test", "consistency"}
         )
-        self.assertEqual(entry["schedule"]["interval"], "weekly")
-        self.assertEqual(entry["open-pull-requests-limit"], 1)
-        self.assertEqual(entry["cooldown"], {"default-days": 7})
-        self.assertIn("area/security", entry["labels"])
+        self.assertEqual(len(seen), len(set(seen)))
+        self.assertEqual(report["packages_checked"], len(set(seen)))
+        self.assertEqual(report["groups_checked"], len(LOCK_NAMES))
 
     def test_lock_files_contain_only_pypi_sha256_material(self) -> None:
         for path in sorted(LOCK_ROOT.glob("*.txt")):

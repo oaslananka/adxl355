@@ -62,6 +62,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   standardized checkout on `v7.0.1`, and documented the HIL runner minimum.
 - Added a seven-day Dependabot cooldown for version updates across all maintained
   ecosystems; security updates remain immediate.
+- Kept custom Python tool hash locks on the repository generator instead of Dependabot after verified bot PRs produced inconsistent manifest/hash pairs.
 - **Breaking (Python):** Raised the minimum supported Python version from 3.9 to
   3.10 so release builds do not depend on a vulnerable legacy setuptools line.
 - **Breaking (C/C++):** Transport read/write callbacks return the exact
