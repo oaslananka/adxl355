@@ -145,6 +145,7 @@ go test ./...
 
 ## Documentation
 
+- [Generated public API references for all maintained languages](docs/api/README.md)
 - [Architecture](docs/architecture.md)
 - [Testing and CI](docs/testing.md)
 - [Physical hardware validation](docs/hardware-testing.md)

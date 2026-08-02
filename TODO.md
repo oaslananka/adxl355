@@ -25,7 +25,7 @@
 - [x] Self-test API hardware testing on Raspberry Pi 5 SPI
 - [ ] Continuous data acquisition example
 - [ ] Verify CMake builds on Linux/GCC, ARM GCC, MinGW
-- [ ] Add doxygen-style documentation comments to public headers
+- [x] Add Doxygen-style documentation comments and error contracts to the public C header
 - [x] Core MVP (probe, read_raw, set_range, power modes, temperature, reset)
 - [x] Mock bus and transport-contract regression testing
 - [x] Linux SPI hardware example (spidev ioctl)
@@ -73,8 +73,9 @@
 - [x] Linux self-hosted SPI/I2C runner setup guide
 - [x] Hardware test plan with identity/reset/configuration/data steps
 - [ ] Interrupt and FIFO detailed documentation
-- [ ] API reference docs for each language
-- [ ] Video/images for hardware setup
+- [x] Source-derived API reference docs for each maintained language
+- [x] Accessible, license-safe wiring diagram for the verified Raspberry Pi 5 SPI fixture
+- [ ] Add I2C setup media after physical I2C HIL evidence in issue #41
 - [x] Architecture documentation
 - [x] Register map documentation
 - [x] Testing guide

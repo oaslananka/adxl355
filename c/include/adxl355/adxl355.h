@@ -15,18 +15,19 @@ extern "C" {
 /* ---------------------------------------------------------------------------
  * Error / Status codes
  * --------------------------------------------------------------------------- */
+/** Stable status values returned by the public C API. */
 typedef enum {
-    ADXL355_OK             = 0,
-    ADXL355_ERR_NULL       = -1,
-    ADXL355_ERR_BUS        = -2,
-    ADXL355_ERR_TIMEOUT    = -3,
-    ADXL355_ERR_INVALID_ARG = -4,
-    ADXL355_ERR_BAD_DEVICE = -5,
-    ADXL355_ERR_NOT_READY  = -6,
-    ADXL355_ERR_UNSUPPORTED = -7,
-    ADXL355_ERR_STATE       = -8,
-    ADXL355_ERR_THRESHOLD   = -9,
-    ADXL355_ERR_RESTORE     = -10
+    ADXL355_OK              = 0,   /**< Operation completed successfully. */
+    ADXL355_ERR_NULL        = -1,  /**< A required pointer was NULL. */
+    ADXL355_ERR_BUS         = -2,  /**< Transport failed or returned a non-exact length. */
+    ADXL355_ERR_TIMEOUT     = -3,  /**< A bounded ready/poll operation timed out. */
+    ADXL355_ERR_INVALID_ARG = -4,  /**< A value or enum encoding was invalid. */
+    ADXL355_ERR_BAD_DEVICE  = -5,  /**< Identity registers did not match ADXL355. */
+    ADXL355_ERR_NOT_READY   = -6,  /**< A coherent sample was unavailable. */
+    ADXL355_ERR_UNSUPPORTED = -7,  /**< The requested operation is not implemented. */
+    ADXL355_ERR_STATE       = -8,  /**< Probe or another required state transition is missing. */
+    ADXL355_ERR_THRESHOLD   = -9,  /**< Caller-owned self-test thresholds were violated. */
+    ADXL355_ERR_RESTORE     = -10  /**< Exact register restoration failed. */
 } adxl355_status_t;
 
 /* ---------------------------------------------------------------------------
@@ -59,6 +60,7 @@ typedef enum {
     ADXL355_AXIS_Z = 2
 } adxl355_axis_t;
 
+/** FILTER register output-data-rate encodings, from 4000 Hz through 3.906 Hz. */
 typedef enum {
     ADXL355_ODR_4000_HZ   = 0,
     ADXL355_ODR_2000_HZ   = 1,
@@ -280,6 +282,12 @@ adxl355_status_t adxl355_set_odr(adxl355_t *dev, adxl355_odr_t odr);
  *
  * Offset bits match acceleration data bits [19:4], so one offset count equals
  * 16 raw acceleration LSB. A successful probe is required.
+ *
+ * @param dev Initialised and probed device handle.
+ * @param axis Axis whose offset register pair will be read.
+ * @param[out] offset Signed register value; modified only on success.
+ * @return ADXL355_OK, ADXL355_ERR_STATE before probe, ADXL355_ERR_INVALID_ARG
+ *         for an invalid axis, or ADXL355_ERR_BUS on an exact-length failure.
  */
 adxl355_status_t adxl355_read_offset(adxl355_t *dev, adxl355_axis_t axis, int16_t *offset);
 
@@ -289,6 +297,12 @@ adxl355_status_t adxl355_read_offset(adxl355_t *dev, adxl355_axis_t axis, int16_
  * The driver temporarily enters standby when needed and restores the exact
  * original POWER_CTL value after the write. The offset is volatile device
  * state and is reset by power cycle or software reset.
+ *
+ * @param dev Initialised and probed device handle.
+ * @param axis Axis whose offset register pair will be written.
+ * @param offset Signed two's-complement offset value.
+ * @return ADXL355_OK, ADXL355_ERR_STATE before probe, ADXL355_ERR_INVALID_ARG
+ *         for an invalid axis, or ADXL355_ERR_BUS if write/restore fails.
  */
 adxl355_status_t adxl355_write_offset(adxl355_t *dev, adxl355_axis_t axis, int16_t offset);
 
@@ -297,7 +311,12 @@ adxl355_status_t adxl355_write_offset(adxl355_t *dev, adxl355_axis_t axis, int16
  * Electrostatic self-test
  * --------------------------------------------------------------------------- */
 
-/** Fill a bounded acquisition configuration without normative thresholds. */
+/**
+ * Fill a bounded acquisition configuration without normative thresholds.
+ *
+ * @param[out] config Configuration to initialize.
+ * @return ADXL355_OK or ADXL355_ERR_NULL.
+ */
 adxl355_status_t adxl355_self_test_config_default(adxl355_self_test_config_t *config);
 
 /**
@@ -308,6 +327,12 @@ adxl355_status_t adxl355_self_test_config_default(adxl355_self_test_config_t *co
  * FILTER, cached range, and POWER_CTL exactly. A restore failure takes
  * precedence over the operation status. If caller thresholds are enabled and
  * violated, the result remains populated and ADXL355_ERR_THRESHOLD is returned.
+ *
+ * @param dev Initialised and probed device handle.
+ * @param config Optional bounded configuration; NULL selects defaults.
+ * @param[out] result Measured response and caller-policy result.
+ * @return ADXL355_OK, ADXL355_ERR_THRESHOLD, ADXL355_ERR_TIMEOUT,
+ *         ADXL355_ERR_RESTORE, or another validated driver error.
  */
 adxl355_status_t adxl355_run_self_test(adxl355_t *dev,
                                         const adxl355_self_test_config_t *config,
@@ -421,6 +446,13 @@ float adxl355_raw_to_mps2(int32_t raw, adxl355_range_t range);
  * round_half_away_from_zero((measured_raw - expected_raw) / 16).
  * Inputs must be valid signed 20-bit acceleration values. When `saturate` is
  * false, a resulting value outside int16_t is rejected. When true, it is clamped.
+ *
+ * @param measured_raw Rounded measured mean in signed 20-bit raw LSB.
+ * @param expected_raw Desired signed 20-bit raw LSB target.
+ * @param current_offset Existing signed offset-register value.
+ * @param saturate Clamp overflow to int16_t when true; reject it when false.
+ * @param[out] offset Calculated offset; modified only on success.
+ * @return ADXL355_OK, ADXL355_ERR_NULL, or ADXL355_ERR_INVALID_ARG.
  */
 adxl355_status_t adxl355_calculate_offset(int32_t measured_raw,
                                            int32_t expected_raw,
@@ -428,7 +460,12 @@ adxl355_status_t adxl355_calculate_offset(int32_t measured_raw,
                                            bool saturate,
                                            int16_t *offset);
 
-/** Return a human-readable string for a status code. */
+/**
+ * Return a static human-readable string for a status code.
+ *
+ * @param status Public status value or an unknown integer cast to the enum.
+ * @return Process-lifetime string; never NULL.
+ */
 const char *adxl355_status_string(adxl355_status_t status);
 
 #ifdef __cplusplus

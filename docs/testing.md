@@ -169,6 +169,23 @@ the C core mapping through its exception wrapper. Tests additionally inject nati
 read/write failures and require the stable driver-level bus error rather than an
 index exception, panic, or fabricated numeric result.
 
+## Generated API references
+
+Compact references for C, C++, Python, Rust, Node.js/TypeScript, and Go are
+committed below `docs/api/`. They are generated from the same normalized public
+surface used by the additive compatibility gate, so documentation drift cannot be
+hidden by manually editing signatures.
+
+```bash
+python scripts/generate_api_reference.py
+python scripts/generate_api_reference.py --verify
+```
+
+The required `Cross-language Consistency` job runs verification. Native HTML or
+terminal documentation remains transient: use each reference page's documented
+`cargo doc`, `pydoc`, TypeScript build, CMake, or `go doc` command when richer
+language-native output is needed.
+
 ## Required CI Quality Gates
 
 The primary workflow keeps stable language job names while enforcing more than

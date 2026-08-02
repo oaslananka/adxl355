@@ -138,6 +138,7 @@ pub mod spi {
     pub fn read_cmd(reg: u8) -> u8 {
         (reg << 1) | 0x01
     }
+    /// Build an SPI write command byte for one register address.
     pub fn write_cmd(reg: u8) -> u8 {
         reg << 1
     }
