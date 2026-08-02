@@ -1,5 +1,14 @@
 add_executable(test_adxl355_cpp test_adxl355_cpp.cpp)
 target_link_libraries(test_adxl355_cpp PRIVATE adxl355_cpp)
 target_include_directories(test_adxl355_cpp PRIVATE ${CMAKE_SOURCE_DIR}/include)
-
 add_test(NAME test_adxl355_cpp COMMAND test_adxl355_cpp)
+
+add_executable(test_adxl355_cpp_noexcept test_adxl355_cpp_noexcept.cpp)
+target_link_libraries(test_adxl355_cpp_noexcept PRIVATE adxl355_cpp_noexcept)
+target_include_directories(test_adxl355_cpp_noexcept PRIVATE ${CMAKE_SOURCE_DIR}/include)
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+    target_compile_options(test_adxl355_cpp_noexcept PRIVATE -fno-exceptions -fno-rtti)
+elseif(MSVC)
+    target_compile_options(test_adxl355_cpp_noexcept PRIVATE /GR-)
+endif()
+add_test(NAME test_adxl355_cpp_noexcept COMMAND test_adxl355_cpp_noexcept)
