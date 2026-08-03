@@ -11,6 +11,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 RENOVATE = REPO_ROOT / "renovate.json"
 MERGIFY = REPO_ROOT / ".mergify.yml"
 DEPENDABOT = REPO_ROOT / ".github/dependabot.yml"
+RELEASE_WORKFLOW = REPO_ROOT / ".github/workflows/release.yml"
 
 
 class DependencyAutomationTests(unittest.TestCase):
@@ -35,6 +36,13 @@ class DependencyAutomationTests(unittest.TestCase):
         )
         self.assertTrue(major["dependencyDashboardApproval"])
         self.assertFalse(major["automerge"])
+
+    def test_crates_io_auth_action_uses_a_resolvable_semver_comment(self) -> None:
+        workflow = RELEASE_WORKFLOW.read_text(encoding="utf-8")
+        self.assertRegex(
+            workflow,
+            r"rust-lang/crates-io-auth-action@[0-9a-f]{40} # v\d+\.\d+\.\d+",
+        )
 
     def test_mergify_only_auto_merges_opted_in_renovate_prs(self) -> None:
         config = cast(
