@@ -290,6 +290,33 @@ Run the native package smoke locally with:
 ./scripts/smoke_cmake_packages.sh
 ```
 
+### SonarQube Cloud analysis in GitHub Actions
+
+`.github/workflows/sonar.yml` performs the repository's SonarQube Cloud analysis
+from GitHub Actions. SonarQube Cloud Automatic Analysis must remain disabled so a
+commit is not analyzed by two competing methods. The workflow uses full Git
+history, a merged C/C++ compilation database, and the Go coverage profile. The
+official scanner action is pinned to an immutable commit and authenticates with
+the repository's `SONAR_TOKEN` secret; no token value belongs in the repository
+or workflow logs.
+
+For each trusted same-repository pull request and each relevant `main` change:
+
+- the **SonarQube Cloud** Actions job contains scanner configuration, language,
+  coverage-import, parse, and upload diagnostics;
+- the run's **Job Summary** contains the Quality Gate conditions, bounded project
+  measures, and a limited list of non-security issues with file and line context;
+- SonarQube Cloud's GitHub check supplies pull-request decoration and the final
+  Quality Gate result; and
+- security-related issue details are deliberately omitted from public logs and
+  summaries. Their count and dashboard link remain visible for private triage.
+
+The Sonar job is initially supplemental rather than a required merge check while
+the inherited Quality Gate findings are being reproduced and corrected. Promote
+it to a required ruleset context only after successful pull-request and `main`
+runs are stable and the Quality Gate is green without suppressing confirmed
+findings.
+
 ## Bounded fuzzing
 
 The required `Fuzz smoke` job runs only on a GitHub-hosted Ubuntu runner. It never
