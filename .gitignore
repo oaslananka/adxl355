@@ -24,6 +24,7 @@ node/.npm-pack.json
 
 # Go
 go/bin/
+go/coverage.out
 
 # IDE
 .vscode/
