@@ -12,8 +12,7 @@ permissions:
 
 jobs:
   assign:
-    runs-on: ubuntu-latest
-    if: github.actor != 'oaslananka'
+    runs-on: ubuntu-24.04
 
     steps:
       - name: Assign to oaslananka
