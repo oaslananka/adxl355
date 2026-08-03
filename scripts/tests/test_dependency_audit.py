@@ -68,6 +68,10 @@ class DependencyAuditTests(unittest.TestCase):
         self.assertRegex(str(pip_audit["uses"]), SHA_PIN)
         self.assertEqual(pip_audit["with"]["no-deps"], True)
         self.assertEqual(pip_audit["with"]["require-hashes"], True)
+        self.assertEqual(
+            pip_audit["with"]["internal-be-careful-extra-flags"],
+            "--disable-pip",
+        )
         locks = jobs["python-audit"]["strategy"]["matrix"]["lock"]
         self.assertEqual(
             set(locks),

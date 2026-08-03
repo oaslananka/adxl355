@@ -43,6 +43,7 @@ jobs:
           inputs: requirements/python/${{ matrix.lock }}.txt
           no-deps: true
           require-hashes: true
+          internal-be-careful-extra-flags: --disable-pip
           vulnerability-service: PyPI
           summary: true
 
