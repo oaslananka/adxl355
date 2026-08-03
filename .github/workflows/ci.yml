@@ -11,8 +11,7 @@ on:
   workflow_dispatch:
   workflow_call:
 
-permissions:
-  contents: read
+permissions: {}
 
 concurrency:
   group: ci-${{ github.event.pull_request.number || github.ref }}
@@ -29,6 +28,8 @@ jobs:
   c:
     name: C (GCC)
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     defaults:
       run:
         working-directory: c
@@ -56,6 +57,8 @@ jobs:
   cpp:
     name: C++ (GCC)
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     defaults:
       run:
         working-directory: cpp
@@ -95,6 +98,8 @@ jobs:
   native-clang:
     name: Native (Clang/Linux)
     runs-on: ubuntu-24.04
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -140,6 +145,8 @@ jobs:
   native-macos:
     name: Native (macOS/arm64)
     runs-on: macos-15
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -169,6 +176,8 @@ jobs:
   native-windows:
     name: Native (Windows/MSVC)
     runs-on: windows-2025
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -203,6 +212,8 @@ jobs:
   native-arm:
     name: Native (Linux/arm64)
     runs-on: ubuntu-24.04-arm
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -235,6 +246,8 @@ jobs:
   python:
     name: Python
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     defaults:
       run:
         working-directory: python
@@ -288,6 +301,8 @@ jobs:
   rust:
     name: Rust
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     defaults:
       run:
         working-directory: rust
@@ -318,6 +333,8 @@ jobs:
   node:
     name: Node.js
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     defaults:
       run:
         working-directory: node
@@ -358,6 +375,8 @@ jobs:
   go:
     name: Go
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     defaults:
       run:
         working-directory: go
@@ -393,6 +412,8 @@ jobs:
   embedded:
     name: Embedded (Arduino Uno)
     runs-on: ubuntu-24.04
+    permissions:
+      contents: read
     timeout-minutes: 12
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -434,6 +455,8 @@ jobs:
   fuzz:
     name: Fuzz smoke
     runs-on: ubuntu-24.04
+    permissions:
+      contents: read
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -482,6 +505,8 @@ jobs:
   consistency:
     name: Cross-language Consistency
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     needs: [c, cpp, native-clang, native-macos, native-windows, native-arm, python, rust, node, go, embedded, fuzz]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

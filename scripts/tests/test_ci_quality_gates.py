@@ -179,6 +179,12 @@ class CiQualityGateTests(unittest.TestCase):
         self.assertEqual(gate["name"], "Tests")
         self.assertEqual(set(gate["needs"]), expected)
         self.assertEqual(gate["if"], "always()")
+        workflow = cast(
+            dict[str, Any], yaml.safe_load(CI_WORKFLOW.read_text(encoding="utf-8"))
+        )
+        self.assertEqual(workflow["permissions"], {})
+        for job_id in expected - {"tests"}:
+            self.assertEqual(jobs[job_id]["permissions"], {"contents": "read"})
         self.assertEqual(gate["permissions"], {})
         self.assertEqual(gate["runs-on"], "ubuntu-24.04")
         self.assertNotIn("uses", str(gate["steps"]))
