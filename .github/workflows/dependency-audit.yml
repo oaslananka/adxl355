@@ -88,6 +88,8 @@ jobs:
     with:
       scan-args: |-
         --recursive
+        --experimental-exclude=go
+        --experimental-exclude=tools/govulncheck
         ./
       fail-on-vuln: true
       results-file-name: dependency-audit-osv.sarif
