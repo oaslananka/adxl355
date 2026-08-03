@@ -26,7 +26,7 @@
     "pack:core-only": "npm run build && npm pack --json > .npm-install-pack.json && node scripts/check-core-only-install.mjs .npm-install-pack.json"
   },
   "devDependencies": {
-    "@types/node": "24.10.1",
+    "@types/node": "24.10.15",
     "typescript": "7.0.2",
     "vitest": "4.1.10"
   },
