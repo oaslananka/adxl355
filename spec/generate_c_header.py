@@ -8,7 +8,7 @@ Usage:
     python spec/generate_c_header.py --diff                   # diff vs current header
 """
 
-import os
+import argparse
 import subprocess
 import sys
 from pathlib import Path
@@ -109,7 +109,9 @@ def generate(spec_path: Path) -> str:
         else:
             addr_str = f"0x{int(addr):02X}"
         desc = r.get("description", "")
-        reg_lines.append(f"#define ADXL355_REG_{fmt_guard(name)} {addr_str}  /* {desc} */")
+        reg_lines.append(
+            f"#define ADXL355_REG_{fmt_guard(name)} {addr_str}  /* {desc} */"
+        )
 
     register_defines = "\n".join(reg_lines)
 
@@ -156,7 +158,9 @@ def generate(spec_path: Path) -> str:
                         f"0x{v_val:02X}  /* {v_label} */"
                     )
 
-    field_defines = "\n".join(field_defs) if field_defs else "/* No field value defines. */"
+    field_defines = (
+        "\n".join(field_defs) if field_defs else "/* No field value defines. */"
+    )
 
     from datetime import datetime
 
@@ -183,11 +187,14 @@ def diff_headers(generated: str, existing: Path):
     # Use git diff if available
     try:
         import tempfile
+
         gen_path = Path(tempfile.mkdtemp()) / "generated.h"
         gen_path.write_text(generated, encoding="utf-8")
         result = subprocess.run(
             ["diff", "-u", str(existing), str(gen_path)],
-            capture_output=True, text=True, timeout=10
+            capture_output=True,
+            text=True,
+            timeout=10,
         )
         if result.returncode == 0:
             print("No differences — generated header matches existing.")
@@ -204,23 +211,56 @@ def diff_headers(generated: str, existing: Path):
             print("Generated header differs from existing (use --output to overwrite).")
 
 
-def main():
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description=__doc__)
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument(
+        "--diff",
+        action="store_true",
+        help="compare generated output with the committed C header",
+    )
+    mode.add_argument(
+        "--output",
+        type=Path,
+        help="write a .h file below the repository root",
+    )
+    return parser.parse_args(argv)
+
+
+def validate_output_path(requested: Path, repository_root: Path) -> Path:
+    """Resolve one generated header path without allowing repository escape."""
+    root = repository_root.resolve(strict=True)
+    candidate = requested if requested.is_absolute() else root / requested
+    resolved = candidate.resolve(strict=False)
+    if resolved == root or root not in resolved.parents:
+        raise ValueError("output path must remain inside the repository")
+    if resolved.suffix.lower() != ".h":
+        raise ValueError("output path must name a C header (.h)")
+    return resolved
+
+
+def main(argv: list[str] | None = None) -> None:
+    args = parse_args(argv)
     spec_dir = Path(__file__).resolve().parent
+    repository_root = spec_dir.parent
     spec_path = spec_dir / "adxl355.registers.yaml"
     generated = generate(spec_path)
 
-    if "--diff" in sys.argv:
-        existing = Path(__file__).resolve().parent.parent / "c" / "include" / "adxl355" / "adxl355_registers.h"
+    if args.diff:
+        existing = repository_root / "c" / "include" / "adxl355" / "adxl355_registers.h"
         diff_headers(generated, existing)
         return
 
-    if "--output" in sys.argv:
-        idx = sys.argv.index("--output")
-        out_path = Path(sys.argv[idx + 1])
+    if args.output is not None:
+        try:
+            out_path = validate_output_path(args.output, repository_root)
+        except ValueError as error:
+            raise SystemExit(str(error)) from error
         out_path.write_text(generated, encoding="utf-8")
         print(f"Written: {out_path}")
-    else:
-        print(generated)
+        return
+
+    print(generated)
 
 
 if __name__ == "__main__":

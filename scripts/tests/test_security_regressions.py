@@ -1,0 +1,65 @@
+from __future__ import annotations
+
+import importlib.util
+import tempfile
+import unittest
+from pathlib import Path
+from typing import Any
+
+import yaml  # type: ignore[import-untyped]
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+AUTO_ASSIGN = REPO_ROOT / ".github/workflows/auto-assign.yml"
+GENERATOR = REPO_ROOT / "spec/generate_c_header.py"
+
+
+def load_generator() -> Any:
+    spec = importlib.util.spec_from_file_location("generate_c_header", GENERATOR)
+    if spec is None or spec.loader is None:
+        raise RuntimeError("cannot load generate_c_header")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+class SecurityRegressionTests(unittest.TestCase):
+    def test_auto_assign_does_not_use_forgeable_context_as_a_trust_decision(
+        self,
+    ) -> None:
+        workflow = yaml.safe_load(AUTO_ASSIGN.read_text(encoding="utf-8"))
+        job = workflow["jobs"]["assign"]
+        self.assertNotIn("if", job)
+        rendered = AUTO_ASSIGN.read_text(encoding="utf-8")
+        self.assertNotIn("github.actor", rendered)
+        self.assertNotIn("github.triggering_actor", rendered)
+
+    def test_generator_output_must_resolve_inside_repository_and_be_a_header(
+        self,
+    ) -> None:
+        generator = load_generator()
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp).resolve()
+            valid = generator.validate_output_path(
+                Path("generated/registers.h"), repo_root
+            )
+            self.assertEqual(valid, repo_root / "generated/registers.h")
+
+            with self.assertRaisesRegex(ValueError, "repository"):
+                generator.validate_output_path(Path("../outside.h"), repo_root)
+            with self.assertRaisesRegex(ValueError, "header"):
+                generator.validate_output_path(
+                    Path("generated/registers.txt"), repo_root
+                )
+
+    def test_generator_parser_rejects_conflicting_or_missing_output_arguments(
+        self,
+    ) -> None:
+        generator = load_generator()
+        with self.assertRaises(SystemExit):
+            generator.parse_args(["--diff", "--output", "generated.h"])
+        with self.assertRaises(SystemExit):
+            generator.parse_args(["--output"])
+
+
+if __name__ == "__main__":
+    unittest.main()
