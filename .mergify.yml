@@ -1,0 +1,43 @@
+merge_protections_settings:
+  reporting_method: check-runs
+  post_comment: false
+  auto_merge_conditions:
+    - author = renovate[bot]
+    - label = automerge
+
+merge_protections:
+  - name: required checks for low-risk Renovate updates
+    if:
+      - base = main
+      - author = renovate[bot]
+    success_conditions:
+      - label = automerge
+      - label != manual-review
+      - "-draft"
+      - check-success = C (GCC)
+      - check-success = C++ (GCC)
+      - check-success = Python (3.10)
+      - check-success = Python (3.11)
+      - check-success = Python (3.12)
+      - check-success = Rust
+      - check-success = Node.js (22)
+      - check-success = Node.js (24)
+      - check-success = Node.js (26)
+      - check-success = Go
+      - check-success = Cross-language Consistency
+      - check-success = dependency-review
+      - check-success = CodeQL (c-cpp)
+      - check-success = CodeQL (python)
+      - check-success = CodeQL (javascript-typescript)
+      - check-success = CodeQL (go)
+
+queue_rules:
+  - name: dependency-updates
+    queue_conditions:
+      - author = renovate[bot]
+      - label = automerge
+    merge_conditions:
+      - label != manual-review
+      - "-draft"
+    merge_method: squash
+    batch_size: 1
