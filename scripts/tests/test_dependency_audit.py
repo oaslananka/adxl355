@@ -15,6 +15,8 @@ WORKFLOWS = REPO_ROOT / ".github" / "workflows"
 AUDIT = WORKFLOWS / "dependency-audit.yml"
 REVIEW = WORKFLOWS / "dependency-review.yml"
 GO_OSV_CONFIG = REPO_ROOT / "go" / "osv-scanner.toml"
+GOVULNCHECK_MOD = REPO_ROOT / "tools" / "govulncheck" / "go.mod"
+GOVULNCHECK_SUM = REPO_ROOT / "tools" / "govulncheck" / "go.sum"
 CI_TEST_INPUT = REPO_ROOT / "requirements" / "python" / "ci-test.in"
 CI_TEST_LOCK = CI_TEST_INPUT.with_suffix(".txt")
 RENOVATE = REPO_ROOT / "renovate.json"
@@ -49,7 +51,16 @@ class DependencyAuditTests(unittest.TestCase):
         self.assertIn("push", triggers)
         self.assertIn("schedule", triggers)
         self.assertIn("workflow_dispatch", triggers)
-        self.assertEqual(workflow["permissions"], {"contents": "read"})
+        self.assertEqual(workflow["permissions"], {})
+        self.assertEqual(
+            workflow["jobs"]["python-audit"]["permissions"],
+            {"contents": "read"},
+        )
+        self.assertEqual(
+            workflow["jobs"]["go-reachability"]["permissions"],
+            {"contents": "read"},
+        )
+        self.assertEqual(workflow["jobs"]["dependency-audit"]["permissions"], {})
 
     def test_dependency_audit_uses_pinned_python_go_and_osv_controls(self) -> None:
         workflow = load_yaml(AUDIT)
@@ -93,8 +104,13 @@ class DependencyAuditTests(unittest.TestCase):
 
         go_job = jobs["go-reachability"]
         commands = "\n".join(str(step.get("run", "")) for step in go_job["steps"])
-        self.assertIn("golang.org/x/vuln/cmd/govulncheck@v1.6.0", commands)
-        self.assertIn("govulncheck ./...", commands)
+        self.assertNotIn("go install", commands)
+        self.assertIn("go mod verify", commands)
+        self.assertIn("go build -mod=readonly", commands)
+        self.assertIn('runner.temp }}/govulncheck" ./...', commands)
+        self.assertIn("golang.org/x/vuln v1.6.0", GOVULNCHECK_MOD.read_text())
+        self.assertTrue(GOVULNCHECK_SUM.is_file())
+        self.assertIn("golang.org/x/vuln v1.6.0", GOVULNCHECK_SUM.read_text())
         setup_go = next(
             step
             for step in go_job["steps"]

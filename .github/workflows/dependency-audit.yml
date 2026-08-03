@@ -9,8 +9,7 @@ on:
     - cron: "23 2 * * *"
   workflow_dispatch:
 
-permissions:
-  contents: read
+permissions: {}
 
 concurrency:
   group: dependency-audit-${{ github.event.pull_request.number || github.ref }}
@@ -20,6 +19,8 @@ jobs:
   python-audit:
     name: Python dependency audit (${{ matrix.lock }})
     runs-on: ubuntu-24.04
+    permissions:
+      contents: read
     strategy:
       fail-fast: false
       matrix:
@@ -50,6 +51,8 @@ jobs:
   go-reachability:
     name: Go reachability audit
     runs-on: ubuntu-24.04
+    permissions:
+      contents: read
     defaults:
       run:
         working-directory: go
@@ -63,10 +66,17 @@ jobs:
         with:
           go-version: "1.25"
           cache: false
-      - name: Install pinned govulncheck
-        run: go install golang.org/x/vuln/cmd/govulncheck@v1.6.0
+      - name: Verify pinned govulncheck module
+        working-directory: tools/govulncheck
+        run: go mod verify
+      - name: Build pinned govulncheck
+        working-directory: tools/govulncheck
+        run: >-
+          go build -mod=readonly -trimpath
+          -o "${{ runner.temp }}/govulncheck"
+          golang.org/x/vuln/cmd/govulncheck
       - name: Scan reachable Go vulnerabilities
-        run: govulncheck ./...
+        run: '"${{ runner.temp }}/govulncheck" ./...'
 
   osv-scan:
     name: OSV repository audit
@@ -85,6 +95,7 @@ jobs:
   dependency-audit:
     name: Dependency Audit
     if: always()
+    permissions: {}
     needs:
       - python-audit
       - go-reachability
