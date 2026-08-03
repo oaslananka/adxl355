@@ -158,6 +158,37 @@ class CiQualityGateTests(unittest.TestCase):
         consistency_needs = set(jobs["consistency"]["needs"])
         self.assertTrue(set(expected).issubset(consistency_needs))
 
+    def test_aggregate_tests_gate_enforces_every_ci_job(self) -> None:
+        jobs = self.load_jobs()
+        gate = jobs["tests"]
+        expected = {
+            "c",
+            "cpp",
+            "native-clang",
+            "native-macos",
+            "native-windows",
+            "native-arm",
+            "python",
+            "rust",
+            "node",
+            "go",
+            "embedded",
+            "fuzz",
+            "consistency",
+        }
+        self.assertEqual(gate["name"], "Tests")
+        self.assertEqual(set(gate["needs"]), expected)
+        self.assertEqual(gate["if"], "always()")
+        self.assertEqual(gate["permissions"], {})
+        self.assertEqual(gate["runs-on"], "ubuntu-24.04")
+        self.assertNotIn("uses", str(gate["steps"]))
+        env = gate["steps"][0]["env"]
+        self.assertEqual(
+            set(env), {name.upper().replace("-", "_") for name in expected}
+        )
+        command = str(gate["steps"][0]["run"])
+        self.assertIn('test "$result" = success', command)
+
     def test_windows_smoke_script_is_bounded_and_uses_installed_consumers(self) -> None:
         script = (REPO_ROOT / "scripts" / "smoke_cmake_packages.ps1").read_text()
         self.assertIn('$ErrorActionPreference = "Stop"', script)
