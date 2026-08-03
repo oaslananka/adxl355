@@ -70,6 +70,11 @@ jobs:
             --require-hashes --no-deps --only-binary=:all: \
             -r requirements/python/ci-test.txt
 
+      - name: Set up Rust with Clippy
+        uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4 # stable 2026-07-16
+        with:
+          components: clippy
+
       - name: Set up Go
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:

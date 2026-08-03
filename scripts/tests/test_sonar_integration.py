@@ -91,6 +91,15 @@ class SonarIntegrationTests(unittest.TestCase):
             if str(step.get("uses", "")).startswith("actions/setup-python@")
         )
         self.assertRegex(setup_python["uses"], r"^actions/setup-python@[0-9a-f]{40}$")
+        rust_toolchain = next(
+            step
+            for step in job["steps"]
+            if str(step.get("uses", "")).startswith("dtolnay/rust-toolchain@")
+        )
+        self.assertRegex(
+            rust_toolchain["uses"], r"^dtolnay/rust-toolchain@[0-9a-f]{40}$"
+        )
+        self.assertEqual(rust_toolchain["with"]["components"], "clippy")
 
     def test_workflow_builds_databases_and_imports_bounded_coverage(self) -> None:
         text = WORKFLOW.read_text(encoding="utf-8")
@@ -127,6 +136,10 @@ class SonarIntegrationTests(unittest.TestCase):
             "sonar-build/python-coverage.xml",
         )
         self.assertEqual(properties["sonar.python.version"], "3.10,3.11,3.12")
+        self.assertEqual(
+            properties["sonar.rust.cargo.manifestPaths"], "rust/Cargo.toml"
+        )
+        self.assertEqual(properties["sonar.yaml.activate"], "true")
         sources = set(properties["sonar.sources"].split(","))
         self.assertTrue(
             {"c", "cpp", "python/src", "node/src", "rust/src", "go"}.issubset(sources)
