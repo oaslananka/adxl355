@@ -140,8 +140,10 @@ jobs:
       - name: Generate Python coverage
         run: |
           python -m coverage run --branch \
-            --include='*/scripts/sonar_summary.py' \
-            -m unittest scripts.tests.test_sonar_integration
+            --include='*/scripts/sonar_summary.py,*/spec/generate_c_header.py' \
+            -m unittest \
+              scripts.tests.test_sonar_integration \
+              scripts.tests.test_security_regressions
           python -m coverage xml -o sonar-build/python-coverage.xml
           python -m coverage report --fail-under=80
 

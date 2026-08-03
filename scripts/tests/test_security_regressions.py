@@ -33,6 +33,14 @@ class SecurityRegressionTests(unittest.TestCase):
         self.assertNotIn("github.actor", rendered)
         self.assertNotIn("github.triggering_actor", rendered)
 
+    def test_generator_renders_the_authoritative_register_spec(self) -> None:
+        generator = load_generator()
+        rendered = generator.generate(REPO_ROOT / "spec/adxl355.registers.yaml")
+        self.assertIn("#define ADXL355_REG_DEVID_AD 0x00", rendered)
+        self.assertIn("#define ADXL355_STATUS_DATA_RDY", rendered)
+        self.assertIn("#define ADXL355_RANGE_2G 0x01", rendered)
+        self.assertIn("ADXL355_SPI_READ_CMD", rendered)
+
     def test_generator_output_must_resolve_inside_repository_and_be_a_header(
         self,
     ) -> None:

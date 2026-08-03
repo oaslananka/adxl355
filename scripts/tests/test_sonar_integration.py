@@ -108,6 +108,8 @@ class SonarIntegrationTests(unittest.TestCase):
         self.assertIn("go test -covermode=atomic -coverprofile=coverage.out", text)
         self.assertIn("requirements/python/ci-test.txt", text)
         self.assertIn("coverage xml -o sonar-build/python-coverage.xml", text)
+        self.assertIn("*/spec/generate_c_header.py", text)
+        self.assertIn("scripts.tests.test_security_regressions", text)
         self.assertIn("coverage report --fail-under=80", text)
         self.assertIn(
             'python scripts/sonar_summary.py "${args[@]}" > "$GITHUB_STEP_SUMMARY"',
