@@ -6,6 +6,8 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
+import sys
 import time
 import urllib.error
 import urllib.parse
@@ -14,6 +16,7 @@ from pathlib import Path
 from typing import Any
 
 ALLOWED_HOSTS = {"sonarcloud.io"}
+REPORT_TASK_PATH = Path(".scannerwork/report-task.txt")
 MAX_PUBLIC_ISSUES = 20
 METRIC_LABELS = {
     "new_reliability_rating": "New-code reliability rating",
@@ -42,39 +45,43 @@ def _validated_url(value: str, field: str) -> str:
     return value
 
 
-def parse_report_task(path: Path) -> dict[str, str]:
-    if not path.is_file():
-        raise FileNotFoundError(f"Sonar report task not found: {path}")
+def parse_report_task(text: str) -> dict[str, str]:
     values: dict[str, str] = {}
-    for raw_line in path.read_text(encoding="utf-8").splitlines():
+    for raw_line in text.splitlines():
         if not raw_line or "=" not in raw_line:
             continue
         key, value = raw_line.split("=", 1)
         values[key.strip()] = value.strip()
-    for required in ("ceTaskUrl", "dashboardUrl"):
+    for required in ("ceTaskId", "dashboardUrl"):
         if required not in values:
             raise ValueError(f"Sonar report task is missing {required}")
-        values[required] = _validated_url(values[required], required)
+    if not re.fullmatch(r"[A-Za-z0-9_-]{8,128}", values["ceTaskId"]):
+        raise ValueError("Sonar compute task id has an invalid format")
+    values["dashboardUrl"] = _validated_url(values["dashboardUrl"], "dashboardUrl")
     return values
 
 
+def load_report_task() -> dict[str, str]:
+    if not REPORT_TASK_PATH.is_file():
+        raise FileNotFoundError(f"Sonar report task not found: {REPORT_TASK_PATH}")
+    return parse_report_task(REPORT_TASK_PATH.read_text(encoding="utf-8"))
+
+
 class SonarClient:
-    def __init__(self, token: str, base_url: str = "https://sonarcloud.io") -> None:
+    def __init__(self, token: str) -> None:
         if not token:
             raise ValueError("SONAR_TOKEN is required")
         self.token = token
-        self.base_url = _validated_url(base_url.rstrip("/"), "base URL")
+        self.base_url = "https://sonarcloud.io"
 
     def get(
-        self, endpoint_or_url: str, params: dict[str, str] | None = None
+        self, endpoint: str, params: dict[str, str] | None = None
     ) -> dict[str, Any]:
-        if endpoint_or_url.startswith("https://"):
-            url = _validated_url(endpoint_or_url, "API URL")
-        else:
-            url = f"{self.base_url}/{endpoint_or_url.lstrip('/')}"
+        if not re.fullmatch(r"api/[A-Za-z0-9_./-]+", endpoint):
+            raise ValueError("Sonar API endpoint is not allow-listed")
+        url = f"{self.base_url}/{endpoint}"
         if params:
-            query = urllib.parse.urlencode(params)
-            url = f"{url}{'&' if '?' in url else '?'}{query}"
+            url = f"{url}?{urllib.parse.urlencode(params)}"
         request = urllib.request.Request(
             url,
             headers={
@@ -100,13 +107,13 @@ class SonarClient:
 
 def wait_for_analysis(
     client: SonarClient,
-    ce_task_url: str,
+    ce_task_id: str,
     *,
     attempts: int,
     interval_seconds: float,
 ) -> str:
     for _ in range(attempts):
-        payload = client.get(ce_task_url)
+        payload = client.get("api/ce/task", {"id": ce_task_id})
         task = payload.get("task", {})
         if not isinstance(task, dict):
             raise ValueError("Sonar compute task response is invalid")
@@ -309,23 +316,19 @@ def render_markdown(
     return "\n".join(lines) + "\n"
 
 
-def write_warning(path: Path, message: str) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(
+def render_warning(message: str) -> str:
+    return (
         "## SonarQube Cloud analysis\n\n"
-        f"> Summary generation warning: {_escape_markdown(message)}\n",
-        encoding="utf-8",
+        f"> Summary generation warning: {_escape_markdown(message)}\n"
     )
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--report-task", type=Path, required=True)
     parser.add_argument("--project-key", required=True)
     scope = parser.add_mutually_exclusive_group(required=True)
     scope.add_argument("--branch")
     scope.add_argument("--pull-request")
-    parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--attempts", type=int, default=60)
     parser.add_argument("--interval-seconds", type=float, default=2.0)
     parser.add_argument("--soft-fail", action="store_true")
@@ -335,11 +338,11 @@ def build_parser() -> argparse.ArgumentParser:
 def main() -> int:
     args = build_parser().parse_args()
     try:
-        report = parse_report_task(args.report_task)
+        report = load_report_task()
         client = SonarClient(os.environ.get("SONAR_TOKEN", ""))
         analysis_id = wait_for_analysis(
             client,
-            report["ceTaskUrl"],
+            report["ceTaskId"],
             attempts=args.attempts,
             interval_seconds=args.interval_seconds,
         )
@@ -363,17 +366,19 @@ def main() -> int:
             scope=scope,
             total_issues=total,
         )
-        args.output.parent.mkdir(parents=True, exist_ok=True)
-        args.output.write_text(markdown, encoding="utf-8")
+        sys.stdout.write(markdown)
         print(
-            f"Sonar summary written for {scope}: gate={gate.get('status', 'UNKNOWN')}, issues={total}"
+            f"Sonar summary written for {scope}: "
+            f"gate={gate.get('status', 'UNKNOWN')}, issues={total}",
+            file=sys.stderr,
         )
         return 0
     except Exception as error:
         if args.soft_fail:
-            write_warning(args.output, str(error))
+            sys.stdout.write(render_warning(str(error)))
             print(
-                "Sonar summary could not be generated; a bounded warning was written."
+                "Sonar summary could not be generated; a bounded warning was written.",
+                file=sys.stderr,
             )
             return 0
         raise

@@ -295,7 +295,8 @@ Run the native package smoke locally with:
 `.github/workflows/sonar.yml` performs the repository's SonarQube Cloud analysis
 from GitHub Actions. SonarQube Cloud Automatic Analysis must remain disabled so a
 commit is not analyzed by two competing methods. The workflow uses full Git
-history, a merged C/C++ compilation database, and the Go coverage profile. The
+history, a merged C/C++ compilation database, the Go coverage profile, and a
+branch-coverage report for the tested Sonar summary helper. The
 official scanner action is pinned to an immutable commit and authenticates with
 the repository's `SONAR_TOKEN` secret; no token value belongs in the repository
 or workflow logs.

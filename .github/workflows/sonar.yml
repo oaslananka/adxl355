@@ -57,6 +57,19 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements/python/ci-test.txt
+
+      - name: Install Python coverage tooling
+        run: |
+          python -m pip install --disable-pip-version-check \
+            --require-hashes --no-deps --only-binary=:all: \
+            -r requirements/python/ci-test.txt
+
       - name: Set up Go
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
@@ -119,6 +132,14 @@ jobs:
           print(f"wrote {len(unique)} compilation commands to {output}")
           PY
 
+      - name: Generate Python coverage
+        run: |
+          python -m coverage run --branch \
+            --include='*/scripts/sonar_summary.py' \
+            -m unittest scripts.tests.test_sonar_integration
+          python -m coverage xml -o sonar-build/python-coverage.xml
+          python -m coverage report --fail-under=80
+
       - name: Read canonical project version
         id: version
         run: echo "value=$(tr -d '[:space:]' < VERSION)" >> "$GITHUB_OUTPUT"
@@ -140,9 +161,7 @@ jobs:
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
           args=(
-            --report-task .scannerwork/report-task.txt
             --project-key oaslananka_adxl355
-            --output "$GITHUB_STEP_SUMMARY"
             --attempts 60
             --interval-seconds 2
             --soft-fail
@@ -152,4 +171,4 @@ jobs:
           else
             args+=(--branch "$BRANCH_NAME")
           fi
-          python scripts/sonar_summary.py "${args[@]}"
+          python scripts/sonar_summary.py "${args[@]}" > "$GITHUB_STEP_SUMMARY"
