@@ -257,3 +257,18 @@ python -m unittest scripts.tests.test_supply_chain -v
 python -m unittest discover -s scripts/tests -p 'test_*.py' -v
 actionlint .github/workflows/*.yml
 ```
+
+## Dependency vulnerability gates
+
+Pull requests are blocked when Dependency Review introduces a `moderate` or higher
+runtime or development vulnerability. The separate `Dependency Audit` workflow
+runs on pull requests, every `main` push, daily, and on manual dispatch. It combines
+hash-aware `pip-audit`, Go call-reachability analysis with pinned `govulncheck`, and
+an OSV-Scanner repository baseline. Renovate vulnerability alerts remain immediate
+and do not wait for the normal update schedule.
+
+The bounded OSV exceptions in `go/osv-scanner.toml` preserve the documented Go 1.21
+compatibility floor for `GO-2026-5024` and the Windows-only standard-library advisory `GO-2025-3750`: pinned `govulncheck` on a dedicated scanner toolchain confirms that no affected
+symbol is reachable because this driver uses `x/sys/unix`. The exception expires on
+2026-11-01 and must be removed, renewed with fresh evidence, or replaced by a
+compatible dependency/toolchain upgrade.
