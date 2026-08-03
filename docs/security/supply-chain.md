@@ -264,7 +264,10 @@ Pull requests are blocked when Dependency Review introduces a `moderate` or high
 runtime or development vulnerability. The separate `Dependency Audit` workflow
 runs on pull requests, every `main` push, daily, and on manual dispatch. It combines
 hash-aware `pip-audit`, Go call-reachability analysis with pinned `govulncheck`, and
-an OSV-Scanner repository baseline. Renovate vulnerability alerts remain immediate
+an OSV-Scanner lock baseline for the non-Go ecosystems. Go modules are excluded from
+OSV SARIF because `govulncheck` is the authoritative reachability gate and avoids
+module/standard-library findings that are not callable by this project. Renovate
+vulnerability alerts remain immediate
 and do not wait for the normal update schedule.
 
 The bounded OSV exceptions in `go/osv-scanner.toml` preserve the documented Go 1.21

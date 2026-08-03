@@ -121,7 +121,10 @@ class DependencyAuditTests(unittest.TestCase):
         osv_job = jobs["osv-scan"]
         self.assertRegex(str(osv_job["uses"]), SHA_PIN)
         self.assertEqual(osv_job["with"]["fail-on-vuln"], True)
-        self.assertIn("--recursive", str(osv_job["with"]["scan-args"]))
+        scan_args = str(osv_job["with"]["scan-args"])
+        self.assertIn("--recursive", scan_args)
+        self.assertIn("--experimental-exclude=go", scan_args)
+        self.assertIn("--experimental-exclude=tools/govulncheck", scan_args)
         self.assertEqual(
             osv_job["permissions"],
             {"actions": "read", "contents": "read", "security-events": "write"},
