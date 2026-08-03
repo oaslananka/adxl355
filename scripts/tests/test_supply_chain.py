@@ -10,7 +10,7 @@ import yaml  # type: ignore[import-untyped]
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 WORKFLOWS = REPO_ROOT / ".github/workflows"
-DEPENDABOT = REPO_ROOT / ".github/dependabot.yml"
+RENOVATE = REPO_ROOT / "renovate.json"
 CODEQL = WORKFLOWS / "codeql.yml"
 RELEASE = WORKFLOWS / "release.yml"
 SCORECARD = WORKFLOWS / "scorecard.yml"
@@ -32,41 +32,18 @@ def workflow_commands(job: dict[str, Any]) -> str:
 
 
 class SupplyChainTests(unittest.TestCase):
-    def test_dependabot_groups_and_rate_limits_all_ecosystems(self) -> None:
-        updates = load_yaml(DEPENDABOT)["updates"]
-        by_target = {
-            (entry["package-ecosystem"], entry["directory"]): entry for entry in updates
-        }
-        expected_targets = {
-            ("github-actions", "/"),
-            ("pip", "/python"),
-            ("cargo", "/rust"),
-            ("npm", "/node"),
-            ("gomod", "/go"),
-        }
-        self.assertEqual(set(by_target), expected_targets)
-        for entry in by_target.values():
-            self.assertEqual(entry["schedule"]["interval"], "weekly")
-            self.assertEqual(entry["schedule"]["timezone"], "Europe/Istanbul")
-            self.assertLessEqual(entry["open-pull-requests-limit"], 3)
-            self.assertIn("dependencies", entry["labels"])
-            self.assertEqual(entry["cooldown"], {"default-days": 7})
-            groups = entry["groups"]
-            self.assertEqual(len(groups), 1)
-            group = next(iter(groups.values()))
-            self.assertEqual(group["patterns"], ["*"])
+    def test_renovate_is_the_single_version_update_bot(self) -> None:
+        config = cast(dict[str, Any], __import__("json").loads(RENOVATE.read_text()))
+        self.assertEqual(
+            set(config["enabledManagers"]),
+            {"github-actions", "pep621", "cargo", "npm", "gomod"},
+        )
+        self.assertEqual(config["timezone"], "Europe/Istanbul")
+        self.assertEqual(config["minimumReleaseAge"], "7 days")
+        self.assertIn("requirements/python/**", config["ignorePaths"])
+        self.assertFalse((REPO_ROOT / ".github/dependabot.yml").exists())
 
     def test_python_build_backend_uses_patched_setuptools_floor(self) -> None:
-        updates = load_yaml(DEPENDABOT)["updates"]
-        pip = next(
-            entry
-            for entry in updates
-            if entry["package-ecosystem"] == "pip" and entry["directory"] == "/python"
-        )
-        ignored = pip.get("ignore", [])
-        self.assertFalse(
-            any(entry.get("dependency-name") == "setuptools" for entry in ignored)
-        )
         pyproject = (REPO_ROOT / "python/pyproject.toml").read_text(encoding="utf-8")
         self.assertIn('requires = ["setuptools==83.0.0"]', pyproject)
         self.assertIn('requires-python = ">=3.10"', pyproject)

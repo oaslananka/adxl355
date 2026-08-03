@@ -1,11 +1,10 @@
 from __future__ import annotations
 
+import json
 import re
 import unittest
 from pathlib import Path
 from typing import Any, cast
-
-import yaml  # type: ignore[import-untyped]
 
 from scripts.generate_python_locks import (
     LOCK_ROOT,
@@ -19,7 +18,7 @@ from scripts.generate_python_locks import (
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 WORKFLOWS = REPO_ROOT / ".github" / "workflows"
-DEPENDABOT = REPO_ROOT / ".github" / "dependabot.yml"
+RENOVATE = REPO_ROOT / "renovate.json"
 LOCK_NAMES = {
     "ci-quality",
     "ci-test",
@@ -97,17 +96,12 @@ class PythonLockTests(unittest.TestCase):
         }.items():
             self.assertEqual(packages[name][0], version)
 
-    def test_custom_locks_use_generator_not_dependabot(self) -> None:
-        data = cast(dict[str, Any], yaml.safe_load(DEPENDABOT.read_text()))
-        pip_entries = [
-            update for update in data["updates"] if update["package-ecosystem"] == "pip"
-        ]
-        self.assertEqual([entry["directory"] for entry in pip_entries], ["/python"])
-        package_entry = pip_entries[0]
-        self.assertEqual(package_entry["schedule"]["interval"], "weekly")
-        self.assertEqual(package_entry["open-pull-requests-limit"], 2)
-        self.assertEqual(package_entry["cooldown"], {"default-days": 7})
-        self.assertNotIn("/requirements/python", DEPENDABOT.read_text())
+    def test_custom_locks_use_generator_not_renovate(self) -> None:
+        data = cast(dict[str, Any], json.loads(RENOVATE.read_text()))
+        self.assertIn("pep621", data["enabledManagers"])
+        self.assertEqual(data["minimumReleaseAge"], "7 days")
+        self.assertIn("requirements/python/**", data["ignorePaths"])
+        self.assertFalse((REPO_ROOT / ".github" / "dependabot.yml").exists())
 
     def test_latest_report_is_read_only_grouped_and_deduplicated(self) -> None:
         seen: list[str] = []

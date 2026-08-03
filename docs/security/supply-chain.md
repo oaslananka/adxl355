@@ -8,7 +8,7 @@ multiple local scanners that enforce the same policy with duplicate findings.
 
 | Category | Primary control | Enforcement |
 |---|---|---|
-| Dependency updates | Dependabot | Weekly, grouped PRs for GitHub Actions, Python, Rust, Node.js, and Go; seven-day cooldown and at most two open version-update PRs per ecosystem |
+| Dependency updates | Renovate | Weekly, grouped and rate-limited PRs for GitHub Actions, Python package metadata, Rust, Node.js, and Go; seven-day minimum release age and Dependency Dashboard approval for major upgrades |
 | Changed dependencies in pull requests | GitHub Dependency Review | A newly introduced dependency finding at **high severity** or critical severity blocks the PR |
 | Static application security testing | CodeQL | Required analysis for C/C++, Python, JavaScript/TypeScript, and Go on pull requests, `main`, and a weekly schedule |
 | Secret prevention | GitHub secret scanning and push protection | Repository setting; secrets are blocked before push where GitHub can identify them |
@@ -44,23 +44,31 @@ is an external maintainer-owned project record; its registration status is
 tracked in the implementation issue rather than represented by a repository
 metadata or audit file.
 
-## Dependabot maintenance policy
+## Renovate maintenance policy
 
-`.github/dependabot.yml` groups all version updates within each ecosystem into a
-single weekly PR. Schedules are staggered in the `Europe/Istanbul` timezone,
-`open-pull-requests-limit` is set to two per ecosystem, and newly published
-versions wait seven days before Dependabot proposes them. GitHub security updates
-are not delayed by this cooldown; vulnerability alerts and security updates remain
-enabled in repository settings.
+`renovate.json` is the single version-update bot configuration. It scans GitHub
+Actions, Python package metadata, Rust, Node.js, and Go on a Monday schedule in
+the `Europe/Istanbul` timezone. Newly released versions wait seven days before
+normal update PRs. Major updates require explicit Dependency Dashboard approval,
+and compiler, build-backend, runtime, and GitHub Actions changes remain manual.
 
-Dependency PRs must pass the same CI, CodeQL, dependency review, and package
-checks as contributor PRs. Do not merge an update only because it is automated;
-review release notes, lockfile changes, package contents, and any bot comments.
+Only low-risk non-major Node development updates receive the `automerge` label.
+Mergify may squash-merge those PRs only when the author is `renovate[bot]`, the
+`manual-review` label is absent, the PR is not a draft, and every required CI,
+dependency-review, and CodeQL check succeeds. GitHub rulesets remain the final
+merge authority.
 
-Compatibility caps must be narrow and documented. The Python package now requires
+GitHub Dependabot alerts and security graph features remain enabled, but
+`.github/dependabot.yml` is intentionally absent so Dependabot version updates do
+not duplicate Renovate PRs. Dependency changes must still pass the same CI,
+CodeQL, dependency review, package-content, and compatibility checks as any other
+contribution.
+
+Compatibility caps must be narrow and documented. The Python package requires
 Python 3.10 or later so its build backend can use patched `setuptools>=83` rather
 than retaining a vulnerable backend for Python 3.9 compatibility. Dependency
-updates must not be capped below a security fix without a dated, reviewed exception.
+updates must not be capped below a security fix without a dated, reviewed
+exception.
 
 ## Hash-locked Python workflow tooling
 
@@ -98,13 +106,12 @@ show the authenticated PyPI artifact set. Unexpected new packages, removed hashe
 yanked-only releases, source-only substitutions, or large platform expansion
 require investigation before merge.
 
-Dependabot remains weekly and rate-limited for the normal `/python` package
-metadata. It is intentionally **not** configured for `/requirements/python`:
-Dependabot edits both reviewed `.in` manifests and generated `.txt` files without
-running this repository's generator, which can remove required build backends or
-leave the pair inconsistent. Custom lock updates therefore use the documented
-report/edit/regenerate workflow and must pass the offline verifier, dependency
-review, and full CI.
+Renovate scans normal Python package metadata but intentionally ignores
+`/requirements/python`. Those reviewed `.in` manifests and generated `.txt` files
+may change only through the repository generator because generic bot edits can
+remove required build backends or leave the pair inconsistent. Custom lock updates
+therefore use the documented report/edit/regenerate workflow and must pass the
+offline verifier, dependency review, and full CI.
 
 Workflow installs use `--only-binary=:all:` where every package has a compatible
 wheel. The SPI adapter is the narrow source-build exception because `spidev` is

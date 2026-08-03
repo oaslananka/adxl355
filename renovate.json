@@ -1,0 +1,165 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:best-practices",
+    "security:openssf-scorecard",
+    "helpers:pinGitHubActionDigestsToSemver",
+    ":configMigration",
+    ":dependencyDashboard",
+    ":semanticCommits",
+    ":separatePatchReleases"
+  ],
+  "enabledManagers": [
+    "github-actions",
+    "pep621",
+    "cargo",
+    "npm",
+    "gomod"
+  ],
+  "timezone": "Europe/Istanbul",
+  "schedule": [
+    "before 8am on monday"
+  ],
+  "minimumReleaseAge": "7 days",
+  "dependencyDashboardTitle": "Dependency Dashboard",
+  "dependencyDashboardLabels": [
+    "dependencies",
+    "dependency-lifecycle"
+  ],
+  "labels": [
+    "dependencies",
+    "dependency-lifecycle"
+  ],
+  "rangeStrategy": "auto",
+  "pinDigests": true,
+  "rebaseWhen": "conflicted",
+  "prCreation": "not-pending",
+  "internalChecksFilter": "strict",
+  "prHourlyLimit": 2,
+  "prConcurrentLimit": 5,
+  "branchConcurrentLimit": 6,
+  "ignorePaths": [
+    "requirements/python/**",
+    "**/node_modules/**",
+    "**/target/**",
+    "**/build/**",
+    "**/dist/**",
+    "artifacts/**"
+  ],
+  "lockFileMaintenance": {
+    "enabled": true,
+    "schedule": [
+      "before 6am on monday"
+    ],
+    "automerge": false,
+    "addLabels": [
+      "manual-review"
+    ]
+  },
+  "packageRules": [
+    {
+      "description": "Label GitHub Actions updates for explicit supply-chain review.",
+      "matchManagers": [
+        "github-actions"
+      ],
+      "automerge": false,
+      "addLabels": [
+        "area/ci",
+        "manual-review"
+      ]
+    },
+    {
+      "description": "Route Python package metadata updates.",
+      "matchManagers": [
+        "pep621"
+      ],
+      "addLabels": [
+        "area/python"
+      ]
+    },
+    {
+      "description": "Route Rust dependency updates.",
+      "matchManagers": [
+        "cargo"
+      ],
+      "addLabels": [
+        "area/rust"
+      ]
+    },
+    {
+      "description": "Route Node.js dependency updates.",
+      "matchManagers": [
+        "npm"
+      ],
+      "addLabels": [
+        "area/node"
+      ]
+    },
+    {
+      "description": "Route Go dependency updates.",
+      "matchManagers": [
+        "gomod"
+      ],
+      "addLabels": [
+        "area/go"
+      ]
+    },
+    {
+      "description": "Require Dependency Dashboard approval for breaking upgrades.",
+      "matchUpdateTypes": [
+        "major"
+      ],
+      "dependencyDashboardApproval": true,
+      "automerge": false,
+      "addLabels": [
+        "breaking-change",
+        "manual-review"
+      ]
+    },
+    {
+      "description": "Keep compiler and Python build-backend changes under manual review.",
+      "matchPackageNames": [
+        "typescript",
+        "setuptools"
+      ],
+      "automerge": false,
+      "addLabels": [
+        "manual-review"
+      ]
+    },
+    {
+      "description": "Opt low-risk Node development updates into Mergify after all required checks pass.",
+      "matchManagers": [
+        "npm"
+      ],
+      "matchDepTypes": [
+        "devDependencies"
+      ],
+      "matchUpdateTypes": [
+        "minor",
+        "patch",
+        "pin",
+        "digest"
+      ],
+      "automerge": false,
+      "addLabels": [
+        "automerge"
+      ],
+      "matchPackageNames": [
+        "!typescript"
+      ]
+    }
+  ],
+  "vulnerabilityAlerts": {
+    "enabled": true,
+    "prCreation": "immediate",
+    "dependencyDashboardApproval": false,
+    "minimumReleaseAge": null,
+    "labels": [
+      "dependencies",
+      "area/security",
+      "manual-review"
+    ]
+  },
+  "osvVulnerabilityAlerts": true
+}
