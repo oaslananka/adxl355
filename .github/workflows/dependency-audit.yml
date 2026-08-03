@@ -1,0 +1,113 @@
+name: Dependency Audit
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  schedule:
+    - cron: "23 2 * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: dependency-audit-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  python-audit:
+    name: Python dependency audit (${{ matrix.lock }})
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        lock:
+          - ci-quality
+          - ci-test
+          - consistency
+          - hil-build
+          - hil-i2c
+          - hil-spi
+          - platformio
+          - release
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Audit reviewed Python locks
+        uses: pypa/gh-action-pip-audit@1220774d901786e6f652ae159f7b6bc8fea6d266 # v1.1.0
+        with:
+          inputs: requirements/python/${{ matrix.lock }}.txt
+          no-deps: true
+          require-hashes: true
+          internal-be-careful-extra-flags: --disable-pip
+          vulnerability-service: PyPI
+          summary: true
+
+  go-reachability:
+    name: Go reachability audit
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: go
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up dedicated scanner toolchain
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: "1.25"
+          cache: false
+      - name: Verify pinned govulncheck module
+        working-directory: tools/govulncheck
+        run: go mod verify
+      - name: Build pinned govulncheck
+        working-directory: tools/govulncheck
+        run: >-
+          go build -mod=readonly -trimpath
+          -o "${{ runner.temp }}/govulncheck"
+          golang.org/x/vuln/cmd/govulncheck
+      - name: Scan reachable Go vulnerabilities
+        run: '"${{ runner.temp }}/govulncheck" ./...'
+
+  osv-scan:
+    name: OSV repository audit
+    uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable.yml@9a498708959aeaef5ef730655706c5a1df1edbc2 # v2.3.8
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    with:
+      scan-args: |-
+        --recursive
+        ./
+      fail-on-vuln: true
+      results-file-name: dependency-audit-osv.sarif
+
+  dependency-audit:
+    name: Dependency Audit
+    if: always()
+    permissions: {}
+    needs:
+      - python-audit
+      - go-reachability
+      - osv-scan
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Enforce all dependency audit results
+        env:
+          PYTHON_AUDIT: ${{ needs.python-audit.result }}
+          GO_REACHABILITY: ${{ needs.go-reachability.result }}
+          OSV_SCAN: ${{ needs.osv-scan.result }}
+        run: |
+          test "$PYTHON_AUDIT" = success
+          test "$GO_REACHABILITY" = success
+          test "$OSV_SCAN" = success

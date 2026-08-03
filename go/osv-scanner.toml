@@ -1,0 +1,11 @@
+GoVersionOverride = "1.21.0"
+
+[[IgnoredVulns]]
+id = "GO-2026-5024"
+ignoreUntil = 2026-11-01
+reason = "govulncheck v1.6.0 reports no reachable vulnerable calls: this module imports x/sys/unix, while the advisory affects a Windows-only symbol. Go 1.21 support is retained until the bounded review date."
+
+[[IgnoredVulns]]
+id = "GO-2025-3750"
+ignoreUntil = 2026-11-01
+reason = "The advisory is Windows-only. Repository code that imports os for device access is Linux build-tagged, no O_CREATE|O_EXCL file-opening path exists, and the dedicated scanner uses a patched analysis toolchain while Go 1.21 compatibility remains under bounded review."
