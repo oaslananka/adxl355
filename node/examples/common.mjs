@@ -1,3 +1,18 @@
+export const MEASUREMENT_SETTLE_MS = 20;
+
+function delayMs(milliseconds) {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds));
+}
+
+export async function enterMeasurementAndSettle(
+  device,
+  measurementMode,
+  sleep = delayMs,
+) {
+  await device.setPowerMode(measurementMode);
+  await sleep(MEASUREMENT_SETTLE_MS);
+}
+
 export function parseIntegerFlag(name, fallback, { min = 0, max = Number.MAX_SAFE_INTEGER } = {}) {
   const index = process.argv.indexOf(`--${name}`);
   const raw = index >= 0 ? process.argv[index + 1] : String(fallback);
