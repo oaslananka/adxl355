@@ -509,7 +509,7 @@
       "value:SCALE_4G_G_PER_LSB=7.8e-06",
       "value:SCALE_8G_G_PER_LSB=1.56e-05",
       "value:STANDARD_GRAVITY_M_S2=9.80665",
-      "value:__version__='0.1.0a3'"
+      "value:__version__='0.1.0a4'"
     ],
     "rust": [
       "declaration:device.rs:pub fn decode_raw20(b0: u8, b1: u8, b2: u8) -> i32",
@@ -621,5 +621,5 @@
       "declaration:types.rs:pub struct RawXyz"
     ]
   },
-  "version": "0.1.0-alpha.3"
+  "version": "0.1.0-alpha.4"
 }

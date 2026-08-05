@@ -5,13 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.1.0-alpha.3] - Unreleased
+## [0.1.0-alpha.4] - Unreleased
 
 ### Fixed
 
+- Refreshed the transitive Node.js PostCSS lock to patched `8.5.25`, restoring
+  the required dependency-audit gate after `CVE-2026-69153` was disclosed.
 - Added a bounded 20 ms measurement-settle step to the Node.js Linux SPI and I2C
   examples before temperature and acceleration reads, with an ordering regression
-  test and Raspberry Pi 5 SPI validation.
+  test and Raspberry Pi 5 SPI validation on the exact merged `main` commit.
+
+### Changed
+
+- **Breaking (Python metadata):** The public `adxl355.__version__` value and Python
+  distribution version advance from `0.1.0a3` to `0.1.0a4` for this prerelease.
+
+## [0.1.0-alpha.3] - 2026-08-02
+
+### Fixed
+
 - Corrected the C/C++ release job to expose the already-built C core through `CMAKE_PREFIX_PATH` before configuring the C++ package.
 - Preserved safe executable intent while extracting native release artifacts so packaged smoke binaries run, while stripping setuid, setgid, and sticky permission bits.
 - Refreshed the reviewed Go module archive baseline to 17,388 bytes after verifying that the growth consists only of maintained Linux SPI/I2C adapters, bounded examples, tests, and module metadata.
@@ -46,8 +58,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added optional Node.js Linux SPI and I2C subpath adapters with exact native
   dependencies, explicit resource ownership, one-message SPI framing, exact I2C
   byte-count checks, core-only installation smoke tests, and bounded examples.
-  Raspberry Pi 5 bounded examples are physically verified for SPI Mode 0 at
-  1 MHz and I2C address `0x1D`.
+  The Raspberry Pi 5 I2C example is physically verified at `0x1D`; Node SPI
+  physical validation remained pending at this release.
 - Added shared C/Python FIFO location and complete XYZ sample contracts with
   bounded reads, marker/empty/framing validation, partial-progress reporting,
   caller-owned C storage, and a documented later physical validation plan.

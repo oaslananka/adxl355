@@ -15,7 +15,7 @@ class PackageMetadataTests(unittest.TestCase):
             project = tomllib.load(handle)["project"]
 
         self.assertEqual(project["name"], "adxl355")
-        self.assertEqual(project["version"], "0.1.0a3")
+        self.assertEqual(project["version"], "0.1.0a4")
         self.assertEqual(project["readme"], "README.md")
         self.assertEqual(project["license"], "MIT")
         self.assertEqual(
@@ -42,7 +42,7 @@ class PackageMetadataTests(unittest.TestCase):
 
         package = manifest["package"]
         self.assertEqual(package["name"], "adxl355-driver")
-        self.assertEqual(package["version"], "0.1.0-alpha.3")
+        self.assertEqual(package["version"], "0.1.0-alpha.4")
         self.assertEqual(manifest["lib"]["name"], "adxl355")
         self.assertEqual(package["repository"], "https://github.com/oaslananka/adxl355")
         self.assertEqual(package["homepage"], "https://github.com/oaslananka/adxl355")
@@ -61,7 +61,7 @@ class PackageMetadataTests(unittest.TestCase):
         self.assertEqual(package["name"], "@oaslananka/adxl355")
         self.assertEqual(lock["name"], "@oaslananka/adxl355")
         self.assertEqual(lock["packages"][""]["name"], "@oaslananka/adxl355")
-        self.assertEqual(package["version"], "0.1.0-alpha.3")
+        self.assertEqual(package["version"], "0.1.0-alpha.4")
         self.assertEqual(package["publishConfig"], {"access": "public"})
         self.assertEqual(set(package["exports"]), {".", "./linux/spi", "./linux/i2c"})
         self.assertEqual(
@@ -83,7 +83,7 @@ class PackageMetadataTests(unittest.TestCase):
     def test_go_submodule_tag_convention_is_documented(self) -> None:
         versioning = (REPO_ROOT / "docs/versioning.md").read_text()
         publishing = (REPO_ROOT / "docs/publishing.md").read_text()
-        self.assertIn("go/v0.1.0-alpha.3", versioning)
+        self.assertIn("go/v0.1.0-alpha.4", versioning)
         self.assertIn("go/v0.1.0-alpha.3", publishing)
         self.assertIn("module github.com/oaslananka/adxl355/go", versioning)
 
@@ -91,7 +91,7 @@ class PackageMetadataTests(unittest.TestCase):
         self,
     ) -> None:
         text = (REPO_ROOT / "docs/versioning.md").read_text()
-        self.assertIn("2026-08-02", text)
+        self.assertIn("2026-08-05", text)
         self.assertIn("PyPI", text)
         self.assertIn("@oaslananka/adxl355", text)
         self.assertIn("adxl355-driver", text)
