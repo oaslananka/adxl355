@@ -46,12 +46,16 @@ class NodeLinuxAdapterTests(unittest.TestCase):
             self.assertIn("if (this.closed)", source)
             self.assertIn("transport is closed", source)
 
-    def test_examples_are_finite_and_restore_standby(self) -> None:
+    def test_examples_are_finite_settled_and_restore_standby(self) -> None:
         common = (NODE / "examples/common.mjs").read_text()
+        self.assertIn("MEASUREMENT_SETTLE_MS = 20", common)
+        self.assertIn("await device.setPowerMode(measurementMode)", common)
+        self.assertIn("await sleep(MEASUREMENT_SETTLE_MS)", common)
         self.assertIn("Date.now() < deadline", common)
         self.assertNotIn("while (true)", common)
         for name in ("linux-spi.mjs", "linux-i2c.mjs"):
             source = (NODE / f"examples/{name}").read_text()
+            self.assertIn("enterMeasurementAndSettle", source)
             self.assertIn("finally", source)
             self.assertIn("PowerMode.Standby", source)
             self.assertIn("transport?.close()", source)

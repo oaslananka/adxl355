@@ -1,6 +1,11 @@
 import { ADXL355, PowerMode } from "@oaslananka/adxl355";
 import { LinuxSpiTransport } from "@oaslananka/adxl355/linux/spi";
-import { collectBoundedSamples, parseIntegerFlag, summarize } from "./common.mjs";
+import {
+  collectBoundedSamples,
+  enterMeasurementAndSettle,
+  parseIntegerFlag,
+  summarize,
+} from "./common.mjs";
 
 const options = {
   busNumber: parseIntegerFlag("bus", 0),
@@ -18,7 +23,7 @@ try {
   device = new ADXL355(transport);
   await device.probe();
   probed = true;
-  await device.setPowerMode(PowerMode.Measurement);
+  await enterMeasurementAndSettle(device, PowerMode.Measurement);
   const temperatureC = await device.readTemperatureC();
   const samples = await collectBoundedSamples(device, sampleCount, timeoutMs);
   console.log(JSON.stringify(summarize("spi", temperatureC, samples), null, 2));

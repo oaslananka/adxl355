@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Added a bounded 20 ms measurement-settle step to the Node.js Linux SPI and I2C
+  examples before temperature and acceleration reads, with an ordering regression
+  test and Raspberry Pi 5 SPI validation.
 - Corrected the C/C++ release job to expose the already-built C core through `CMAKE_PREFIX_PATH` before configuring the C++ package.
 - Preserved safe executable intent while extracting native release artifacts so packaged smoke binaries run, while stripping setuid, setgid, and sticky permission bits.
 - Refreshed the reviewed Go module archive baseline to 17,388 bytes after verifying that the growth consists only of maintained Linux SPI/I2C adapters, bounded examples, tests, and module metadata.
@@ -43,8 +46,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added optional Node.js Linux SPI and I2C subpath adapters with exact native
   dependencies, explicit resource ownership, one-message SPI framing, exact I2C
   byte-count checks, core-only installation smoke tests, and bounded examples.
-  The Raspberry Pi 5 I2C example is physically verified at `0x1D`; Node SPI
-  physical validation remains pending.
+  Raspberry Pi 5 bounded examples are physically verified for SPI Mode 0 at
+  1 MHz and I2C address `0x1D`.
 - Added shared C/Python FIFO location and complete XYZ sample contracts with
   bounded reads, marker/empty/framing validation, partial-progress reporting,
   caller-owned C storage, and a documented later physical validation plan.

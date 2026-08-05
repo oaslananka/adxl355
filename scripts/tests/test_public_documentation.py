@@ -323,22 +323,30 @@ class PublicDocumentationTests(unittest.TestCase):
         ):
             self.assertIn(phrase, hardware)
 
-    def test_node_i2c_physical_evidence_is_scoped_and_spi_remains_pending(self) -> None:
+    def test_node_spi_and_i2c_physical_evidence_is_scoped_and_bounded(self) -> None:
         readme = " ".join(README.read_text().split())
         hardware = " ".join(
             (REPO_ROOT / "docs" / "hardware-testing.md").read_text().split()
         )
         node_readme = " ".join((REPO_ROOT / "node" / "README.md").read_text().split())
-        self.assertIn("Raspberry Pi 5 I2C bounded example pass; SPI pending", readme)
+        self.assertIn("Raspberry Pi 5 SPI and I2C bounded example passes", readme)
         for phrase in (
             "commit `6a30a322cdbc482a455df25dfdf03b076a66e299`",
-            "Node.js `v24.18.0`",
             "8 samples captured, all 8 unique",
-            "standby, ±2 g, and default ODR",
-            "Node SPI physical result remains pending",
+            "commit `ff4ff366ff021c5f446e324db8472d01b5613caf`",
+            "32 samples captured, all 32 unique",
+            "bounded 20 ms measurement settle",
+            "29.3094 °C",
+            "POWER_CTL=0x01",
+            "does not replace the separate paired release-candidate SPI/I2C HIL requirement",
         ):
             self.assertIn(phrase, hardware)
-        self.assertIn("Physical Node SPI validation remains pending", node_readme)
+        for phrase in (
+            "bounded 20 ms settle interval",
+            "SPI Mode 0 run at 1 MHz captured 32/32 unique samples",
+            "standby, ±2 g, and the default ODR",
+        ):
+            self.assertIn(phrase, node_readme)
 
     def test_calibration_docs_record_repeatable_physical_evidence(self) -> None:
         text = (REPO_ROOT / "docs" / "calibration.md").read_text()

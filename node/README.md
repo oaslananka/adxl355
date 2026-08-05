@@ -74,13 +74,14 @@ reprogram the Linux adapter clock.
 
 Both adapters own their native descriptor until idempotent `close()`. Operations
 after close and backend/load failures use the package `BusError` hierarchy. The
-repository examples `examples/linux-spi.mjs` and `examples/linux-i2c.mjs` collect
-a finite sample count, enforce a timeout, restore standby, and close resources.
+repository examples `examples/linux-spi.mjs` and `examples/linux-i2c.mjs` enter
+measurement mode, wait through a bounded 20 ms settle interval, collect a finite
+sample count, enforce a timeout, restore standby, and close resources.
 
-The bounded I2C example is physically verified on Raspberry Pi 5 at address `0x1D`
-with Node.js 24 ARM64. Eight samples were captured and all were unique; independent
-readback confirmed standby, ±2 g, and default ODR after exit. Physical Node SPI
-validation remains pending and is not implied by the I2C result.
+Both bounded adapters are physically verified on Raspberry Pi 5 with Node.js 24
+ARM64. The I2C run at address `0x1D` captured 8/8 unique samples. The SPI Mode 0
+run at 1 MHz captured 32/32 unique samples and measured 29.3094 °C. Independent
+readback after each command confirmed standby, ±2 g, and the default ODR.
 
 ## Project links
 
