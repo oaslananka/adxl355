@@ -549,10 +549,12 @@ non-root HIL runner account.
 3. On SPI, use `/dev/spidev0.0`, Mode 0, and 1 MHz. Confirm command and payload
    stay in one chip-select transaction through the adapter unit contract, then
    record the same physical measurements and standby readback.
-4. Verify the example exits within its timeout, closes the native descriptor on
+4. Enter measurement mode before temperature or acceleration reads and wait
+   through the maintained bounded 20 ms settle interval.
+5. Verify the example exits within its timeout, closes the native descriptor on
    both success and failure, and publishes no hostname, private address, or raw
    environment data.
-5. Keep SPI and I2C evidence tied to the same implementation commit where
+6. Keep SPI and I2C evidence tied to the same implementation commit where
    practical. A successful Python HIL run does not substitute for exercising the
    Node adapter itself.
 
@@ -573,8 +575,31 @@ fixture:
 The command ran as the non-root fixture account from a separate `/tmp` checkout and
 exited within its 20-second outer timeout. No host name, private address, environment
 dump, credential, or raw secret was recorded. This proves the maintained Node I2C
-adapter and bounded example on the `0x1D` fixture only. The fixture is currently
-strapped for I2C, so a Node SPI physical result remains pending and is not claimed.
+adapter and bounded example on the `0x1D` fixture only.
+
+### Recorded Node SPI result
+
+A bounded Node.js SPI example succeeded on **2026-08-05** against exact
+implementation commit `ff4ff366ff021c5f446e324db8472d01b5613caf` on the dedicated
+Raspberry Pi 5 fixture:
+
+- runtime: Node.js `v24.16.0` for Linux ARM64 with npm `11.16.0`;
+- native backends: exact `spi-device@3.1.2` and `i2c-bus@5.2.3` packages rebuilt
+  from the committed lockfile, followed by a successful native-module load check;
+- transport: `/dev/spidev0.0`, SPI Mode 0, 8-bit words, and 1 MHz;
+- acquisition: 32 samples captured, all 32 unique, after the bounded 20 ms
+  measurement settle, with a measured temperature of `29.3094 °C`;
+- identity: `DEVID_AD=0xAD`, `DEVID_MST=0x1D`, `PARTID=0xED`, and `REVID=0x01`;
+- cleanup: independent register readback confirmed `POWER_CTL=0x01`,
+  `RANGE=0x81`, and `FILTER=0x00`, proving standby, ±2 g, and default ODR.
+
+The command ran from a clean `git archive` of the exact commit, exited within its
+20-second outer timeout, and closed its native descriptor. An earlier immediate
+read produced an invalid `233.2873 °C` temperature and a startup-transition first
+sample; that rejected run motivated the bounded settle helper and its ordering
+regression test. No host name, private address, environment dump, credential, or
+raw secret was recorded. This is Node adapter feature evidence and does not replace
+the separate paired release-candidate SPI/I2C HIL requirement.
 
 ## FIFO physical validation plan
 
