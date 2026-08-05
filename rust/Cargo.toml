@@ -1,6 +1,6 @@
 [package]
 name = "adxl355-driver"
-version = "0.1.0-alpha.3"
+version = "0.1.0-alpha.4"
 edition = "2021"
 description = "ADXL355 accelerometer driver for embedded and desktop Rust"
 license = "MIT"

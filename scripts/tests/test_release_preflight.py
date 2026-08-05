@@ -59,7 +59,7 @@ class ReleasePreflightTests(unittest.TestCase):
 
     def test_current_fixture_matches_alpha_release_version(self) -> None:
         root = self.make_fixture()
-        release = parse_release_tag("v0.1.0-alpha.3")
+        release = parse_release_tag("v0.1.0-alpha.4")
         errors = validate_versions(release, collect_version_sources(root))
         self.assertEqual(errors, [])
 
@@ -70,7 +70,7 @@ class ReleasePreflightTests(unittest.TestCase):
         package["version"] = "0.1.1"
         package_path.write_text(json.dumps(package, indent=2) + "\n")
 
-        release = parse_release_tag("v0.1.0-alpha.3")
+        release = parse_release_tag("v0.1.0-alpha.4")
         errors = validate_versions(release, collect_version_sources(root))
 
         self.assertTrue(
@@ -81,14 +81,14 @@ class ReleasePreflightTests(unittest.TestCase):
         root = self.make_fixture()
         path = root / "python/pyproject.toml"
         path.write_text(
-            path.read_text().replace('version = "0.1.0a3"', 'version = "0.1.0-alpha.3"')
+            path.read_text().replace('version = "0.1.0a4"', 'version = "0.1.0-alpha.4"')
         )
 
-        release = parse_release_tag("v0.1.0-alpha.3")
+        release = parse_release_tag("v0.1.0-alpha.4")
         errors = validate_versions(release, collect_version_sources(root))
         self.assertTrue(
             any(
-                "python/pyproject.toml" in error and "0.1.0a3" in error
+                "python/pyproject.toml" in error and "0.1.0a4" in error
                 for error in errors
             )
         )

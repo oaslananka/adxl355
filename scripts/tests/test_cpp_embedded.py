@@ -67,7 +67,7 @@ class CppEmbeddedTests(unittest.TestCase):
 
     def test_platformio_manifest_and_uno_fixture_are_pinned(self) -> None:
         manifest = json.loads(LIBRARY_JSON.read_text())
-        self.assertEqual(manifest["version"], "0.1.0-alpha.3")
+        self.assertEqual(manifest["version"], "0.1.0-alpha.4")
         self.assertEqual(manifest["frameworks"], ["arduino"])
         self.assertEqual(manifest["platforms"], ["atmelavr"])
         self.assertEqual(manifest["build"]["srcDir"], "embedded/arduino/src")
