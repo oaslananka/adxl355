@@ -50,6 +50,15 @@ python scripts/verify_vectors.py --ci
 
 Consult `docs/testing.md` for language commands and `docs/hardware-testing.md` for manual HIL. Do not report a missing toolchain or skipped HIL as passing evidence.
 
+## Package artifact boundary
+
+These `AGENTS.md` files are repository governance metadata, not runtime API.
+
+- Keep curated package payloads narrow when a package manager has an explicit file manifest. The existing npm `files` list and Cargo `include` list must not be broadened just to carry agent instructions.
+- Python wheel/sdist contents remain governed by setuptools/MANIFEST configuration and package checks; do not add agent instructions to package data.
+- Go module/source archives may include repository Markdown as non-runtime source metadata. That does not create an exported API or a compatibility claim.
+- Do not weaken package allowlists, install-smoke checks, or release verification to accommodate these instructions.
+
 ## Generated and release state
 
 - Do not hand-edit generated API/reference output when an owning generator exists.
