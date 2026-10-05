@@ -15,7 +15,7 @@ Do not create nested `AGENTS.md` files merely because a language has its own dir
 Before changing behavior, read the relevant implementation/tests plus:
 
 - `README.md`
-- `CONTRIBUTING.md`
+- [`CONTRIBUTING.md`](CONTRIBUTING.md)
 - `docs/architecture.md`
 - `docs/testing.md`
 - `docs/hardware-testing.md`
