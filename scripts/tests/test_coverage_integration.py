@@ -16,12 +16,19 @@ class CoverageIntegrationTests(unittest.TestCase):
         workflow = cast(dict[str, Any], yaml.safe_load(WORKFLOW.read_text()))
         job = workflow["jobs"]["go-coverage"]
         self.assertEqual(job["permissions"], {"contents": "read", "id-token": "write"})
+        setup_python = next(
+            step for step in job["steps"]
+            if str(step.get("uses", "")).startswith("actions/setup-python@")
+        )
+        self.assertRegex(setup_python["uses"], r"^actions/setup-python@[0-9a-f]{40}$")
+        self.assertEqual(setup_python["with"]["python-version"], "3.12")
         upload = next(
             step for step in job["steps"]
             if str(step.get("uses", "")).startswith("codecov/codecov-action@")
         )
         self.assertRegex(upload["uses"], r"^codecov/codecov-action@[0-9a-f]{40}$")
         self.assertTrue(upload["with"]["use_oidc"])
+        self.assertTrue(upload["with"]["use_pypi"])
         self.assertTrue(upload["with"]["fail_ci_if_error"])
         self.assertEqual(upload["with"]["files"], "go/coverage.out")
         self.assertEqual(upload["with"]["flags"], "go")

@@ -40,6 +40,10 @@ jobs:
         with:
           go-version: "1.21"
           cache: false
+      - name: Set up Python for Codecov PyPI uploader
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
       - name: Generate Go coverage
         working-directory: go
         run: |
@@ -50,6 +54,7 @@ jobs:
         uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
         with:
           use_oidc: true
+          use_pypi: true
           fail_ci_if_error: true
           disable_search: true
           files: go/coverage.out
