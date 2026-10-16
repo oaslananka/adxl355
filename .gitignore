@@ -39,3 +39,6 @@ Thumbs.db
 
 # Environment
 .env
+
+# Benchmarks
+benchmarks/rust/target/
