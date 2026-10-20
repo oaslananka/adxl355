@@ -53,6 +53,26 @@ def test_calculate_offset_rejects_invalid_current_offset(value: object) -> None:
         calculate_offset(0, 0, current_offset=value)  # type: ignore[arg-type]
 
 
+@pytest.mark.parametrize("value", [1, 0, "false", None, 1.0])
+def test_calculate_offset_rejects_non_boolean_saturate(value: object) -> None:
+    with pytest.raises(InvalidConfigurationError, match="saturate must be a boolean"):
+        calculate_offset(0, 0, saturate=value)  # type: ignore[arg-type]
+
+
+def test_calculate_offset_rejects_non_boolean_saturate_on_overflow() -> None:
+    # A truthy non-boolean previously clamped silently instead of being rejected.
+    with pytest.raises(InvalidConfigurationError, match="saturate must be a boolean"):
+        calculate_offset(-(1 << 19), (1 << 19) - 1, saturate="false")  # type: ignore[arg-type]
+    with pytest.raises(InvalidConfigurationError, match="saturate must be a boolean"):
+        calculate_offset(-(1 << 19), (1 << 19) - 1, saturate=1)  # type: ignore[arg-type]
+
+
+def test_calculate_offset_accepts_explicit_boolean_saturate() -> None:
+    with pytest.raises(InvalidConfigurationError, match="exceeds int16 range"):
+        calculate_offset(-(1 << 19), (1 << 19) - 1, saturate=False)
+    assert calculate_offset(-(1 << 19), (1 << 19) - 1, saturate=True) == -(1 << 15)
+
+
 def test_offset_read_write_uses_signed_big_endian_burst_and_restores_mode() -> None:
     device, transport = probed_device()
     transport.set_register(Register.OFFSET_Y_H, 0xFE)
