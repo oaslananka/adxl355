@@ -144,6 +144,10 @@ jobs:
             -m unittest \
               scripts.tests.test_sonar_integration \
               scripts.tests.test_security_regressions
+          # The script-only report omits python/src/adxl355 and causes
+          # false 0% new-code coverage on Python driver pull requests.
+          PYTHONPATH=python/src python -m coverage run --append --branch \
+            --source=python/src/adxl355 -m pytest -q python/tests
           python -m coverage xml -o sonar-build/python-coverage.xml
           python -m coverage report --fail-under=80
 
