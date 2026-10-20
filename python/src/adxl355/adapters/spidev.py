@@ -18,6 +18,7 @@ import contextlib
 import time
 from typing import Optional, Protocol, cast
 
+from adxl355.errors import BusError
 from adxl355.registers import spi_read_cmd, spi_write_cmd
 from adxl355.transport import Transport
 
@@ -85,7 +86,16 @@ class SpiDevTransport(Transport):
         # ADXL355 command byte: address in bits 7:1, read flag in bit 0.
         header = bytes([spi_read_cmd(reg)])
         dummy = bytes([0x00]) * length
+        # One Mode 0 frame clocks out the command response plus ``length``
+        # payload bytes, so a conforming transfer returns exactly
+        # ``length + 1`` bytes.
+        expected = length + 1
         result = spi.xfer2(list(header + dummy))
+        if len(result) != expected:
+            raise BusError(
+                f"Invalid SPI transfer length at register 0x{reg:02X}: "
+                f"expected {expected}, got {len(result)}"
+            )
         return bytes(result[1:])
 
     def write_register(self, reg: int, data: bytes) -> None:
