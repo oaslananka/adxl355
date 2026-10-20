@@ -455,6 +455,31 @@ tests, maps, debug symbols, or unrelated assets leaked into the archive. Do not
 raise a limit merely to make CI green. Size budgets are regression signals, not
 claims about memory use, runtime allocation, or embedded flash/RAM suitability.
 
+## Performance benchmarks (CodSpeed)
+
+CPU-cost benchmarks for the C core and the Rust crate live under `benchmarks/`
+and run in CI through `.github/workflows/codspeed.yml` using CodSpeed's CPU
+simulation instrument. They use in-memory mock register files only, so they
+measure driver overhead (transport framing and length validation, raw decode,
+unit conversion, configuration, FIFO, and self-test state machines) and are not
+hardware or timing evidence. The benchmark projects are standalone and are not
+part of any published package.
+
+```bash
+# C core (Google Benchmark via CodSpeed's compatibility layer)
+cmake -S benchmarks/c -B build/bench-c -DCODSPEED_MODE=simulation
+cmake --build build/bench-c --parallel
+codspeed run -m simulation -- ./build/bench-c/adxl355_c_bench
+
+# Rust (divan via codspeed-divan-compat)
+cd benchmarks/rust
+cargo codspeed build -m simulation
+codspeed run -m simulation -- cargo codspeed run
+```
+
+Configuring without `-DCODSPEED_MODE` builds a regular Google Benchmark binary,
+and `cargo bench` in `benchmarks/rust` runs plain divan, for quick local timing.
+
 ## Hardware-in-the-Loop Tests
 
 Physical validation is implemented as the explicit CLI

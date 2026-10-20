@@ -1,0 +1,17 @@
+[package]
+name = "adxl355-benchmarks"
+version = "0.0.0"
+edition = "2021"
+description = "CodSpeed performance benchmarks for the ADXL355 Rust driver (not published)"
+license = "MIT"
+publish = false
+
+[dependencies]
+adxl355-driver = { path = "../../rust" }
+
+[[bench]]
+name = "driver"
+harness = false
+
+[dev-dependencies]
+divan = { version = "5.0.3", package = "codspeed-divan-compat" }
