@@ -105,6 +105,19 @@ class TestSpiStartupCleanup(TestCase):
             transport.close()
             self.assertTrue(healthy.closed)
 
+    def test_close_only_once_after_successful_open(self) -> None:
+        """Closing twice must not touch an already released Linux SPI handle."""
+        fake = FakeSpi()
+        with patch.dict(sys.modules, {"spidev": SimpleNamespace(SpiDev=lambda: fake)}):
+            transport = SpiDevTransport()
+            self.assertEqual(transport.mode, 0)
+            with patch.object(fake, "close", wraps=fake.close) as close_spy:
+                transport.close()
+                transport.close()
+                self.assertEqual(close_spy.call_count, 1)
+                self.assertIsNone(transport._spi)
+
+
 
 def test_read_register_uses_adxl355_command_and_single_transaction() -> None:
     fake = FakeSpi([[0x00, 0xAA, 0xBB, 0xCC]])
