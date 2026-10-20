@@ -5,7 +5,7 @@ from __future__ import annotations
 import sys
 from types import SimpleNamespace
 from unittest import TestCase
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 import pytest
 
@@ -104,6 +104,15 @@ class TestSpiStartupCleanup(TestCase):
             self.assertFalse(healthy.closed)
             transport.close()
             self.assertTrue(healthy.closed)
+
+    def test_close_before_first_open_does_not_allocate_spi(self) -> None:
+        """Closing an unused transport must not initialize SPI hardware."""
+        factory = Mock()
+        with patch.dict(sys.modules, {"spidev": SimpleNamespace(SpiDev=factory)}):
+            transport = SpiDevTransport()
+            transport.close()
+            assert factory.call_count == 0
+            self.assertIsNone(transport._spi)
 
     def test_close_only_once_after_successful_open(self) -> None:
         """Closing twice must not touch an already released Linux SPI handle."""
