@@ -6,7 +6,7 @@ int adxl355_linux_spi_prepare_read(uint8_t reg,
                                    size_t payload_length,
                                    adxl355_linux_spi_read_transfer_t *transfer)
 {
-    if (transfer == NULL || payload_length == 0U ||
+    if (transfer == NULL || reg > 0x7FU || payload_length == 0U ||
         payload_length > ADXL355_LINUX_SPI_MAX_PAYLOAD) {
         return -1;
     }
