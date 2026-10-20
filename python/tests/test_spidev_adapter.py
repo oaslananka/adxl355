@@ -111,7 +111,7 @@ class TestSpiStartupCleanup(TestCase):
         with patch.dict(sys.modules, {"spidev": SimpleNamespace(SpiDev=factory)}):
             transport = SpiDevTransport()
             transport.close()
-            assert factory.call_count == 0
+            self.assertEqual(factory.call_count, 0)
             self.assertIsNone(transport._spi)
 
     def test_close_only_once_after_successful_open(self) -> None:
