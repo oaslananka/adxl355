@@ -85,8 +85,8 @@ static void test_out_of_range_register_is_rejected(void)
                 "0x7F read command should encode without aliasing");
     ASSERT_TRUE(transfer.length == 2U, "accepted read should keep valid length encoding");
 
-    memset(&transfer, 0xA5, sizeof(transfer));
-    memcpy(&snapshot, &transfer, sizeof(transfer));
+    /* Keep the previously initialized valid transfer as a mutation sentinel. */
+    snapshot = transfer;
 
     ASSERT_TRUE(adxl355_linux_spi_prepare_read(0x80U, 1U, &transfer) != 0,
                 "register 0x80 should be rejected before command encoding");
