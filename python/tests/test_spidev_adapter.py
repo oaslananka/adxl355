@@ -10,6 +10,7 @@ from unittest.mock import Mock, patch
 import pytest
 
 from adxl355.adapters.spidev import SpiDevTransport
+from adxl355.errors import BusError
 
 
 class FakeSpi:
@@ -137,6 +138,44 @@ def test_read_register_uses_adxl355_command_and_single_transaction() -> None:
 
     assert fake.transfers == [[0x11, 0x00, 0x00, 0x00]]
     assert payload == bytes([0xAA, 0xBB, 0xCC])
+
+
+def test_read_register_accepts_exactly_sized_spi_frame() -> None:
+    """A single-byte read accepts only the exact 1 + length response frame."""
+    fake = FakeSpi([[0x00, 0x5A]])
+    transport = SpiDevTransport()
+    transport._spi = fake
+
+    payload = transport.read_register(0x08, 1)
+
+    assert fake.transfers == [[0x11, 0x00]]
+    assert payload == bytes([0x5A])
+
+
+def test_read_register_rejects_truncated_spi_frame() -> None:
+    """A response shorter than the requested frame must not be accepted."""
+    fake = FakeSpi([[0x00, 0xAA, 0xBB]])
+    transport = SpiDevTransport()
+    transport._spi = fake
+
+    with pytest.raises(BusError) as exc_info:
+        transport.read_register(0x08, 3)
+
+    assert fake.transfers == [[0x11, 0x00, 0x00, 0x00]]
+    assert "expected 4, got 3" in str(exc_info.value)
+
+
+def test_read_register_rejects_overlong_spi_frame() -> None:
+    """A response longer than the requested frame must not be accepted."""
+    fake = FakeSpi([[0x00, 0xAA, 0xBB, 0xCC, 0xDD]])
+    transport = SpiDevTransport()
+    transport._spi = fake
+
+    with pytest.raises(BusError) as exc_info:
+        transport.read_register(0x08, 3)
+
+    assert fake.transfers == [[0x11, 0x00, 0x00, 0x00]]
+    assert "expected 4, got 5" in str(exc_info.value)
 
 
 def test_write_register_uses_adxl355_command_and_single_transaction() -> None:
