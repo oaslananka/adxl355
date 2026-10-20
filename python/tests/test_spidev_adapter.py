@@ -114,7 +114,7 @@ class TestSpiStartupCleanup(TestCase):
             with patch.object(fake, "close", wraps=fake.close) as close_spy:
                 transport.close()
                 transport.close()
-                assert close_spy.call_count == 1
+                self.assertEqual(close_spy.call_count, 1)
                 self.assertIsNone(transport._spi)
 
 
