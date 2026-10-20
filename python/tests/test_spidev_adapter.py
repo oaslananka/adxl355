@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import sys
 from types import SimpleNamespace
+from unittest import TestCase
+from unittest.mock import patch
 
 import pytest
 
@@ -32,6 +34,76 @@ class FakeSpi:
 
     def close(self) -> None:
         self.closed = True
+
+
+class FaultySpi(FakeSpi):
+    """Fake SPI device whose clock or mode assignment raises after open."""
+
+    def __init__(self, fail_on: str) -> None:
+        self._fail_on = fail_on
+        self._max_speed_hz = 0
+        self._mode = -1
+        # FakeSpi.__init__ assigns speed/mode before ``opened`` exists.
+        self.opened = None
+        super().__init__()
+
+    @property
+    def max_speed_hz(self) -> int:
+        return self._max_speed_hz
+
+    @max_speed_hz.setter
+    def max_speed_hz(self, value: int) -> None:
+        if self._fail_on == "max_speed_hz" and self.opened is not None:
+            raise OSError("injected clock configuration failure")
+        self._max_speed_hz = value
+
+    @property
+    def mode(self) -> int:
+        return self._mode
+
+    @mode.setter
+    def mode(self, value: int) -> None:
+        if self._fail_on == "mode" and self.opened is not None:
+            raise OSError("injected mode configuration failure")
+        self._mode = value
+
+
+class TestSpiStartupCleanup(TestCase):
+    """Failure injection ensures a newly opened SPI handle is always released."""
+
+    def test_clock_configuration_failure_closes_new_handle(self) -> None:
+        faulty = FaultySpi("max_speed_hz")
+        with patch.dict(sys.modules, {"spidev": SimpleNamespace(SpiDev=lambda: faulty)}):
+            transport = SpiDevTransport(max_speed_hz=1_000_000)
+            with self.assertRaisesRegex(OSError, "injected clock configuration failure"):
+                transport.read_register(0x08, 1)
+
+        self.assertEqual(faulty.opened, (0, 0))
+        self.assertTrue(faulty.closed)
+        self.assertIsNone(transport._spi)
+
+    def test_mode_configuration_failure_closes_handle_and_retry_uses_new_device(self) -> None:
+        faulty = FaultySpi("mode")
+        healthy = FakeSpi()
+        devices = iter([faulty, healthy])
+        with patch.dict(sys.modules, {"spidev": SimpleNamespace(SpiDev=lambda: next(devices))}):
+            transport = SpiDevTransport()
+            with self.assertRaisesRegex(OSError, "injected mode configuration failure"):
+                _ = transport.mode
+
+            self.assertEqual(faulty.opened, (0, 0))
+            self.assertTrue(faulty.closed)
+            self.assertIsNone(transport._spi)
+
+            # A new device opens successfully on retry.
+            payload = transport.read_register(0x08, 1)
+            self.assertEqual(healthy.opened, (0, 0))
+            self.assertEqual(healthy.mode, 0)
+            self.assertEqual(healthy.transfers, [[0x11, 0x00]])
+            self.assertEqual(payload, bytes([0x00]))
+            self.assertFalse(healthy.closed)
+            transport.close()
+            self.assertTrue(healthy.closed)
 
 
 def test_read_register_uses_adxl355_command_and_single_transaction() -> None:

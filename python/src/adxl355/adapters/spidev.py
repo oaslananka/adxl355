@@ -14,6 +14,7 @@ Usage:
 
 from __future__ import annotations
 
+import contextlib
 import time
 from typing import Optional, Protocol, cast
 
@@ -56,8 +57,16 @@ class SpiDevTransport(Transport):
 
             spi = cast(_SpiDevice, spidev.SpiDev())
             spi.open(self._bus, self._device)
-            spi.max_speed_hz = self._max_speed_hz
-            spi.mode = 0  # CPOL=0, CPHA=0
+            try:
+                spi.max_speed_hz = self._max_speed_hz
+                spi.mode = 0  # CPOL=0, CPHA=0
+            except Exception:
+                # Release the newly opened handle before propagating the
+                # original configuration failure; it is not stored in
+                # ``self._spi``, so ``close()`` would never reach it.
+                with contextlib.suppress(Exception):
+                    spi.close()
+                raise
             self._spi = spi
         return self._spi
 
