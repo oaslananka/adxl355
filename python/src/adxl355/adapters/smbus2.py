@@ -15,6 +15,7 @@ import importlib
 import time
 from typing import Callable, Optional, Protocol, cast
 
+from adxl355.errors import BusError
 from adxl355.transport import Transport
 
 
@@ -65,7 +66,12 @@ class Smbus2Transport(Transport):
             # smbus2 supports block reads via read_i2c_block_data.
             # The ADXL355 auto-increments after the first byte.
             block = i2c.read_i2c_block_data(self._address, reg, length)
-            return bytes(block[:length])
+            if not isinstance(block, list) or len(block) != length:
+                received = len(block) if isinstance(block, list) else 0
+                raise BusError(
+                    f"Expected {length} bytes from smbus2 block read, received {received}"
+                )
+            return bytes(block)
 
     def write_register(self, reg: int, data: bytes) -> None:
         i2c = self._ensure_open()
