@@ -1,0 +1,6 @@
+{
+  "schema_version": 1,
+  "scenario": "base-recovery-20261021-positive",
+  "source_repository": "oaslananka/adxl355",
+  "expected_outcome": "SUCCEEDED"
+}
