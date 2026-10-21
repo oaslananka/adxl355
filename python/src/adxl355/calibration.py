@@ -19,6 +19,12 @@ def _bounded_integer(name: str, value: int, minimum: int, maximum: int, unit: st
     return value
 
 
+def _strict_boolean(name: str, value: bool) -> bool:
+    if type(value) is not bool:
+        raise InvalidConfigurationError(f"{name} must be a boolean")
+    return value
+
+
 def _round_raw_delta_to_offset(delta: int) -> int:
     half_count = OFFSET_RAW_LSB_PER_COUNT // 2
     if delta >= 0:
@@ -51,6 +57,7 @@ def calculate_offset(
     Inputs must already be rounded to integer raw LSB and lie in the signed
     20-bit acceleration range.
     """
+    saturate = _strict_boolean("saturate", saturate)
     measured = _bounded_integer("measured_raw", measured_raw, RAW_MIN, RAW_MAX, "raw-LSB")
     expected = _bounded_integer("expected_raw", expected_raw, RAW_MIN, RAW_MAX, "raw-LSB")
     current = _bounded_integer(

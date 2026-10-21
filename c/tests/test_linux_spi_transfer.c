@@ -74,12 +74,38 @@ static void test_invalid_lengths_are_rejected(void)
                 "null transfer payload copy should be rejected");
 }
 
+static void test_out_of_range_register_is_rejected(void)
+{
+    adxl355_linux_spi_read_transfer_t transfer;
+    adxl355_linux_spi_read_transfer_t snapshot;
+
+    ASSERT_TRUE(adxl355_linux_spi_prepare_read(0x7FU, 1U, &transfer) == 0,
+                "highest in-range register should be accepted");
+    ASSERT_TRUE(transfer.tx[0] == (uint8_t)ADXL355_SPI_READ_CMD(0x7FU),
+                "0x7F read command should encode without aliasing");
+    ASSERT_TRUE(transfer.length == 2U, "accepted read should keep valid length encoding");
+
+    /* Keep the previously initialized valid transfer as a mutation sentinel. */
+    snapshot = transfer;
+
+    ASSERT_TRUE(adxl355_linux_spi_prepare_read(0x80U, 1U, &transfer) != 0,
+                "register 0x80 should be rejected before command encoding");
+    ASSERT_TRUE(memcmp(&transfer, &snapshot, sizeof(transfer)) == 0,
+                "rejected register 0x80 must not modify the destination transfer");
+
+    ASSERT_TRUE(adxl355_linux_spi_prepare_read(0xFFU, 1U, &transfer) != 0,
+                "register 0xFF should be rejected before command encoding");
+    ASSERT_TRUE(memcmp(&transfer, &snapshot, sizeof(transfer)) == 0,
+                "rejected register 0xFF must not modify the destination transfer");
+}
+
 int main(void)
 {
     test_one_byte_read();
     test_nine_byte_read();
     test_payload_excludes_command_phase();
     test_invalid_lengths_are_rejected();
+    test_out_of_range_register_is_rejected();
 
     printf("Linux SPI transfer tests: %d assertions, %d failures\n", tests_run, tests_failed);
     return tests_failed == 0 ? EXIT_SUCCESS : EXIT_FAILURE;
