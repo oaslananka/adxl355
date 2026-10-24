@@ -1,0 +1,6 @@
+{
+  "schema_version": 1,
+  "scenario": "single-entry-20261024",
+  "runner": "github-actions-opencode",
+  "acceptance": "pr-only"
+}
