@@ -58,7 +58,7 @@ class CiQualityGateTests(unittest.TestCase):
         self.assertIn("requirements/python/ci-test.txt", commands)
         self.assertIn("requirements/python/ci-quality.txt", commands)
         quality_lock = (PYTHON_LOCK_ROOT / "ci-quality.txt").read_text()
-        self.assertIn("setuptools==83.0.0", quality_lock)
+        self.assertIn("setuptools==84.1.0", quality_lock)
         self.assertIn("ruff==0.15.22", quality_lock)
         self.assertIn("mypy==1.20.2", quality_lock)
         self.assertIn("ruff check", commands)

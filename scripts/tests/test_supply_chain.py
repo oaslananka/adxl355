@@ -45,7 +45,7 @@ class SupplyChainTests(unittest.TestCase):
 
     def test_python_build_backend_uses_patched_setuptools_floor(self) -> None:
         pyproject = (REPO_ROOT / "python/pyproject.toml").read_text(encoding="utf-8")
-        self.assertIn('requires = ["setuptools==83.0.0"]', pyproject)
+        self.assertIn('requires = ["setuptools==84.1.0"]', pyproject)
         self.assertIn('requires-python = ">=3.10"', pyproject)
         self.assertIn('python_version = "3.10"', pyproject)
 

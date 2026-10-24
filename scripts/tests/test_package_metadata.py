@@ -62,6 +62,10 @@ class PackageMetadataTests(unittest.TestCase):
         self.assertEqual(lock["name"], "@oaslananka/adxl355")
         self.assertEqual(lock["packages"][""]["name"], "@oaslananka/adxl355")
         self.assertEqual(package["version"], "0.1.0-alpha.4")
+        self.assertEqual(package["devDependencies"]["vitest"], "5.0.5")
+        self.assertEqual(lock["packages"][""]["devDependencies"]["vitest"], "5.0.5")
+        self.assertEqual(lock["packages"]["node_modules/vitest"]["version"], "5.0.5")
+        self.assertEqual(lock["packages"]["node_modules/@vitest/mocker"]["version"], "5.0.5")
         self.assertEqual(package["publishConfig"], {"access": "public"})
         self.assertEqual(set(package["exports"]), {".", "./linux/spi", "./linux/i2c"})
         self.assertEqual(
