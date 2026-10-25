@@ -1,0 +1,7 @@
+{
+  "schema_version": 1,
+  "scenario": "second-github-worker-20261025",
+  "runner": "github-actions-opencode",
+  "worker_account": "boardreadyops",
+  "acceptance": "review-and-manual-merge-only"
+}
