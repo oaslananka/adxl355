@@ -1,6 +1,0 @@
-{
-  "schema_version": 1,
-  "scenario": "base-recovery-20261021-conflicting-base",
-  "source_repository": "oaslananka/adxl355",
-  "expected_outcome": "BLOCKED"
-}
