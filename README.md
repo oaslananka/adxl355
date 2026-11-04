@@ -1,8 +1,8 @@
 # ADXL355
 
 [![GitGem](https://gitgem.org/api/badge/github/oaslananka/adxl355.svg)](https://gitgem.org/github/oaslananka/adxl355)
-[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/oaslananka/adxl355)
 [![OpenSSF Best Practices](https://www.bestpractices.dev/projects/13419/badge)](https://www.bestpractices.dev/projects/13419)
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/oaslananka/adxl355/badge)](https://scorecard.dev/viewer/?uri=github.com/oaslananka/adxl355)
 
 Cross-platform ADXL355 accelerometer driver family for C, C++, Python, Rust,
 Node.js/TypeScript, and Go.
@@ -242,10 +242,14 @@ listed above.
 - [Contribute changes and run required tests](CONTRIBUTING.md)
 - [Report bugs or request improvements](https://github.com/oaslananka/adxl355/issues)
 - [Report vulnerabilities privately](SECURITY.md)
-- [Review OpenSSF Best Practices evidence proposals](.bestpractices.json)
+- [Browse source explanations on DeepWiki](https://deepwiki.com/oaslananka/adxl355) (third-party reference; source files remain authoritative)
+- [Review OpenSSF Best Practices self-assessment](https://www.bestpractices.dev/projects/13419)
+- [Inspect proposed Best Practices evidence](.bestpractices.json)
 
-OpenSSF badge responses are a maintainer-reviewed self-assessment. The repository
-evidence file proposes answers; it does not itself award or claim a badge level.
+The OpenSSF Best Practices badge reports the live, independently hosted project
+self-assessment. The repository evidence file only proposes answers and does not
+itself award a badge. The OpenSSF Scorecard badge links to the latest external
+supply-chain analysis, which is distinct from the Best Practices badge.
 
 ## Documentation
 
