@@ -59,6 +59,10 @@ build_component() {
       (cd "$copy" && npm run build >/dev/null && \
         npm pack --ignore-scripts --silent --pack-destination "$dest" >/dev/null)
       ;;
+    *)
+      printf 'unsupported component during build: %s\n' "$component" >&2
+      return 2
+      ;;
   esac
 }
 
@@ -72,9 +76,10 @@ for component in "$@"; do
   ((${#items[@]} > 0)) || { echo "no $component artifacts" >&2; exit 3; }
   for artifact in "${items[@]}"; do
     name="$(basename -- "$artifact")"
-    [[ -f "$b/$name" ]] && cmp -s -- "$artifact" "$b/$name" || {
-      echo "NOT REPRODUCIBLE: $component $name" >&2; exit 3;
-    }
+    if [[ ! -f "$b/$name" ]] || ! cmp -s -- "$artifact" "$b/$name"; then
+      echo "NOT REPRODUCIBLE: $component $name" >&2
+      exit 3
+    fi
     printf 'PASS %s: %s sha256=%s\n' "$component" "$name" \
       "$(sha256sum -- "$artifact" | cut -d ' ' -f 1)"
   done

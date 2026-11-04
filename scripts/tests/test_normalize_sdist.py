@@ -72,7 +72,7 @@ class NormalizeSdistTests(unittest.TestCase):
                     normalize_sdist(archive, epoch=1)
                 self.assertEqual(archive.read_bytes(), before)
 
-    def test_directory_entry_preserved_and_sdist_world_readable(self) -> None:
+    def test_directory_entry_preserved_and_original_permissions_retained(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             archive = Path(temporary) / "package.tar.gz"
             with tarfile.open(archive, "w:gz") as tar:
@@ -82,8 +82,10 @@ class NormalizeSdistTests(unittest.TestCase):
                 file = tarfile.TarInfo("package-1.0/module.py")
                 file.size = 2
                 tar.addfile(file, BytesIO(b"x\n"))
+            archive.chmod(0o640)
+            before = stat.S_IMODE(archive.stat().st_mode)
             normalize_sdist(archive, epoch=42)
-            self.assertEqual(stat.S_IMODE(archive.stat().st_mode), 0o644)
+            self.assertEqual(stat.S_IMODE(archive.stat().st_mode), before)
             with tarfile.open(archive, "r:gz") as tar:
                 self.assertTrue(tar.getmember("package-1.0").isdir())
                 self.assertEqual(

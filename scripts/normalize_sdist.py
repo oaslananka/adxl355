@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 import gzip
 import os
+import shutil
 import tarfile
 import tempfile
 from pathlib import Path, PurePosixPath
@@ -89,9 +90,9 @@ def normalize_sdist(archive: Path, *, epoch: int) -> None:
         ) as temp:
             temp_name = temp.name
             _write_archive(temp, contents, epoch)
-        # Newly created temporary files default to 0600; release archives must
-        # remain readable by ordinary package consumers after atomic replace.
-        os.chmod(temp_name, 0o644)
+        # Preserve the existing release artifact's file mode; never broaden its
+        # permissions while replacing the archive with deterministic bytes.
+        shutil.copymode(archive, temp_name)
         os.replace(temp_name, archive)
         temp_name = None
     finally:
