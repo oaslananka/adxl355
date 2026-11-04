@@ -1,13 +1,11 @@
 from __future__ import annotations
 
-import datetime as dt
 import json
 import re
 import unittest
 from pathlib import Path
 from typing import Any, cast
 
-import tomllib
 import yaml  # type: ignore[import-untyped]
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -140,26 +138,21 @@ class DependencyAuditTests(unittest.TestCase):
         self.assertEqual(env["GO_REACHABILITY"], "${{ needs.go-reachability.result }}")
         self.assertEqual(env["OSV_SCAN"], "${{ needs.osv-scan.result }}")
 
-    def test_go_osv_exception_is_reachability_based_bounded_and_reviewable(
-        self,
-    ) -> None:
-        config = tomllib.loads(GO_OSV_CONFIG.read_text(encoding="utf-8"))
-        ignored = config["IgnoredVulns"]
-        self.assertEqual(config["GoVersionOverride"], "1.21.0")
-        by_id = {item["id"]: item for item in ignored}
-        self.assertEqual(set(by_id), {"GO-2025-3750", "GO-2026-5024"})
-        for entry in by_id.values():
-            expiry = dt.date.fromisoformat(str(entry["ignoreUntil"]))
-            self.assertGreater(expiry, dt.date(2026, 8, 3))
-            self.assertLessEqual(expiry, dt.date(2026, 11, 3))
-        xsys_reason = str(by_id["GO-2026-5024"]["reason"]).lower()
-        self.assertIn("govulncheck", xsys_reason)
-        self.assertIn("x/sys/unix", xsys_reason)
-        self.assertIn("go 1.21", xsys_reason)
-        stdlib_reason = str(by_id["GO-2025-3750"]["reason"]).lower()
-        self.assertIn("windows-only", stdlib_reason)
-        self.assertIn("linux build-tagged", stdlib_reason)
-        self.assertIn("go 1.21", stdlib_reason)
+    def test_go_dependency_advisory_is_fixed_without_exceptions(self) -> None:
+        self.assertFalse(GO_OSV_CONFIG.exists())
+        go_mod = (REPO_ROOT / "go" / "go.mod").read_text(encoding="utf-8")
+        self.assertIn("go 1.25.0", go_mod)
+        self.assertIn("golang.org/x/sys v0.44.0", go_mod)
+        for workflow in (
+            "ci.yml",
+            "codeql.yml",
+            "coverage.yml",
+            "release.yml",
+            "sonar.yml",
+        ):
+            contents = (WORKFLOWS / workflow).read_text(encoding="utf-8")
+            self.assertNotIn('go-version: "1.21"', contents)
+            self.assertIn('go-version: "1.26"', contents)
 
     def test_renovate_security_updates_remain_immediate(self) -> None:
         config = json.loads(RENOVATE.read_text(encoding="utf-8"))
