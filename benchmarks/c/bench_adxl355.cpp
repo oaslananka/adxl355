@@ -1,4 +1,4 @@
-// CodSpeed benchmarks for the ADXL355 C core.
+// Local performance benchmarks for the ADXL355 C core.
 //
 // Every benchmark runs against the repository's in-memory mock register file
 // (c/tests/test_mock_bus.c), so the measurements cover driver CPU cost only:

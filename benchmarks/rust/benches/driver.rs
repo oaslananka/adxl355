@@ -1,4 +1,4 @@
-//! CodSpeed benchmarks for the ADXL355 Rust driver.
+//! Local performance benchmarks for the ADXL355 Rust driver.
 //!
 //! All benchmarks run against an in-memory register-file transport, so they
 //! measure driver CPU cost (framing, validation, decode, and conversion) and

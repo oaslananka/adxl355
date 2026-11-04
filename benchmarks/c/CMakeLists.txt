@@ -1,10 +1,10 @@
 cmake_minimum_required(VERSION 3.14)
 project(adxl355_benchmarks LANGUAGES C CXX)
 
-# CodSpeed benchmarks for the ADXL355 C core. This project is standalone and
+# Local performance benchmarks for the ADXL355 C core. This project is standalone and
 # is never part of the installed/exported C or C++ packages.
 #
-#   cmake -S benchmarks/c -B build/bench-c -DCODSPEED_MODE=simulation
+#   cmake -S benchmarks/c -B build/bench-c
 #   cmake --build build/bench-c --parallel
 #   ./build/bench-c/adxl355_c_bench
 
@@ -25,9 +25,8 @@ set(BENCHMARK_DOWNLOAD_DEPENDENCIES ON CACHE BOOL "" FORCE)
 
 FetchContent_Declare(
     google_benchmark
-    GIT_REPOSITORY https://github.com/CodSpeedHQ/codspeed-cpp
-    GIT_TAG f5a917fdd14db7293bd37acb682873fec19f8b6c # v2.4.0
-    SOURCE_SUBDIR google_benchmark
+    GIT_REPOSITORY https://github.com/google/benchmark.git
+    GIT_TAG 192ef10025eb2c4cdd392bc502f0c852196baa48 # v1.9.5
 )
 FetchContent_MakeAvailable(google_benchmark)
 

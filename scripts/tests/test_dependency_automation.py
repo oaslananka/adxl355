@@ -50,7 +50,12 @@ class DependencyAutomationTests(unittest.TestCase):
         )
         self.assertEqual(
             config["merge_protections_settings"]["auto_merge_conditions"],
-            ["author = renovate[bot]", "label = automerge"],
+            [
+                "author = renovate[bot]",
+                "base = main",
+                "label = automerge",
+                "label != manual-review",
+            ],
         )
         protections = config["merge_protections"]
         self.assertEqual(len(protections), 1)
@@ -58,10 +63,32 @@ class DependencyAutomationTests(unittest.TestCase):
         self.assertIn("label = automerge", conditions)
         self.assertIn("label != manual-review", conditions)
         self.assertIn("-draft", conditions)
+        self.assertIn("check-success = Tests", conditions)
+        self.assertIn("check-success = Dependency Audit", conditions)
+        self.assertEqual(config["merge_queue"]["max_parallel_checks"], 1)
         queue = config["queue_rules"][0]
         self.assertEqual(queue["merge_method"], "squash")
         self.assertIn("author = renovate[bot]", queue["queue_conditions"])
         self.assertIn("label = automerge", queue["queue_conditions"])
+        self.assertIn("label != manual-review", queue["queue_conditions"])
+        self.assertIn("-draft", queue["queue_conditions"])
+        self.assertNotIn("merge_conditions", queue)
+
+    def test_only_low_risk_updates_receive_automerge_label(self) -> None:
+        config = cast(dict[str, Any], json.loads(RENOVATE.read_text(encoding="utf-8")))
+        self.assertEqual(config["schedule"], ["before 8am every weekday"])
+        rules = config["packageRules"]
+        stable = next(rule for rule in rules if rule.get("matchCurrentVersion") == "!/^0/")
+        self.assertEqual(set(stable["matchManagers"]), {"npm", "cargo", "gomod", "pep621"})
+        self.assertEqual(set(stable["matchUpdateTypes"]), {"minor", "patch"})
+        self.assertIn("automerge", stable["addLabels"])
+        self.assertFalse(stable["automerge"])
+        self.assertEqual(set(stable["matchPackageNames"]), {"!typescript", "!setuptools"})
+        actions = next(rule for rule in rules if rule.get("matchManagers") == ["github-actions"])
+        self.assertFalse(actions["automerge"])
+        self.assertIn("manual-review", actions["addLabels"])
+        self.assertIn("manual-review", config["vulnerabilityAlerts"]["labels"])
+        self.assertNotIn("automerge", config["vulnerabilityAlerts"]["labels"])
 
 
 if __name__ == "__main__":

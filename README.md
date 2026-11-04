@@ -1,6 +1,7 @@
 # ADXL355
 
-[![CodSpeed](https://img.shields.io/endpoint?url=https://codspeed.io/badge.json)](https://app.codspeed.io/oaslananka/adxl355?utm_source=badge)
+[![GitGem](https://gitgem.org/api/badge/github/oaslananka/adxl355.svg)](https://gitgem.org/github/oaslananka/adxl355)
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/oaslananka/adxl355)
 
 Cross-platform ADXL355 accelerometer driver family for C, C++, Python, Rust,
 Node.js/TypeScript, and Go.
