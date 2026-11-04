@@ -64,7 +64,7 @@ SHA-256 hashes and fails if any artifact set or byte stream differs:
 ```bash
 # npm development dependencies must first be installed (no optional scripts):
 (cd node && npm ci --ignore-scripts --no-audit --no-fund)
-python3 scripts/check_reproducible_builds.py --components c python rust npm
+bash scripts/check_reproducible_builds.sh --components c python rust npm
 ```
 
 The script sets `SOURCE_DATE_EPOCH` from the Git commit, `TZ=UTC` and `LC_ALL=C`.

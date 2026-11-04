@@ -144,14 +144,12 @@ jobs:
             -m unittest \
               scripts.tests.test_sonar_integration \
               scripts.tests.test_security_regressions
-          # Reproducible artifact tooling is production source in scripts/;
-          # include its real unit-test execution in the coverage XML instead
-          # of reporting 0% on newly added Python code.
+          # The sdist normalizer is Python production source in scripts/.
+          # Include its real test coverage instead of incorrectly reporting 0%.
           python -m coverage run --append --branch \
-            --source=scripts.normalize_sdist,scripts.check_reproducible_builds \
+            --source=scripts.normalize_sdist \
             -m unittest \
-              scripts.tests.test_normalize_sdist \
-              scripts.tests.test_reproducible_builds
+              scripts.tests.test_normalize_sdist
           # The script-only report omits python/src/adxl355 and causes
           # false 0% new-code coverage on Python driver pull requests.
           PYTHONPATH=python/src python -m coverage run --append --branch \

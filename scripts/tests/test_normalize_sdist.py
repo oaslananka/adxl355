@@ -8,6 +8,9 @@ import tempfile
 import unittest
 from io import BytesIO
 from pathlib import Path
+from unittest.mock import patch
+import os
+import stat
 
 from scripts.normalize_sdist import SdistError, normalize_sdist
 
@@ -68,6 +71,65 @@ class NormalizeSdistTests(unittest.TestCase):
                 with self.assertRaises(SdistError):
                     normalize_sdist(archive, epoch=1)
                 self.assertEqual(archive.read_bytes(), before)
+
+    def test_directory_entry_preserved_and_sdist_world_readable(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            archive = Path(temporary) / "package.tar.gz"
+            with tarfile.open(archive, "w:gz") as tar:
+                directory = tarfile.TarInfo("package-1.0/")
+                directory.type = tarfile.DIRTYPE
+                tar.addfile(directory)
+                file = tarfile.TarInfo("package-1.0/module.py")
+                file.size = 2
+                tar.addfile(file, BytesIO(b"x\n"))
+            normalize_sdist(archive, epoch=42)
+            self.assertEqual(stat.S_IMODE(archive.stat().st_mode), 0o644)
+            with tarfile.open(archive, "r:gz") as tar:
+                self.assertTrue(tar.getmember("package-1.0").isdir())
+                self.assertEqual(
+                    tar.extractfile("package-1.0/module.py").read(), b"x\n"
+                )
+
+    def test_cli_normalizes_and_rejects_wrong_extension(self) -> None:
+        from scripts import normalize_sdist as module
+
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "test.tar.gz"
+            self.sample(path, mtime=100)
+            with patch("sys.argv", ["normalize_sdist.py", str(path), "--epoch", "456"]):
+                module.main()
+            with tarfile.open(path, "r:gz") as archive:
+                self.assertTrue(all(member.mtime == 456 for member in archive))
+            path.rename(Path(temporary) / "test.zip")
+            with self.assertRaisesRegex(SdistError, "expected a .tar.gz"):
+                normalize_sdist(Path(temporary) / "test.zip", epoch=1)
+
+    def test_duplicate_archive_member_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            archive = Path(temporary) / "duplicate.tar.gz"
+            with tarfile.open(archive, "w:gz") as tar:
+                for _ in range(2):
+                    member = tarfile.TarInfo("package/file.py")
+                    member.size = 1
+                    tar.addfile(member, BytesIO(b"x"))
+            before = archive.read_bytes()
+            with self.assertRaisesRegex(SdistError, "duplicate archive member"):
+                normalize_sdist(archive, epoch=1)
+            self.assertEqual(before, archive.read_bytes())
+
+    def test_failed_atomic_replace_cleans_temporary_output(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            folder = Path(temporary)
+            archive = folder / "test.tar.gz"
+            self.sample(archive, mtime=2)
+            with patch.object(
+                os, "replace", side_effect=OSError("mock file-system error")
+            ):
+                with self.assertRaisesRegex(OSError, "mock file-system error"):
+                    normalize_sdist(archive, epoch=2)
+            self.assertEqual(
+                sorted(path.name for path in folder.iterdir()), ["test.tar.gz"]
+            )
 
     def test_negative_epoch_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

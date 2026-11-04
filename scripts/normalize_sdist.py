@@ -89,6 +89,9 @@ def normalize_sdist(archive: Path, *, epoch: int) -> None:
         ) as temp:
             temp_name = temp.name
             _write_archive(temp, contents, epoch)
+        # Newly created temporary files default to 0600; release archives must
+        # remain readable by ordinary package consumers after atomic replace.
+        os.chmod(temp_name, 0o644)
         os.replace(temp_name, archive)
         temp_name = None
     finally:
