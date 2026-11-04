@@ -101,7 +101,11 @@ jobs:
           python -m pip install --disable-pip-version-check \
             --require-hashes --no-deps --only-binary=:all: \
             -r requirements/python/release.txt
+          # Normalize sdist metadata before checksums and attestation; the
+          # immutable source commit supplies the reproducible timestamp.
+          export SOURCE_DATE_EPOCH="$(git show -s --format=%ct HEAD)"
           python -m build --no-isolation python --outdir "$OUT"
+          python scripts/normalize_sdist.py "$OUT"/*.tar.gz --epoch "$SOURCE_DATE_EPOCH"
           (
             cd "$OUT"
             for artifact in ./*.whl ./*.tar.gz; do

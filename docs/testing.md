@@ -7,6 +7,9 @@ This project uses a dual testing strategy:
 1. **Hardware-free tests** (default, mandatory)
 2. **Hardware-in-the-loop tests** (manual-only, separated)
 
+For current statement-coverage measurements, limits, and opt-in independent
+package reproduction, see [quality evidence](quality-evidence.md).
+
 ## C Tests
 
 ### Prerequisites

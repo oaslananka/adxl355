@@ -73,6 +73,15 @@ class ReleaseWorkflowTests(unittest.TestCase):
         )
         self.assertNotIn("--github-output", preflight_commands)
 
+    def test_python_release_normalizes_sdist_before_checksums(self) -> None:
+        text = RELEASE_WORKFLOW.read_text(encoding="utf-8")
+        build = text.index("python -m build --no-isolation python --outdir")
+        normalize = text.index("python scripts/normalize_sdist.py")
+        checksum = text.index("sha256sum -- ./*.whl ./*.tar.gz")
+        self.assertLess(build, normalize)
+        self.assertLess(normalize, checksum)
+        self.assertIn('SOURCE_DATE_EPOCH="$(git show -s --format=%ct HEAD)"', text)
+
     def test_package_jobs_checkout_preflight_sha_and_upload_checksums(self) -> None:
         jobs = self.load_release()["jobs"]
         workflow_text = RELEASE_WORKFLOW.read_text()

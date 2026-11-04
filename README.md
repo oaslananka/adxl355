@@ -4,125 +4,58 @@
 [![OpenSSF Best Practices](https://www.bestpractices.dev/projects/13419/badge)](https://www.bestpractices.dev/projects/13419)
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/oaslananka/adxl355/badge)](https://scorecard.dev/viewer/?uri=github.com/oaslananka/adxl355)
 
-Cross-platform ADXL355 accelerometer driver family for C, C++, Python, Rust,
-Node.js/TypeScript, and Go.
+**Cross-platform ADXL355 precision-accelerometer drivers** for C, C++, Python,
+Rust, Node.js/TypeScript, and Go — a shared register contract with language-specific
+adapters, mock-based test suites, and documented Raspberry Pi 5 validation.
 
-This repository is an **alpha-stage, hardware-focused driver project**. The
-shared register model, conversion behavior, lifecycle contract, automated CI,
-package dry runs, and an opt-in physical HIL framework are implemented. The
-published `v0.1.0-alpha.3` prerelease has paired final SPI and I2C HIL evidence
-on exact commit `71de69b8727a9f8eef254de586d9bce7bc8fa8ac`. A production maturity
-claim remains intentionally deferred because APIs and feature coverage are still
-alpha-stage and language-specific.
+> **Alpha software — not production certified.** The `v0.1.0-alpha.3` prerelease
+> was validated over SPI and I2C on the exact release commit. Current `main`
+> contains unreleased work; functionality, transport availability, and physical
+> test evidence differ by language. See [feature coverage](#current-status)
+> and [hardware evidence](#hardware-validation-status).
 
-## Current status
+**Navigate:** [Install & download](#packages-and-downloads) ·
+[Quick start](#quick-start-from-the-repository-root) ·
+[Language support](#current-status) ·
+[Hardware evidence](#hardware-validation-status) ·
+[Security & contributions](#participate-and-report-issues) ·
+[Documentation](#documentation)
 
-All six implementations provide the tested core device path: probe, reset,
-range and power-mode control, raw XYZ reads, acceleration conversion,
-temperature, status, and stateless decode/conversion helpers. Feature coverage
-outside that core is intentionally language-specific.
+## At a glance
 
-| Language | Core device API | ODR configuration | FIFO support | Self-test response | DRDY / event flow | Linux SPI adapter | Linux I2C adapter | embedded-hal SPI/I2C | Packaging dry run | Physical HIL evidence |
-|---|---|---|---|---|---|---|---|---|---|---|
-| C | Yes | Yes | Bounded count/decode/read, caller storage | Yes, bounded measured response | Internal-clock DRDY/INT1/INT2 configuration; no GPIO loop | Example only | No | No | Yes, CMake install/export | Raspberry Pi 5 SPI response pass; C DRDY API is unit/sanitizer verified |
-| C++ | Yes, C wrapper | Yes | No public method | No public wrapper | No public wrapper | User `BusInterface` | User `BusInterface` | Arduino SPI compile fixture | Yes, CMake install/export plus PlatformIO pack | No language-specific physical pass |
-| Python | Yes | Yes | Bounded count/decode/read, typed partial results | Yes, bounded measured response | Internal-clock DRDY/INT configuration plus bounded libgpiod reference | Yes, `spidev` | Yes, `smbus2` | No | Yes, sdist/wheel | Raspberry Pi 5 I2C + dedicated DRDY/GPIO17 pass at `002173d` |
-| Rust | Yes | No | No public method | No public method | No public method | No Linux-specific adapter | No Linux-specific adapter | Yes | Yes, `cargo package` | No language-specific physical pass |
-| Node.js | Yes | No | No public method | No public method | No public method | Yes, optional `spi-device` adapter | Yes, optional `i2c-bus` adapter | No | Yes, `npm pack` plus core-only smoke | Raspberry Pi 5 SPI and I2C bounded example passes |
-| Go | Yes | No | No public method | No public method | No public method | Yes, `adxl355/linuxio` on Linux amd64/arm64 | Yes, `adxl355/linuxio` on Linux amd64/arm64 | No | Module/build and cross-build checks | Raspberry Pi 5 SPI and I2C bounded example passes |
+| Implementation | Supported core | Important boundaries |
+| --- | --- | --- |
+| **C** | Full base driver and callback bus | Extended FIFO, offsets, self-test and DRDY; Linux SPI example only |
+| **C++** | C-core wrapper, exception and no-exception APIs | User-supplied bus; Arduino compile fixture is not physical validation |
+| **Python** | Core driver, Linux SPI and I2C adapters | Extended FIFO, calibration, self-test and a bounded GPIO/DRDY reference |
+| **Rust** | `no_std` core and optional `embedded-hal` | No public FIFO/self-test/DRDY methods or bundled Linux adapter |
+| **Node.js** | Core driver, optional Linux SPI and I2C adapters | No public FIFO/self-test/DRDY methods |
+| **Go** | Core driver with Linux SPI/I2C adapters | No public FIFO/self-test/DRDY methods; current `main` requires Go ≥1.25 |
 
-“User transport” means the driver exposes a bus contract but does not ship a
-Linux device adapter for that language. The verified `0.1.0-alpha.3` release is available as `adxl355` on PyPI, `adxl355-driver` on crates.io (imported as `adxl355`), and `@oaslananka/adxl355` on npm. The nested Go module is discoverable through its immutable `go/v0.1.0-alpha.3` tag. Current `main` may contain additional unreleased work beyond those immutable package artifacts.
+## Packages and downloads
 
-## Implemented and verified
+The **published** version is `0.1.0-alpha.3`. Downloads below are independently
+reported by each registry; counts are **not unique users**, are subject to cache
+and CI/mirror traffic, and **must not be added into a project-wide total**.
 
-- Shared datasheet-derived register specification and golden test vectors.
-- Exact-length transport validation and stable driver-level bus errors.
-- Probe-before-use lifecycle and standby-safe range/configuration behavior.
-- Raw 20-bit decode, g and m/s² conversion, temperature, and status reads.
-- C/Python signed hardware-offset APIs and deterministic raw-LSB calibration helpers.
-- C/Python electrostatic self-test response APIs with bounded `DATA_RDY` polling,
-  exact register restoration, and optional caller-owned thresholds.
-- C/Python FIFO contracts with shared marker/empty/framing vectors, bounded complete
-  XYZ reads, caller-owned storage in C, and typed partial-progress errors in Python.
-- C/Python internal-clock data-ready configuration that distinguishes the always-active-high dedicated DRDY pin from DATA_RDY routed to INT1/INT2, preserves unrelated register bits, and performs exact rollback on failure.
-- A finite Linux Python libgpiod v2 reference flow with blocking rising-edge waits, kernel monotonic timestamps, GPIO sequence-gap accounting, timeout/overrun/transport errors, and safe cleanup; it is not a daemon or a portable-core GPIO dependency.
-  The dedicated Raspberry Pi 5 fixture produced 32/32 unique I2C samples from GPIO17 with zero sequence gaps and zero FIFO overruns at exact commit `002173d0c8dae8b15261b6d00cf011011cf8db7c`; this does not claim SPI or INT1/INT2-routed interrupt validation.
-- C++ ODR configuration, an owning exception API, a stack-owned `Status`/`Result<T>` no-exception API, and a hash-locked Arduino Uno PlatformIO compile fixture.
-- Mock-based tests in all six languages and a required zero-skip vector gate.
-- CI quality gates for sanitizers, lint/type analysis, package smoke tests,
-  dependency auditing, CodeQL, race detection, and coverage reporting.
-- Grouped dependency updates, immutable workflow action pins, release SBOM and
-  high-severity vulnerability gates, and OIDC-backed artifact attestations.
-- Manual-only Linux SPI/I2C HIL workflow with sanitized diagnostic evidence.
-- Go `adxl355/linuxio` transports for 64-bit Linux spidev and i2c-dev, with explicit descriptor ownership, inspectable operation errors, exact transfer validation, and bounded SPI/I2C examples.
-- Node.js Linux SPI/I2C subpath adapters with exact optional native dependencies, explicit close ownership, one-message SPI framing, exact I2C byte counts, and bounded examples.
+[![PyPI all-time downloads](https://img.shields.io/pepy/dt/adxl355?label=PyPI%20all-time&logo=pypi)](https://pepy.tech/projects/adxl355)
+[![crates.io all-time downloads](https://img.shields.io/crates/d/adxl355-driver?label=crates.io%20all-time&logo=rust)](https://crates.io/crates/adxl355-driver)
+[![npm last-30-days downloads](https://img.shields.io/npm/dm/%40oaslananka%2Fadxl355?label=npm%20last%2030d&logo=npm)](https://www.npmjs.com/package/@oaslananka/adxl355)
+[![GitHub verified bundle downloads](https://img.shields.io/github/downloads/oaslananka/adxl355/v0.1.0-alpha.3/adxl355-release-0.1.0-alpha.3-71de69b8727a.tar.gz?label=GitHub%20bundle&logo=github)](https://github.com/oaslananka/adxl355/releases/tag/v0.1.0-alpha.3)
 
-## Explicitly not claimed
+| Package | Install the published prerelease | Registry |
+| --- | --- | --- |
+| Python (`adxl355`) | `pip install adxl355==0.1.0a3` | [PyPI](https://pypi.org/project/adxl355/) |
+| Rust (`adxl355-driver`) | `cargo add adxl355-driver@0.1.0-alpha.3` | [crates.io](https://crates.io/crates/adxl355-driver) |
+| Node.js (`@oaslananka/adxl355`) | `npm install @oaslananka/adxl355@0.1.0-alpha.3` | [npm](https://www.npmjs.com/package/@oaslananka/adxl355) |
+| Go module | `go get github.com/oaslananka/adxl355/go@v0.1.0-alpha.3` | [Source tag](https://github.com/oaslananka/adxl355/releases/tag/v0.1.0-alpha.3) |
+| C / C++ | Use the CMake source/install targets | [Verified release bundle](https://github.com/oaslananka/adxl355/releases/tag/v0.1.0-alpha.3) |
 
-Register constants document the chip, but **Register presence does not imply a public API**. `FIFO_DATA`, offset registers, and `SELF_TEST` are represented in
-the register map. Bounded FIFO count/decode/read methods are implemented only in
-C and Python; C++, Rust, Node.js, and Go do not expose them. Internal-clock
-data-ready configuration is implemented only in C and Python. The bounded Linux
-GPIO reference is Python-only, owns no background thread, and is not an unbounded
-daemon; the other language packages expose no interrupt or continuous-acquisition
-method. Signed offset programming, calibration helpers, and
-electrostatic self-test response measurement are implemented only in C and Python. The self-test APIs report measured response;
-they do not apply undocumented factory acceptance limits or imply parity in the
-other languages. The Arduino Uno fixture proves package and exception-free AVR
-compilation only; it is not physical Arduino hardware evidence and does not imply
-support for boards or frameworks that are not built in CI.
-
-## Hardware validation status
-
-The published [`v0.1.0-alpha.3`](https://github.com/oaslananka/adxl355/releases/tag/v0.1.0-alpha.3)
-prerelease records paired Raspberry Pi 5 HIL evidence on exact commit
-`71de69b8727a9f8eef254de586d9bce7bc8fa8ac`. SPI [run 30736413982](https://github.com/oaslananka/adxl355/actions/runs/30736413982)
-and I2C [run 30736668298](https://github.com/oaslananka/adxl355/actions/runs/30736668298)
-both captured 32/32 unique samples, verified identity `0xAD/0x1D/0xED` and
-revision `0x01`, measured 29.1989 °C, and restored standby, ±2 g, and the default
-ODR. Permanent sanitized release assets are `hil-spi-30736413982.json` and
-`hil-i2c-30736668298.json`; the I2C release fixture used address `0x1D` at
-100 kHz.
-
-The manual HIL workflow has a successful Raspberry Pi 5 SPI result on `main`
-([run 30725059679](https://github.com/oaslananka/adxl355/actions/runs/30725059679)): the ADXL355 returned revision `0x01` and 32 unique samples. The Go
-`adxl355/linuxio` SPI example was independently exercised at 1 MHz from exact code
-commit `08273bff4611a33f1b88dae6a08c92d5199eab28`. The bounded run reported
-`28.0939 °C`, captured 32 nonzero samples with 29 unique XYZ tuples, and an
-independent post-run register read confirmed `POWER_CTL=0x01` (standby). The
-C/Python self-test implementation was also exercised over SPI on code commit
-`12d6206393223439e14b8e36b97e567751e8f8bb`: two independent 64-sample runs
-measured approximately 0.342 g X, 0.339 g Y, and 1.419 g Z response, and a third
-run passed the Rev.D min/max windows. Every run restored `SELF_TEST`, `RANGE`,
-`FILTER`, and `POWER_CTL` exactly. This is feature evidence, not final
-release-candidate HIL evidence. I2C feature evidence also passed on `main` in
-[run 30734635341](https://github.com/oaslananka/adxl355/actions/runs/30734635341):
-the `0x1D` fixture returned revision `0x01`, 28.6464 °C, and 32 unique samples.
-The exact-`main` Go I2C example independently captured 32 nonzero, unique samples
-and restored `POWER_CTL=0x01`. These earlier runs remain feature-specific history;
-the paired final release evidence is recorded above. Wiring, runner setup,
-supported bus settings, diagnostics, and evidence requirements are documented in
-[`docs/hardware-testing.md`](docs/hardware-testing.md).
-
-## Device lifecycle contract
-
-Creating a driver object only stores the transport; it does not verify hardware.
-Call `probe()` successfully before stateful hardware operations. Stateless decode
-and unit-conversion helpers remain usable without a device.
-
-| Language | Required startup | Pre-probe error |
-|---|---|---|
-| C | `adxl355_init()` → `adxl355_probe()` | `ADXL355_ERR_STATE` |
-| C++ | construct `Device` or `NoexceptDevice` → `probe()` | `InvalidStateError` or `Status::InvalidState` |
-| Python | construct `ADXL355` → `probe()` | `DeviceStateError` |
-| Rust | `Adxl355::new()` → `probe()` | `Error::InvalidState` |
-| Node.js | construct `ADXL355` → `await probe()` | `DeviceStateError` |
-| Go | `New()` → `Probe()` | `ErrInvalidState` |
-
-All transports must return exactly the requested read length. Zero, truncated,
-and overlong responses are rejected before indexing. C and C++ callbacks return
-the exact transferred byte count on success and a negative value on failure.
+**Counting scope:** The GitHub badge counts **only the release source bundle**, not
+checksums, SBOMs, HIL JSONs, or automatically generated GitHub source archives.
+PyPI's all-time figure comes from Pepy, which includes known mirrors; npm's
+native badge exposes a recent period rather than a reliable all-time total.
+See [release verification](docs/publishing.md) for artifact provenance.
 
 ## Quick start from the repository root
 
@@ -237,6 +170,138 @@ restore standby before closing the descriptor. SPI and I2C were physically
 verified on Raspberry Pi 5, including the paired final `v0.1.0-alpha.3` HIL runs
 listed above.
 
+## Current status
+
+All six implementations provide the tested core device path: probe, reset,
+range and power-mode control, raw XYZ reads, acceleration conversion,
+temperature, status, and stateless decode/conversion helpers. Feature coverage
+outside that core is intentionally language-specific.
+
+<details>
+<summary><strong>Full six-language capability and hardware-evidence matrix</strong></summary>
+
+| Language | Core device API | ODR configuration | FIFO support | Self-test response | DRDY / event flow | Linux SPI adapter | Linux I2C adapter | embedded-hal SPI/I2C | Packaging dry run | Physical HIL evidence |
+|---|---|---|---|---|---|---|---|---|---|---|
+| C | Yes | Yes | Bounded count/decode/read, caller storage | Yes, bounded measured response | Internal-clock DRDY/INT1/INT2 configuration; no GPIO loop | Example only | No | No | Yes, CMake install/export | Raspberry Pi 5 SPI response pass; C DRDY API is unit/sanitizer verified |
+| C++ | Yes, C wrapper | Yes | No public method | No public wrapper | No public wrapper | User `BusInterface` | User `BusInterface` | Arduino SPI compile fixture | Yes, CMake install/export plus PlatformIO pack | No language-specific physical pass |
+| Python | Yes | Yes | Bounded count/decode/read, typed partial results | Yes, bounded measured response | Internal-clock DRDY/INT configuration plus bounded libgpiod reference | Yes, `spidev` | Yes, `smbus2` | No | Yes, sdist/wheel | Raspberry Pi 5 I2C + dedicated DRDY/GPIO17 pass at `002173d` |
+| Rust | Yes | No | No public method | No public method | No public method | No Linux-specific adapter | No Linux-specific adapter | Yes | Yes, `cargo package` | No language-specific physical pass |
+| Node.js | Yes | No | No public method | No public method | No public method | Yes, optional `spi-device` adapter | Yes, optional `i2c-bus` adapter | No | Yes, `npm pack` plus core-only smoke | Raspberry Pi 5 SPI and I2C bounded example passes |
+| Go | Yes | No | No public method | No public method | No public method | Yes, `adxl355/linuxio` on Linux amd64/arm64 | Yes, `adxl355/linuxio` on Linux amd64/arm64 | No | Module/build and cross-build checks | Raspberry Pi 5 SPI and I2C bounded example passes |
+
+“User transport” means the driver exposes a bus contract but does not ship a
+Linux device adapter for that language. The verified `0.1.0-alpha.3` release is available as `adxl355` on PyPI, `adxl355-driver` on crates.io (imported as `adxl355`), and `@oaslananka/adxl355` on npm. The nested Go module is discoverable through its immutable `go/v0.1.0-alpha.3` tag. Current `main` may contain additional unreleased work beyond those immutable package artifacts.
+
+</details>
+
+## Implemented and verified
+
+<details>
+<summary><strong>Implemented and verified functionality, security, and testing</strong></summary>
+
+- Shared datasheet-derived register specification and golden test vectors.
+- Exact-length transport validation and stable driver-level bus errors.
+- Probe-before-use lifecycle and standby-safe range/configuration behavior.
+- Raw 20-bit decode, g and m/s² conversion, temperature, and status reads.
+- C/Python signed hardware-offset APIs and deterministic raw-LSB calibration helpers.
+- C/Python electrostatic self-test response APIs with bounded `DATA_RDY` polling,
+  exact register restoration, and optional caller-owned thresholds.
+- C/Python FIFO contracts with shared marker/empty/framing vectors, bounded complete
+  XYZ reads, caller-owned storage in C, and typed partial-progress errors in Python.
+- C/Python internal-clock data-ready configuration that distinguishes the always-active-high dedicated DRDY pin from DATA_RDY routed to INT1/INT2, preserves unrelated register bits, and performs exact rollback on failure.
+- A finite Linux Python libgpiod v2 reference flow with blocking rising-edge waits, kernel monotonic timestamps, GPIO sequence-gap accounting, timeout/overrun/transport errors, and safe cleanup; it is not a daemon or a portable-core GPIO dependency.
+  The dedicated Raspberry Pi 5 fixture produced 32/32 unique I2C samples from GPIO17 with zero sequence gaps and zero FIFO overruns at exact commit `002173d0c8dae8b15261b6d00cf011011cf8db7c`; this does not claim SPI or INT1/INT2-routed interrupt validation.
+- C++ ODR configuration, an owning exception API, a stack-owned `Status`/`Result<T>` no-exception API, and a hash-locked Arduino Uno PlatformIO compile fixture.
+- Mock-based tests in all six languages and a required zero-skip vector gate.
+- CI quality gates for sanitizers, lint/type analysis, package smoke tests,
+  dependency auditing, CodeQL, race detection, and coverage reporting.
+- Grouped dependency updates, immutable workflow action pins, release SBOM and
+  high-severity vulnerability gates, and OIDC-backed artifact attestations.
+- Manual-only Linux SPI/I2C HIL workflow with sanitized diagnostic evidence.
+- Go `adxl355/linuxio` transports for 64-bit Linux spidev and i2c-dev, with explicit descriptor ownership, inspectable operation errors, exact transfer validation, and bounded SPI/I2C examples.
+- Node.js Linux SPI/I2C subpath adapters with exact optional native dependencies, explicit close ownership, one-message SPI framing, exact I2C byte counts, and bounded examples.
+
+</details>
+
+## Explicitly not claimed
+
+**Do not infer feature support from register constants or cross-language names.**
+Physical acceptance applies only to the exact documented fixtures and revisions.
+
+<details>
+<summary><strong>Language-specific API limits and non-goals</strong></summary>
+
+Register constants document the chip, but **Register presence does not imply a public API**. `FIFO_DATA`, offset registers, and `SELF_TEST` are represented in
+the register map. Bounded FIFO count/decode/read methods are implemented only in
+C and Python; C++, Rust, Node.js, and Go do not expose them. Internal-clock
+data-ready configuration is implemented only in C and Python. The bounded Linux
+GPIO reference is Python-only, owns no background thread, and is not an unbounded
+daemon; the other language packages expose no interrupt or continuous-acquisition
+method. Signed offset programming, calibration helpers, and
+electrostatic self-test response measurement are implemented only in C and Python. The self-test APIs report measured response;
+they do not apply undocumented factory acceptance limits or imply parity in the
+other languages. The Arduino Uno fixture proves package and exception-free AVR
+compilation only; it is not physical Arduino hardware evidence and does not imply
+support for boards or frameworks that are not built in CI.
+
+</details>
+
+## Hardware validation status
+
+The published [`v0.1.0-alpha.3`](https://github.com/oaslananka/adxl355/releases/tag/v0.1.0-alpha.3)
+prerelease records paired Raspberry Pi 5 HIL evidence on exact commit
+`71de69b8727a9f8eef254de586d9bce7bc8fa8ac`. SPI [run 30736413982](https://github.com/oaslananka/adxl355/actions/runs/30736413982)
+and I2C [run 30736668298](https://github.com/oaslananka/adxl355/actions/runs/30736668298)
+both captured 32/32 unique samples, verified identity `0xAD/0x1D/0xED` and
+revision `0x01`, measured 29.1989 °C, and restored standby, ±2 g, and the default
+ODR. Permanent sanitized release assets are `hil-spi-30736413982.json` and
+`hil-i2c-30736668298.json`; the I2C release fixture used address `0x1D` at
+100 kHz.
+
+<details>
+<summary><strong>Detailed physical validation logs and historical feature runs</strong></summary>
+
+The manual HIL workflow has a successful Raspberry Pi 5 SPI result on `main`
+([run 30725059679](https://github.com/oaslananka/adxl355/actions/runs/30725059679)): the ADXL355 returned revision `0x01` and 32 unique samples. The Go
+`adxl355/linuxio` SPI example was independently exercised at 1 MHz from exact code
+commit `08273bff4611a33f1b88dae6a08c92d5199eab28`. The bounded run reported
+`28.0939 °C`, captured 32 nonzero samples with 29 unique XYZ tuples, and an
+independent post-run register read confirmed `POWER_CTL=0x01` (standby). The
+C/Python self-test implementation was also exercised over SPI on code commit
+`12d6206393223439e14b8e36b97e567751e8f8bb`: two independent 64-sample runs
+measured approximately 0.342 g X, 0.339 g Y, and 1.419 g Z response, and a third
+run passed the Rev.D min/max windows. Every run restored `SELF_TEST`, `RANGE`,
+`FILTER`, and `POWER_CTL` exactly. This is feature evidence, not final
+release-candidate HIL evidence. I2C feature evidence also passed on `main` in
+[run 30734635341](https://github.com/oaslananka/adxl355/actions/runs/30734635341):
+the `0x1D` fixture returned revision `0x01`, 28.6464 °C, and 32 unique samples.
+The exact-`main` Go I2C example independently captured 32 nonzero, unique samples
+and restored `POWER_CTL=0x01`. These earlier runs remain feature-specific history;
+the paired final release evidence is recorded above. Wiring, runner setup,
+supported bus settings, diagnostics, and evidence requirements are documented in
+[`docs/hardware-testing.md`](docs/hardware-testing.md).
+
+</details>
+
+## Device lifecycle contract
+
+Creating a driver object only stores the transport; it does not verify hardware.
+Call `probe()` successfully before stateful hardware operations. Stateless decode
+and unit-conversion helpers remain usable without a device.
+
+| Language | Required startup | Pre-probe error |
+|---|---|---|
+| C | `adxl355_init()` → `adxl355_probe()` | `ADXL355_ERR_STATE` |
+| C++ | construct `Device` or `NoexceptDevice` → `probe()` | `InvalidStateError` or `Status::InvalidState` |
+| Python | construct `ADXL355` → `probe()` | `DeviceStateError` |
+| Rust | `Adxl355::new()` → `probe()` | `Error::InvalidState` |
+| Node.js | construct `ADXL355` → `await probe()` | `DeviceStateError` |
+| Go | `New()` → `Probe()` | `ErrInvalidState` |
+
+All transports must return exactly the requested read length. Zero, truncated,
+and overlong responses are rejected before indexing. C and C++ callbacks return
+the exact transferred byte count on success and a negative value on failure.
+
 ## Participate and report issues
 
 - [Contribute changes and run required tests](CONTRIBUTING.md)
@@ -259,6 +324,7 @@ supply-chain analysis, which is distinct from the Best Practices badge.
 - [12-month maintenance roadmap](docs/roadmap.md)
 - [Security requirements, threat model, and assurance argument](docs/security/assurance-case.md)
 - [Testing and CI](docs/testing.md)
+- [Measured coverage and reproducible-build evidence](docs/quality-evidence.md)
 - [Physical hardware validation](docs/hardware-testing.md)
 - [Calibration procedure](docs/calibration.md)
 - [Versioning and package names](docs/versioning.md)

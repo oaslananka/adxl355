@@ -39,6 +39,22 @@ class PublicDocumentationTests(unittest.TestCase):
             readme,
         )
 
+    def test_download_badges_track_published_channels_without_fake_total(self) -> None:
+        readme = README.read_text(encoding="utf-8")
+        self.assertIn("img.shields.io/pepy/dt/adxl355?label=PyPI%20all-time", readme)
+        self.assertIn("img.shields.io/crates/d/adxl355-driver?label=crates.io%20all-time", readme)
+        self.assertIn("img.shields.io/npm/dm/%40oaslananka%2Fadxl355", readme)
+        self.assertIn(
+            "img.shields.io/github/downloads/oaslananka/adxl355/"
+            "v0.1.0-alpha.3/adxl355-release-0.1.0-alpha.3-71de69b8727a.tar.gz",
+            readme,
+        )
+        self.assertNotIn("img.shields.io/github/downloads/oaslananka/adxl355/total", readme)
+        self.assertIn("must not be added into a project-wide total", readme)
+        self.assertIn("## At a glance", readme)
+        self.assertIn("<summary><strong>Full six-language capability", readme)
+        self.assertIn("[Measured coverage and reproducible-build evidence]", readme)
+
     def test_readme_does_not_overstate_maturity_or_unsupported_apis(self) -> None:
         text = README.read_text().lower()
         self.assertNotIn("production-ready", text)
