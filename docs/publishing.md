@@ -193,3 +193,14 @@ The public Go proxy discovers the tag without a registry credential.
 - [ ] Registry package pages expose repository, license, changelog, and security links
 - [ ] No long-lived registry credential is configured in GitHub
 - [ ] Partial-failure recovery preserves every immutable tag and version
+
+### Deterministic source archives
+
+Before checksums and attestations, the release workflow normalizes the Python
+sdist tar and gzip metadata using `scripts/normalize_sdist.py` and the commit's
+`SOURCE_DATE_EPOCH`. This preserves source file contents while fixing nonsemantic
+archive timestamps, owner IDs and entry order. The Python wheel, Rust crate,
+npm package and C static library were reproduced byte-for-byte in independent
+local builds on 2026-11-04. The evidence and the opt-in repeat command live in
+[quality evidence](quality-evidence.md). Bitwise identity on a single controlled
+Linux toolchain does not prove cross-platform reproducibility or hardware behavior.
