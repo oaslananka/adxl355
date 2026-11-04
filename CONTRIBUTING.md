@@ -23,11 +23,28 @@ This project follows a [Code of Conduct](CODE_OF_CONDUCT.md). Please be respectf
 - Python >= 3.10 (Python package)
 - Rust toolchain (Rust crate)
 - Node.js 22 or >= 24 (npm package; CI covers 22, 24, and 26)
-- Go >= 1.21 (Go module)
+- Go >= 1.25 (Go module; CI uses Go 1.26)
 
 ### Testing
 
 See [docs/testing.md](docs/testing.md) for full testing instructions.
+
+### Test policy
+
+Changes to driver behavior, hardware transfer framing, public APIs, or shared
+register semantics must include automated regression tests (and shared test
+vectors where applicable). Run the relevant language tests and the cross-language
+consistency gate before requesting a merge. Hardware-in-the-loop tests require
+opt-in access to a real sensor; do not claim physical validation from mocks.
+If a change cannot be tested automatically, explain the limitation in its PR.
+
+### Review and acceptance
+
+The repository is maintained by one owner. Pull requests are accepted through
+required automated CI and security checks under the protected `main` ruleset;
+an additional independent human approval is **not** a prerequisite. Review
+threads must be resolved, and breaking, security-sensitive, or release changes
+receive explicit maintainer evaluation rather than unconditional automerge.
 
 ## Coding Standards
 
