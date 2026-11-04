@@ -125,7 +125,7 @@ npm test
 ### Prerequisites
 
 ```bash
-# Go >= 1.21
+# Go >= 1.25 (supported CI toolchain: Go 1.26)
 ```
 
 ### Running

@@ -56,5 +56,8 @@ After a fix is available, the project may publish a GitHub Security Advisory and
 release notes. Reporter credit is optional and will follow the preference stated
 in the private report.
 
+Security requirements, trust boundaries, and known limitations are described
+in [`docs/security/assurance-case.md`](docs/security/assurance-case.md).
+
 Supply-chain controls and exception policy are documented in
 [`docs/security/supply-chain.md`](docs/security/supply-chain.md).

@@ -251,6 +251,9 @@ evidence file proposes answers; it does not itself award or claim a badge level.
 
 - [Generated public API references for all maintained languages](docs/api/README.md)
 - [Architecture](docs/architecture.md)
+- [Governance, maintainer responsibilities, and continuity limits](docs/governance.md)
+- [12-month maintenance roadmap](docs/roadmap.md)
+- [Security requirements, threat model, and assurance argument](docs/security/assurance-case.md)
 - [Testing and CI](docs/testing.md)
 - [Physical hardware validation](docs/hardware-testing.md)
 - [Calibration procedure](docs/calibration.md)
