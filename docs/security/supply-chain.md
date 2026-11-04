@@ -8,7 +8,7 @@ multiple local scanners that enforce the same policy with duplicate findings.
 
 | Category | Primary control | Enforcement |
 |---|---|---|
-| Dependency updates | Renovate | Weekly, grouped and rate-limited PRs for GitHub Actions, Python package metadata, Rust, Node.js, and Go; seven-day minimum release age and Dependency Dashboard approval for major upgrades |
+| Dependency updates | Renovate | Weekday, rate-limited PRs for GitHub Actions, Python package metadata, Rust, Node.js, and Go; seven-day minimum release age and Dependency Dashboard approval for major upgrades |
 | Changed dependencies in pull requests | GitHub Dependency Review | A newly introduced dependency finding at **high severity** or critical severity blocks the PR |
 | Static application security testing | CodeQL | Required analysis for C/C++, Python, JavaScript/TypeScript, and Go on pull requests, `main`, and a weekly schedule |
 | Secret prevention | GitHub secret scanning and push protection | Repository setting; secrets are blocked before push where GitHub can identify them |
@@ -49,7 +49,10 @@ metadata or audit file.
 `renovate.json` is the single version-update bot configuration. It scans GitHub
 Actions, Python package metadata, Rust, Node.js, and Go on a weekday morning schedule in
 the `Europe/Istanbul` timezone. Newly released versions wait seven days before
-normal update PRs. Major updates require explicit Dependency Dashboard approval,
+normal update PRs. After that release-age check passes, Renovate creates
+the PR immediately so that pull-request CI can run; waiting for branch-level
+status checks would stall on bare Renovate branches. Major updates require
+explicit Dependency Dashboard approval,
 and breaking, pre-1.0 minor, compiler, build-backend, and GitHub Actions changes remain manual.
 
 Stable (1.0+) non-major updates in Node, Rust, Go, and Python package metadata,

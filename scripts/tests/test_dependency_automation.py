@@ -27,6 +27,10 @@ class DependencyAutomationTests(unittest.TestCase):
         )
         self.assertEqual(config["timezone"], "Europe/Istanbul")
         self.assertEqual(config["minimumReleaseAge"], "7 days")
+        # Branch CI runs on pull_request, not bare Renovate branches. With
+        # minimumReleaseAge set, not-pending can hold PRs indefinitely.
+        self.assertEqual(config["prCreation"], "immediate")
+        self.assertEqual(config["internalChecksFilter"], "strict")
         self.assertIn("requirements/python/**", config["ignorePaths"])
         self.assertTrue(config["vulnerabilityAlerts"]["enabled"])
         self.assertEqual(config["vulnerabilityAlerts"]["prCreation"], "immediate")

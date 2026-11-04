@@ -33,7 +33,7 @@
   "rangeStrategy": "auto",
   "pinDigests": true,
   "rebaseWhen": "conflicted",
-  "prCreation": "not-pending",
+  "prCreation": "immediate",
   "internalChecksFilter": "strict",
   "prHourlyLimit": 2,
   "prConcurrentLimit": 5,
