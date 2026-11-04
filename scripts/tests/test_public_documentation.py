@@ -19,6 +19,26 @@ DOCS = (
 
 
 class PublicDocumentationTests(unittest.TestCase):
+    def test_readme_badges_are_supported_and_deepwiki_is_plain_link(self) -> None:
+        readme = README.read_text(encoding="utf-8")
+        self.assertIn(
+            "[![GitGem](https://gitgem.org/api/badge/github/oaslananka/adxl355.svg)]",
+            readme,
+        )
+        self.assertIn(
+            "[![OpenSSF Best Practices](https://www.bestpractices.dev/projects/13419/badge)]",
+            readme,
+        )
+        self.assertIn(
+            "[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/oaslananka/adxl355/badge)]",
+            readme,
+        )
+        self.assertNotIn("deepwiki.com/badge.svg", readme)
+        self.assertIn(
+            "[Browse source explanations on DeepWiki](https://deepwiki.com/oaslananka/adxl355)",
+            readme,
+        )
+
     def test_readme_does_not_overstate_maturity_or_unsupported_apis(self) -> None:
         text = README.read_text().lower()
         self.assertNotIn("production-ready", text)
