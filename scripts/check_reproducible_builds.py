@@ -26,10 +26,6 @@ ROOT = Path(__file__).resolve().parents[1]
 COMPONENTS = ("c", "python", "rust", "npm")
 
 
-def run(args: list[str], *, cwd: Path = ROOT, env: dict[str, str]) -> None:
-    subprocess.run(args, cwd=cwd, env=env, check=True, stdout=subprocess.DEVNULL)
-
-
 def sha256(file: Path) -> str:
     return hashlib.sha256(file.read_bytes()).hexdigest()
 
@@ -52,7 +48,7 @@ def build_one(component: str, destination: Path, env: dict[str, str]) -> None:
     destination.mkdir(parents=True)
     if component == "c":
         build = destination.parent / "c-build"
-        run(
+        subprocess.run(
             [
                 "cmake",
                 "-S",
@@ -63,12 +59,21 @@ def build_one(component: str, destination: Path, env: dict[str, str]) -> None:
                 "-DADXL355_BUILD_TESTS=OFF",
                 "-DADXL355_BUILD_EXAMPLES=OFF",
             ],
+            cwd=ROOT,
             env=env,
+            check=True,
+            stdout=subprocess.DEVNULL,
         )
-        run(["cmake", "--build", str(build), "--parallel", "2"], env=env)
+        subprocess.run(
+            ["cmake", "--build", str(build), "--parallel", "2"],
+            cwd=ROOT,
+            env=env,
+            check=True,
+            stdout=subprocess.DEVNULL,
+        )
         shutil.copy2(build / "libadxl355.a", destination / "libadxl355.a")
     elif component == "python":
-        run(
+        subprocess.run(
             [
                 "uvx",
                 "--from",
@@ -81,14 +86,17 @@ def build_one(component: str, destination: Path, env: dict[str, str]) -> None:
                 "--outdir",
                 str(destination),
             ],
+            cwd=ROOT,
             env=env,
+            check=True,
+            stdout=subprocess.DEVNULL,
         )
         for sdist in destination.glob("*.tar.gz"):
             normalize_sdist(sdist, epoch=int(env["SOURCE_DATE_EPOCH"]))
     elif component == "rust":
         build = destination.parent / "rust-target"
         local = dict(env, CARGO_TARGET_DIR=str(build))
-        run(
+        subprocess.run(
             [
                 "cargo",
                 "package",
@@ -97,7 +105,10 @@ def build_one(component: str, destination: Path, env: dict[str, str]) -> None:
                 "rust/Cargo.toml",
                 "--no-verify",
             ],
+            cwd=ROOT,
             env=local,
+            check=True,
+            stdout=subprocess.DEVNULL,
         )
         crates = list((build / "package").glob("*.crate"))
         if len(crates) != 1:
@@ -117,8 +128,14 @@ def build_one(component: str, destination: Path, env: dict[str, str]) -> None:
         (copy / "node_modules").symlink_to(
             ROOT / "node/node_modules", target_is_directory=True
         )
-        run(["npm", "run", "build"], cwd=copy, env=env)
-        run(
+        subprocess.run(
+            ["npm", "run", "build"],
+            cwd=copy,
+            env=env,
+            check=True,
+            stdout=subprocess.DEVNULL,
+        )
+        subprocess.run(
             [
                 "npm",
                 "pack",
@@ -129,6 +146,8 @@ def build_one(component: str, destination: Path, env: dict[str, str]) -> None:
             ],
             cwd=copy,
             env=env,
+            check=True,
+            stdout=subprocess.DEVNULL,
         )
     else:
         raise ValueError(f"unrecognized component: {component}")
