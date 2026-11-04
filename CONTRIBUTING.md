@@ -40,7 +40,7 @@ If a change cannot be tested automatically, explain the limitation in its PR.
 
 ### Review and acceptance
 
-The repository is maintained by one owner. Pull requests are accepted through
+The repository is maintained by one owner (see [governance](docs/governance.md)). Pull requests are accepted through
 required automated CI and security checks under the protected `main` ruleset;
 an additional independent human approval is **not** a prerequisite. Review
 threads must be resolved, and breaking, security-sensitive, or release changes
