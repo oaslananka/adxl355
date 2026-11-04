@@ -2,6 +2,7 @@
 
 [![GitGem](https://gitgem.org/api/badge/github/oaslananka/adxl355.svg)](https://gitgem.org/github/oaslananka/adxl355)
 [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/oaslananka/adxl355)
+[![OpenSSF Best Practices](https://www.bestpractices.dev/projects/13419/badge)](https://www.bestpractices.dev/projects/13419)
 
 Cross-platform ADXL355 accelerometer driver family for C, C++, Python, Rust,
 Node.js/TypeScript, and Go.
@@ -235,6 +236,16 @@ Both commands probe identity, read temperature, collect a finite sample count, a
 restore standby before closing the descriptor. SPI and I2C were physically
 verified on Raspberry Pi 5, including the paired final `v0.1.0-alpha.3` HIL runs
 listed above.
+
+## Participate and report issues
+
+- [Contribute changes and run required tests](CONTRIBUTING.md)
+- [Report bugs or request improvements](https://github.com/oaslananka/adxl355/issues)
+- [Report vulnerabilities privately](SECURITY.md)
+- [Review OpenSSF Best Practices evidence proposals](.bestpractices.json)
+
+OpenSSF badge responses are a maintainer-reviewed self-assessment. The repository
+evidence file proposes answers; it does not itself award or claim a badge level.
 
 ## Documentation
 
