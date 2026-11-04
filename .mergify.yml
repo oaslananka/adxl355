@@ -3,7 +3,9 @@ merge_protections_settings:
   post_comment: false
   auto_merge_conditions:
     - author = renovate[bot]
+    - base = main
     - label = automerge
+    - label != manual-review
 
 merge_protections:
   - name: required checks for low-risk Renovate updates
@@ -30,13 +32,19 @@ merge_protections:
       - check-success = CodeQL (python)
       - check-success = CodeQL (javascript-typescript)
       - check-success = CodeQL (go)
+      - check-success = Tests
+      - check-success = Dependency Audit
+
+# Keep single-PR updates in-place where GitHub permits; avoid extra batch CI.
+merge_queue:
+  max_parallel_checks: 1
 
 queue_rules:
   - name: dependency-updates
     queue_conditions:
+      - base = main
       - author = renovate[bot]
       - label = automerge
-    merge_conditions:
       - label != manual-review
       - "-draft"
     merge_method: squash

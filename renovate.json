@@ -18,7 +18,7 @@
   ],
   "timezone": "Europe/Istanbul",
   "schedule": [
-    "before 8am on monday"
+    "before 8am every weekday"
   ],
   "minimumReleaseAge": "7 days",
   "dependencyDashboardTitle": "Dependency Dashboard",
@@ -147,6 +147,28 @@
       ],
       "matchPackageNames": [
         "!typescript"
+      ]
+    },
+    {
+      "description": "Label stable, non-major runtime dependency updates for Mergify after required CI checks.",
+      "matchManagers": [
+        "npm",
+        "cargo",
+        "gomod",
+        "pep621"
+      ],
+      "matchUpdateTypes": [
+        "minor",
+        "patch"
+      ],
+      "matchCurrentVersion": "!/^0/",
+      "matchPackageNames": [
+        "!typescript",
+        "!setuptools"
+      ],
+      "automerge": false,
+      "addLabels": [
+        "automerge"
       ]
     }
   ],

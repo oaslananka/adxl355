@@ -47,13 +47,16 @@ metadata or audit file.
 ## Renovate maintenance policy
 
 `renovate.json` is the single version-update bot configuration. It scans GitHub
-Actions, Python package metadata, Rust, Node.js, and Go on a Monday schedule in
+Actions, Python package metadata, Rust, Node.js, and Go on a weekday morning schedule in
 the `Europe/Istanbul` timezone. Newly released versions wait seven days before
 normal update PRs. Major updates require explicit Dependency Dashboard approval,
-and compiler, build-backend, runtime, and GitHub Actions changes remain manual.
+and breaking, pre-1.0 minor, compiler, build-backend, and GitHub Actions changes remain manual.
 
-Only low-risk non-major Node development updates receive the `automerge` label.
-Mergify may squash-merge those PRs only when the author is `renovate[bot]`, the
+Stable (1.0+) non-major updates in Node, Rust, Go, and Python package metadata,
+plus low-risk Node development updates, receive the `automerge` label.
+Updates to TypeScript or setuptools are never opted in, and security advisory
+PRs require manual review even when created immediately.
+Mergify may squash-merge eligible PRs only when the author is `renovate[bot]`, the
 `manual-review` label is absent, the PR is not a draft, and every required CI,
 dependency-review, and CodeQL check succeeds. GitHub rulesets remain the final
 merge authority.
