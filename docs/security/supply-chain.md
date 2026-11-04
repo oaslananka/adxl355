@@ -276,8 +276,10 @@ module/standard-library findings that are not callable by this project. Renovate
 vulnerability alerts remain immediate
 and do not wait for the normal update schedule.
 
-The bounded OSV exceptions in `go/osv-scanner.toml` preserve the documented Go 1.21
-compatibility floor for `GO-2026-5024` and the Windows-only standard-library advisory `GO-2025-3750`: pinned `govulncheck` on a dedicated scanner toolchain confirms that no affected
-symbol is reachable because this driver uses `x/sys/unix`. The exception expires on
-2026-11-01 and must be removed, renewed with fresh evidence, or replaced by a
-compatible dependency/toolchain upgrade.
+The Go module requires Go 1.25 or newer to use `golang.org/x/sys v0.44.0`,
+which fixes `GO-2026-5024` in its Windows-only package. Go CI and release
+checks run on a currently supported Go 1.26 toolchain. The previous Go 1.21
+minimum and expired OSV exceptions were removed rather than suppressing a
+known dependency advisory. `govulncheck` remains the authoritative Go
+call-reachability check. The Windows-specific standard-library advisory
+`GO-2025-3750` is also addressed by the newer supported Go toolchain.

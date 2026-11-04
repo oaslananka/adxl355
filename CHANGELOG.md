@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Upgraded the Go driver module's `golang.org/x/sys` dependency to patched
+  `v0.44.0` for `GO-2026-5024` and removed its expired OSV exemptions.
+
 - Refreshed the transitive Node.js PostCSS lock to patched `8.5.25`, restoring
   the required dependency-audit gate after `CVE-2026-69153` was disclosed.
 - Added a bounded 20 ms measurement-settle step to the Node.js Linux SPI and I2C
@@ -16,6 +19,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   test and Raspberry Pi 5 SPI validation on the exact merged `main` commit.
 
 ### Changed
+
+- **Breaking (Go):** The minimum Go toolchain for the nested Go module is
+  1.25, raised from 1.21 for the patched `x/sys` dependency; CI and release
+  checks now use a supported Go 1.26 toolchain.
 
 - **Breaking (Python metadata):** The public `adxl355.__version__` value and Python
   distribution version advance from `0.1.0a3` to `0.1.0a4` for this prerelease.
