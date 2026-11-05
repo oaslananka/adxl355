@@ -25,7 +25,10 @@ class MockBus : public adxl355::BusInterface {
 public:
     uint8_t regs[128]{};
     bool fail_reads{false};
+    bool throw_reads{false};
     bool fail_writes{false};
+    bool throw_writes{false};
+    bool throw_delays{false};
     size_t short_read_length{static_cast<size_t>(-1)};
     int fail_write_reg{-1};
     size_t fail_write_occurrence{0};
@@ -50,7 +53,12 @@ public:
     int read(void *ctx, uint8_t reg, uint8_t *data, size_t len) override {
         (void)ctx;
         read_count++;
-        if (fail_reads) {
+        if (throw_reads) {
+            throw std::runtime_error("read failure");
+        }
+        const size_t first = static_cast<size_t>(reg);
+        if (fail_reads || data == nullptr || first >= sizeof(regs) ||
+            len > sizeof(regs) - first) {
             return -1;
         }
         const size_t reported_len = short_read_length == static_cast<size_t>(-1)
@@ -66,7 +74,12 @@ public:
     int write(void *ctx, uint8_t reg, const uint8_t *data, size_t len) override {
         (void)ctx;
         write_count++;
-        if (fail_writes) {
+        if (throw_writes) {
+            throw std::runtime_error("write failure");
+        }
+        const size_t first = static_cast<size_t>(reg);
+        if (fail_writes || data == nullptr || first >= sizeof(regs) ||
+            len > sizeof(regs) - first) {
             return -1;
         }
         if (fail_write_reg >= 0 && reg == static_cast<uint8_t>(fail_write_reg)) {
@@ -85,6 +98,9 @@ public:
     void delayMs(void *ctx, uint32_t ms) override {
         (void)ctx;
         (void)ms;
+        if (throw_delays) {
+            throw std::runtime_error("delay failure");
+        }
     }
 };
 
@@ -353,36 +369,8 @@ void test_move_preserves_bus_callback_owner() {
          "C++ moved device writes through rebound callback context");
 }
 
-class ThrowingMockBus final : public MockBus {
-public:
-    bool throw_reads{false};
-    bool throw_writes{false};
-    bool throw_delays{false};
-
-    int read(void *ctx, uint8_t reg, uint8_t *data, size_t len) override {
-        if (throw_reads) {
-            throw std::runtime_error("read failure");
-        }
-        return MockBus::read(ctx, reg, data, len);
-    }
-
-    int write(void *ctx, uint8_t reg, const uint8_t *data, size_t len) override {
-        if (throw_writes) {
-            throw std::runtime_error("write failure");
-        }
-        return MockBus::write(ctx, reg, data, len);
-    }
-
-    void delayMs(void *ctx, uint32_t ms) override {
-        if (throw_delays) {
-            throw std::runtime_error("delay failure");
-        }
-        MockBus::delayMs(ctx, ms);
-    }
-};
-
 void test_noexcept_bus_contains_native_exceptions() {
-    ThrowingMockBus bus;
+    MockBus bus;
     adxl355::NoexceptDevice dev(bus);
     TEST(dev.initStatus() == adxl355::Status::Ok,
          "exception-containing adapter initialized");
