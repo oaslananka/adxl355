@@ -1,9 +1,15 @@
 {
   "$schema": "https://raw.githubusercontent.com/platformio/platformio-core/develop/platformio/assets/schema/library.json",
   "name": "ADXL355 C and C++ Driver",
-  "version": "0.1.0-alpha.4",
+  "version": "0.1.0",
   "description": "Thin Arduino/PlatformIO integration for the authoritative ADXL355 C core and C++ wrappers.",
-  "keywords": ["adxl355", "accelerometer", "sensor", "spi", "arduino"],
+  "keywords": [
+    "adxl355",
+    "accelerometer",
+    "sensor",
+    "spi",
+    "arduino"
+  ],
   "homepage": "https://github.com/oaslananka/adxl355",
   "repository": {
     "type": "git",
@@ -17,8 +23,12 @@
     }
   ],
   "license": "MIT",
-  "frameworks": ["arduino"],
-  "platforms": ["atmelavr"],
+  "frameworks": [
+    "arduino"
+  ],
+  "platforms": [
+    "atmelavr"
+  ],
   "headers": [
     "adxl355/adxl355.hpp",
     "adxl355/arduino_spi.hpp"

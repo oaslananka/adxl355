@@ -30,9 +30,9 @@ class VersioningTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "supported prerelease"):
             VersionSet.parse("1.2.3-preview.1")
 
-    def test_repository_version_file_is_canonical_alpha(self) -> None:
+    def test_repository_version_file_is_initial_stable_release(self) -> None:
         version = load_version(REPO_ROOT)
-        self.assertEqual(version.semver, "0.1.0-alpha.4")
+        self.assertEqual(version.semver, "0.1.0")
 
     def test_sync_check_reports_manifest_drift(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
