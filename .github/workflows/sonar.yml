@@ -147,9 +147,10 @@ jobs:
           # The sdist normalizer is Python production source in scripts/.
           # Include its real test coverage instead of incorrectly reporting 0%.
           python -m coverage run --append --branch \
-            --source=scripts.normalize_sdist \
+            --source=scripts.normalize_sdist,scripts.hil_release_policy \
             -m unittest \
-              scripts.tests.test_normalize_sdist
+              scripts.tests.test_normalize_sdist \
+              scripts.tests.test_hil_release_policy
           # The script-only report omits python/src/adxl355 and causes
           # false 0% new-code coverage on Python driver pull requests.
           PYTHONPATH=python/src python -m coverage run --append --branch \

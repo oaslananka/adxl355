@@ -31,11 +31,21 @@ SemVer value. Python uses the equivalent PEP 440 value. See
 
 ## External hardware evidence prerequisite
 
-The packaging workflow cannot safely schedule a physical lab fixture. Before a
-production-ready release claim, maintainers must attach successful manual HIL
-evidence for both SPI and I2C to the release record. Each artifact must reference
-the release-candidate commit, include the device revision, and be no more than 30
-days old. See [`hardware-testing.md`](hardware-testing.md) for fixture and address
+**Normal CI and package dry runs do not require an ADXL355 or physical runner.**
+For registry publication, the `hil-policy` job compares the exact release commit
+with the last physical HIL-validated baseline. If only documentation, tests or
+known hardware-neutral maintenance changed, previous paired SPI/I2C evidence
+may be reused. Any sensor-facing, unknown, or release policy change fails
+closed until paired physical SPI/I2C acceptance is verified and the baseline
+is updated under the protected repository rules. See
+[`publishing.md`](publishing.md#risk-based-physical-hil-policy).
+
+The packaging workflow cannot schedule a physical lab fixture. A
+**production-ready hardware certification claim** remains stricter: successful
+manual HIL evidence for both SPI and I2C must reference the exact candidate,
+include the device revision, and be no more than 30 days old. No CI status
+alone supplies a physical certification. See
+[`hardware-testing.md`](hardware-testing.md) for fixture and address
 coverage requirements.
 
 ## Current evidence status
@@ -44,9 +54,12 @@ The Raspberry Pi 5 SPI fixture has passed on `main` in workflow run
 [30725059679](https://github.com/oaslananka/adxl355/actions/runs/30725059679), and
 the `0x1D` I2C fixture has passed in workflow run
 [30734635341](https://github.com/oaslananka/adxl355/actions/runs/30734635341).
-These are feature and fixture evidence. Because release evidence must reference
-the exact release-candidate commit, both SPI and I2C runs are repeated after the
-final candidate SHA is selected.
+These are feature and fixture evidence. New paired SPI and I2C runs are
+required for sensor-affecting changes; software-only changes may reuse
+verified historical acceptance under the release `hil-policy` gate. The
+current `0.1.0` candidate still has hardware-affecting changes relative to
+the accepted physical baseline, so the gate reports HIL REQUIRED. Do not
+present that state as a completed physical validation.
 
 ## Enforced gates
 

@@ -15,6 +15,47 @@
 > to the GitHub release. `REGISTRY_PUBLISHING_ENABLED` is returned to `false`
 > after each controlled publication attempt.
 
+## Risk-based physical HIL policy
+
+**Daily CI, code review, dependency updates, builds and package dry runs do
+not require a connected ADXL355.** Physical HIL is an opt-in activity for
+sensor-facing changes, not a recurring developer task.
+
+The tag-triggered release workflow uses `hil-policy` **before any registry
+publication**. Its baseline is the previously published release with verified
+paired SPI/I2C evidence (see `docs/hil-validated-baseline.json`). Both archived
+reports are addressed by immutable SHA-256 hashes. The gate uses the exact
+tagged release commit and its ancestry, not a moving branch.
+
+- **Software-only changes:** documentation, conventional maintenance, safe
+  test-only changes and selected CI metadata may reuse prior physical HIL.
+  They still must pass the complete protected release CI/security/package
+  gates.
+- **Sensor-facing or unrecognized changes:** the driver, buses/adapters,
+  register definitions, HIL workflow, or release acceptance mechanism cannot
+  inherit previous HIL. The release publication gate stops, clearly reporting
+  the affected paths. Restore a physical fixture *only then*, run paired SPI
+  and I2C against a known candidate SHA, verify and archive both reports, and
+  update the immutable accepted baseline under normal code review before
+  publishing a subsequent candidate. The new baseline names the exact tested
+  ancestor `validated_commit`, both released HIL report file names and
+  SHA-256 digests, and the authoritative two GitHub HIL workflow run URLs.
+  Do **not** invent a release tag for an as-yet-unpublished candidate or
+  rewrite earlier evidence. The new run reports must independently confirm
+  `success: true`, the tested commit and safe standby restoration.
+  After the baseline update is merged, only documentation/evidence changes
+  may separate the accepted SHA from the eventual release SHA.
+- **No silent waiver:** an absent sensor, failed scan, missing baseline, or
+  changed evidence-validation policy never turns into a successful HIL result.
+  Modifying `VERSION` alone is not proof that the existing `0.1.0` candidate
+  preserves its previously tested hardware behavior.
+
+Run `bash scripts/check_hil_release.sh "$(git rev-parse HEAD)"` in Git
+Bash or Linux to evaluate the exact checked-out commit. The check exits with
+status 2 and lists the changed hardware-facing paths if new HIL is needed. The report contains no secrets or external uploads.
+This rule does not automatically publish a release and does not change the
+protected publishing environment or `REGISTRY_PUBLISHING_ENABLED=false`.
+
 ## Automated release verification and publication boundary
 
 Pushing a root `v*` tag starts `.github/workflows/release.yml`. The workflow always:
@@ -186,7 +227,7 @@ The public Go proxy discovers the tag without a registry credential.
 - [ ] Exact trusted-publisher bindings match the table above
 - [ ] The protected `release` environment still restricts `v[0-9]*` tags and requires review
 - [ ] `REGISTRY_PUBLISHING_ENABLED` is `true` only for an approved release attempt
-- [ ] HIL evidence for both SPI and I2C is successful on the release-candidate commit and no older than 30 days
+- [ ] Risk-based HIL check is green: if sensor behavior changed, paired SPI/I2C evidence is recorded on the validated candidate and no older than 30 days; otherwise reuse the unchanged validated physical baseline
 - [ ] Required CI and the aggregate high-severity vulnerability gate pass
 - [ ] Package checksums, size reports, SBOM, and bundle attestations verify
 - [ ] Python wheel, npm tarball, and Rust crate install from clean consumers
