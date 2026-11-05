@@ -5,7 +5,7 @@ It is not a blanket OpenSSF Silver claim, a safety certification, or a substitut
 for hardware-in-the-loop tests. The repository retains a single maintainer;
 independent human approval is not a requirement.
 
-## Coverage measurements — 4–5 November 2026
+## Coverage measurements — 4–6 November 2026
 
 | Implementation and scope | Measured result | Measurement | Status |
 | --- | ---: | --- | --- |
@@ -15,7 +15,8 @@ independent human approval is not a requirement.
 | C `c/src/adxl355.c` | **83.83%** executable *lines* (of 637) | GCC `--coverage` + `gcov` after `ctest` | This is **line coverage**, not proven statement coverage |
 | Go example binaries and support | 45.9–74.5% statements across example packages | `go test ./... -cover` | Not representative of core driver coverage |
 | Node.js/TypeScript `node/src/**/*.ts` | **90.35%** (309 / 342 statements; 85.38% branches) | Vitest **5.0.5** + ephemeral `@vitest/coverage-v8@5.0.5` on Node **26.13.0**, all **108** tests, 5 November 2026 | Exceeds 80% for the measured source including mocked Linux SPI/I2C adapters; not physical HIL |
-| C++ public wrapper, Rust | **Not yet independently measured** as complete statement coverage | Tests and CI pass; statement coverage evidence is incomplete | No 80% assertion |
+| Rust `rust/src` (all features, 58 unit/integration tests) | **88.20% LLVM regions** (613 / 695); **91.18% executable lines** (424 / 465); **91.18% functions** (62 / 68) | `rustc 1.99.1` / LLVM **23.1.1** source instrumentation (`-C instrument-coverage`), Windows MSVC, 6 November 2026 | LLVM *regions* and lines are **not statement counters**; no exact 80% statement claim or physical HIL |
+| C++ public wrapper | **Not yet independently measured** as complete statement coverage | Existing unit/CI tests run but full C++ source coverage is unquantified | No 80% assertion |
 
 The Go core gained tests for malformed frames, valid/invalid power-mode transitions,
 write/read failures, acceleration conversions and invalid register range. Its
@@ -29,6 +30,15 @@ do not count mock coverage as a hardware acceptance result.
 Python coverage includes simulated adapters and the public library. C's percentage
 comes from `gcov` executable lines and must not be relabeled as statements.
 The Node.js/TypeScript V8 source statement coverage improved from **88.88% (304/342)** to **90.35% (309/342)** on the same local toolchain, by adding 27 focused Linux validation/error tests. The shared `linux/common.ts` helper now has **100% statements and branches** under Vitest; Node source overall has **85.38% branch coverage**. This includes mocked optional Linux adapters; no native physical sensor access was tested. This is opt-in, locally measured evidence, not an enforced CI coverage threshold.
+Rust LLVM source coverage improved from **78.42% (545/695) to 88.20% (613/695)**
+regions, with **91.18% (424/465)** executable lines and **91.18% (62/68)**
+functions on the exact same MSVC toolchain. Four additional Rust tests
+assert stable error messages, preserved backend causes and `embedded-hal`
+error behavior, including standard-library error chaining. `rust/src/error.rs`
+reached 100% of LLVM regions and lines. The instrumented tests use
+fake transports only; no physical device was accessed. LLVM regions
+are more granular than lines but are **not** the same metric as executable
+statements; this does not certify the project-wide Silver criterion.
 The Silver `test_statement_coverage80` item remains **unverified for the complete
 multi-language product** pending accurate statement counters for remaining source
 and permitted hardware-specific exclusions grounded in real evidence.
@@ -71,6 +81,51 @@ ctest --test-dir /tmp/adxl355-c-cover --output-on-failure
 gcov -o /tmp/adxl355-c-cover/CMakeFiles/adxl355.dir/src/adxl355.c.gcno \
   c/src/adxl355.c
 ```
+
+#### Rust source coverage (Windows MSVC, no repository dependency change)
+
+The run used the official `llvm-tools-preview` component matched to
+`rustc 1.99.1` (LLVM 23.1.1), with an isolated target and profile directory.
+From the repository root in PowerShell:
+
+```powershell
+rustup component add llvm-tools-preview
+$work = Join-Path $env:TEMP "adxl355-rust-coverage"
+New-Item -ItemType Directory -Force -Path $work | Out-Null
+$env:CARGO_TARGET_DIR = Join-Path $work "target"
+$env:RUSTFLAGS = "-Cinstrument-coverage"
+$env:LLVM_PROFILE_FILE = Join-Path $work "rust-%p-%m.profraw"
+Push-Location rust
+$artifacts = @(cargo test --locked --all-features --tests --no-run --message-format=json)
+cargo test --locked --all-features --tests
+Pop-Location
+$bins = @($artifacts | Where-Object { $_ -match '^\{' } | ForEach-Object {
+  $artifact = $_ | ConvertFrom-Json
+  if ($artifact.reason -eq "compiler-artifact" -and
+      $artifact.profile.test -and $artifact.executable) { $artifact.executable }
+} | Sort-Object -Unique)
+$llvm = Join-Path (rustc --print sysroot) "lib\rustlib\x86_64-pc-windows-msvc\bin"
+$profdata = Join-Path $work "rust.profdata"
+$raw = @(Get-ChildItem $work -Filter "rust-*.profraw" | Select-Object -ExpandProperty FullName)
+& (Join-Path $llvm "llvm-profdata.exe") merge -sparse @raw -o $profdata
+$covArgs = @("export", "-instr-profile=$profdata", $bins[0])
+foreach ($bin in $bins | Select-Object -Skip 1) { $covArgs += "-object=$bin" }
+$coverage = (& (Join-Path $llvm "llvm-cov.exe") @covArgs) | ConvertFrom-Json
+$source = @($coverage.data[0].files | Where-Object {
+  $_.filename -match '[\\/]rust[\\/]src[\\/].+\.rs$'
+})
+$covered = 0; $total = 0
+foreach ($file in $source) {
+  $covered += [int]$file.summary.regions.covered
+  $total += [int]$file.summary.regions.count
+}
+"$covered/$total LLVM source regions"
+```
+
+Include **all seven** test executables and count only `rust/src` files, not
+test implementations or dependencies. LLVM's regions, executable lines,
+and functions are different counters; do not call them statements.
+Delete disposable coverage artifacts after use.
 
 Use a disposable directory and remove temporary coverage data when finished.
 Do not run optional hardware suites on machines without an authorized fixture.
