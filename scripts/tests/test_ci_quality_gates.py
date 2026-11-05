@@ -47,6 +47,20 @@ class CiQualityGateTests(unittest.TestCase):
             self.assertIn("UBSAN_OPTIONS=", environment)
         self.assertIn("scripts/smoke_cmake_packages.sh", cpp_commands)
 
+    def test_gcc_jobs_have_bounded_runtime_and_preinstalled_toolchains(self) -> None:
+        # Hosted Ubuntu already has GCC and CMake; do not let an unattended
+        # build/apt hang consume the default six-hour Actions job limit.
+        jobs = self.load_jobs()
+        for job_name in ("c", "cpp"):
+            with self.subTest(job=job_name):
+                job = jobs[job_name]
+                self.assertEqual(job["timeout-minutes"], 12)
+                commands = self.commands(job)
+                for tool in ("gcc", "g++", "cmake"):
+                    self.assertIn(f"command -v {tool}", commands)
+                    self.assertIn(f"{tool} --version", commands)
+                self.assertNotIn("apt-get", commands)
+
     def test_clang_jobs_use_preinstalled_ubuntu_tools(self) -> None:
         # GitHub-hosted ubuntu-24.04 images include Clang and CMake; apt-get
         # introduces network delays and can stall required CI jobs.
