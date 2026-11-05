@@ -14,7 +14,8 @@ independent human approval is not a requirement.
 | Go Linux SPI/I2C `go/adxl355/linuxio` | **95.5%** statements (Linux/amd64, Go 1.26.8, 5 November 2026) | `go test ./adxl355/linuxio -coverprofile=/tmp/adxl355-linuxio-coverage.out` | Above 80% on this package; error-path mocks and invalid-FD errno tests, **not** physical HIL |
 | C `c/src/adxl355.c` | **83.83%** executable *lines* (of 637) | GCC `--coverage` + `gcov` after `ctest` | This is **line coverage**, not proven statement coverage |
 | Go example binaries and support | 45.9–74.5% statements across example packages | `go test ./... -cover` | Not representative of core driver coverage |
-| C++ public wrapper, Rust, Node.js | **Not yet independently measured** as complete statement coverage | Tests and CI pass; statement coverage evidence is incomplete | No 80% assertion |
+| Node.js/TypeScript `node/src/**/*.ts` | **90.35%** (309 / 342 statements; 85.38% branches) | Vitest **5.0.5** + ephemeral `@vitest/coverage-v8@5.0.5` on Node **26.13.0**, all **108** tests, 5 November 2026 | Exceeds 80% for the measured source including mocked Linux SPI/I2C adapters; not physical HIL |
+| C++ public wrapper, Rust | **Not yet independently measured** as complete statement coverage | Tests and CI pass; statement coverage evidence is incomplete | No 80% assertion |
 
 The Go core gained tests for malformed frames, valid/invalid power-mode transitions,
 write/read failures, acceleration conversions and invalid register range. Its
@@ -27,6 +28,7 @@ uncovered branches include real successful kernel ioctl configuration;
 do not count mock coverage as a hardware acceptance result.
 Python coverage includes simulated adapters and the public library. C's percentage
 comes from `gcov` executable lines and must not be relabeled as statements.
+The Node.js/TypeScript V8 source statement coverage improved from **88.88% (304/342)** to **90.35% (309/342)** on the same local toolchain, by adding 27 focused Linux validation/error tests. The shared `linux/common.ts` helper now has **100% statements and branches** under Vitest; Node source overall has **85.38% branch coverage**. This includes mocked optional Linux adapters; no native physical sensor access was tested. This is opt-in, locally measured evidence, not an enforced CI coverage threshold.
 The Silver `test_statement_coverage80` item remains **unverified for the complete
 multi-language product** pending accurate statement counters for remaining source
 and permitted hardware-specific exclusions grounded in real evidence.
@@ -34,7 +36,7 @@ and permitted hardware-specific exclusions grounded in real evidence.
 ### Reproduce the measurements locally
 
 Run from a working tree with supported toolchains (Go >=1.25, CMake/GCC,
-Python and a free isolated `uvx` environment):
+Python, Node.js 22/24/26, and a free isolated `uvx` environment):
 
 ```bash
 # Python: reports actual executable statements, no repository dependency change.
@@ -48,6 +50,17 @@ uvx --from 'coverage==7.10.7' coverage report -m
   go test ./adxl355/linuxio -coverprofile=/tmp/adxl355-linuxio-coverage.out && \
   go tool cover -func=/tmp/adxl355-linuxio-coverage.out | tail -1)
 (cd go && go test ./... -coverprofile=/tmp/adxl355-go-cover.out)
+
+# Node.js: install V8 coverage provider ephemerally (no manifest/lock write).
+# Run from repository root; the provider version must match Vitest 5.0.5.
+(cd node && npm ci --ignore-scripts --no-audit --no-fund && \
+  npm install --no-save --package-lock=false --ignore-scripts --no-audit --no-fund \
+    @vitest/coverage-v8@5.0.5 && \
+  npx --no-install vitest run --coverage --coverage.provider=v8 \
+    --coverage.include='src/**/*.ts' --coverage.reporter=text \
+    --coverage.reporter=json-summary \
+    --coverage.reportsDirectory=/tmp/adxl355-node-cover)
+# The transient provider can be cleared by rerunning npm ci afterwards.
 
 # C: build instrumentation in an isolated directory; gcov reports lines.
 cmake -S c -B /tmp/adxl355-c-cover \
