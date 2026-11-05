@@ -12,7 +12,7 @@ independent human approval is not a requirement.
 | Python `python/src/adxl355` | **97%** (816 / 843 statements) | `coverage.py` on all 204 Python tests | Passes 80% for measured source |
 | Go core `go/adxl355` | **88.1%** statements | `go test ./adxl355 -cover` | Passes 80% for measured package |
 | Go Linux SPI/I2C `go/adxl355/linuxio` | **95.5%** statements (Linux/amd64, Go 1.26.8, 5 November 2026) | `go test ./adxl355/linuxio -coverprofile=/tmp/adxl355-linuxio-coverage.out` | Above 80% on this package; error-path mocks and invalid-FD errno tests, **not** physical HIL |
-| C `c/src/adxl355.c` | **83.83%** executable *lines* (of 637) | GCC `--coverage` + `gcov` after `ctest` | This is **line coverage**, not proven statement coverage |
+| C `c/src/adxl355.c` | **85.56%** executable *lines* (545 / 637; formerly 83.83%) | GCC/gcov **13.3.0**, `--coverage -O0`, **306/306** C assertions, Linux/amd64, 6 November 2026 | Measured **line coverage**, not proven statement coverage or physical HIL |
 | Go example binaries and support | 45.9–74.5% statements across example packages | `go test ./... -cover` | Not representative of core driver coverage |
 | Node.js/TypeScript `node/src/**/*.ts` | **90.35%** (309 / 342 statements; 85.38% branches) | Vitest **5.0.5** + ephemeral `@vitest/coverage-v8@5.0.5` on Node **26.13.0**, all **108** tests, 5 November 2026 | Exceeds 80% for the measured source including mocked Linux SPI/I2C adapters; not physical HIL |
 | Rust `rust/src` (all features, 58 unit/integration tests) | **88.20% LLVM regions** (613 / 695); **91.18% executable lines** (424 / 465); **91.18% functions** (62 / 68) | `rustc 1.99.1` / LLVM **23.1.1** source instrumentation (`-C instrument-coverage`), Windows MSVC, 6 November 2026 | LLVM *regions* and lines are **not statement counters**; no exact 80% statement claim or physical HIL |
@@ -28,6 +28,15 @@ transports and invalid Linux file descriptors. Neither the source driver
 nor the accepted physical SPI/I2C HIL baseline changed. The remaining
 uncovered branches include real successful kernel ioctl configuration;
 do not count mock coverage as a hardware acceptance result.
+The C `adxl355_get_range()` readback contract now covers all three valid
+range encodings, null and pre-probe guards, reserved register values, failed
+and short reads, preserved output on errors, and read-only bus access using
+a mock register file. On the same GCC 13.3 toolchain, C source executable
+line coverage improved from **83.83% (534/637)** to **85.56% (545/637)**,
+with all **306/306** assertions passing (previously 283/283); Clang strict
+warnings and the same assertions also passed. No C driver behavior or
+physical HIL baseline changed. These are *executable lines*, not statements.
+
 Python coverage includes simulated adapters and the public library. C's percentage
 comes from `gcov` executable lines and must not be relabeled as statements.
 The Node.js/TypeScript V8 source statement coverage improved from **88.88% (304/342)** to **90.35% (309/342)** on the same local toolchain, by adding 27 focused Linux validation/error tests. The shared `linux/common.ts` helper now has **100% statements and branches** under Vitest; Node source overall has **85.38% branch coverage**. This includes mocked optional Linux adapters; no native physical sensor access was tested. This is opt-in, locally measured evidence, not an enforced CI coverage threshold.

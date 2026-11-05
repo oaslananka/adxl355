@@ -251,6 +251,66 @@ static void test_pre_probe_operations_return_state_error(void)
     TEST_END();
 }
 
+static void test_get_range_readback_contract(void)
+{
+    TEST_START("get_range_readback_contract");
+    adxl355_mock_bus_t mock;
+    adxl355_mock_bus_init(&mock);
+    adxl355_mock_bus_set_identity_ok(&mock);
+    mock.regs[ADXL355_REG_RANGE] = ADXL355_RANGE_2G;
+    adxl355_bus_t bus = adxl355_mock_bus_get_interface(&mock);
+    adxl355_t dev;
+    TEST_ASSERT(adxl355_init(&dev, &bus) == ADXL355_OK, "init should succeed");
+
+    adxl355_range_t actual = ADXL355_RANGE_8G;
+    TEST_ASSERT(adxl355_get_range(NULL, &actual) == ADXL355_ERR_NULL,
+                "null device should be rejected");
+    TEST_ASSERT(adxl355_get_range(&dev, NULL) == ADXL355_ERR_NULL,
+                "null output should be rejected");
+    TEST_ASSERT(adxl355_get_range(&dev, &actual) == ADXL355_ERR_STATE,
+                "range read before probe should be rejected");
+    TEST_ASSERT(actual == ADXL355_RANGE_8G, "pre-probe read should leave output intact");
+    TEST_ASSERT(mock.call_count == 0U, "pre-probe calls must not access the bus");
+    TEST_ASSERT(adxl355_probe(&dev) == ADXL355_OK, "probe should succeed");
+
+    const adxl355_range_t ranges[] = {
+        ADXL355_RANGE_2G, ADXL355_RANGE_4G, ADXL355_RANGE_8G
+    };
+    const size_t before_reads = mock.call_count;
+    for (size_t i = 0U; i < sizeof(ranges) / sizeof(ranges[0]); i++) {
+        mock.regs[ADXL355_REG_RANGE] = (uint8_t)(0xC0U | (uint8_t)ranges[i]);
+        TEST_ASSERT(adxl355_get_range(&dev, &actual) == ADXL355_OK,
+                    "valid range encoding should succeed");
+        TEST_ASSERT(actual == ranges[i], "range must be read from hardware register");
+    }
+    TEST_ASSERT(mock.call_count == before_reads + 3U,
+                "each successful range query reads one register");
+    for (size_t i = before_reads; i < mock.call_count; i++) {
+        TEST_ASSERT(!mock.calls[i].is_write &&
+                    mock.calls[i].reg == ADXL355_REG_RANGE &&
+                    mock.calls[i].len == 1U,
+                    "range query must only read one RANGE register byte");
+    }
+
+    mock.regs[ADXL355_REG_RANGE] = 0xC0U; /* Reserved range selection. */
+    TEST_ASSERT(adxl355_get_range(&dev, &actual) == ADXL355_ERR_INVALID_ARG,
+                "reserved range encoding must be rejected");
+    TEST_ASSERT(actual == ADXL355_RANGE_8G, "invalid encoding must not change output");
+
+    mock.force_read_error = 1;
+    TEST_ASSERT(adxl355_get_range(&dev, &actual) == ADXL355_ERR_BUS,
+                "failed register read must return bus error");
+    TEST_ASSERT(actual == ADXL355_RANGE_8G, "bus error must not change output");
+    mock.force_read_error = 0;
+
+    mock.short_read_reg = ADXL355_REG_RANGE;
+    mock.short_read_length = 0U;
+    TEST_ASSERT(adxl355_get_range(&dev, &actual) == ADXL355_ERR_BUS,
+                "short register read must return bus error");
+    TEST_ASSERT(actual == ADXL355_RANGE_8G, "short read must not change output");
+    TEST_END();
+}
+
 static void test_set_range_temporarily_enters_standby(void)
 {
     TEST_START("set_range_temporarily_enters_standby");
@@ -1652,6 +1712,7 @@ int main(void)
     test_probe_reset_range_converts_one_g();
     test_probe_ok();
     test_pre_probe_operations_return_state_error();
+    test_get_range_readback_contract();
     test_set_range_temporarily_enters_standby();
     test_set_range_in_standby_avoids_power_writes();
     test_set_range_failure_restores_measurement();
