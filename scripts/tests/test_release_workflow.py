@@ -1,12 +1,11 @@
 from __future__ import annotations
 
-import unittest
 import re
+import unittest
 from pathlib import Path
 from typing import Any, cast
 
 import yaml
-
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 RELEASE_WORKFLOW = REPO_ROOT / ".github/workflows/release.yml"
@@ -37,6 +36,32 @@ class ReleaseWorkflowTests(unittest.TestCase):
         ci = yaml.safe_load(CI_WORKFLOW.read_text())
         triggers = ci.get("on", ci.get(True, {}))
         self.assertIn("workflow_call", triggers)
+
+    def test_registry_publication_requires_risk_based_hil_without_blocking_ci(
+        self,
+    ) -> None:
+        jobs = self.load_release()["jobs"]
+        self.assertIn("hil-policy", jobs)
+        policy = jobs["hil-policy"]
+        self.assertEqual(
+            policy["if"], "${{ vars.REGISTRY_PUBLISHING_ENABLED == 'true' }}"
+        )
+        self.assertEqual(policy["needs"], ["preflight"])
+        self.assertEqual(policy["permissions"], {"contents": "read"})
+        self.assertEqual(
+            policy["steps"][0]["with"]["ref"],
+            "${{ needs.preflight.outputs.release_sha }}",
+        )
+        self.assertEqual(policy["steps"][0]["with"]["fetch-depth"], 0)
+        self.assertEqual(policy["steps"][0]["with"]["fetch-tags"], True)
+        script = "\n".join(str(step.get("run", "")) for step in policy["steps"])
+        self.assertIn("scripts/hil_release_policy.py", script)
+        self.assertIn("--require-software-only", script)
+        for name in PUBLISH_JOBS:
+            self.assertIn("hil-policy", jobs[name]["needs"])
+        for name in PACKAGE_JOBS:
+            self.assertNotIn("hil-policy", jobs[name]["needs"])
+        self.assertNotIn("hil-policy", jobs["ci"].get("needs", []))
 
     def test_every_package_job_requires_ci_and_preflight(self) -> None:
         jobs = self.load_release()["jobs"]
@@ -124,7 +149,7 @@ class ReleaseWorkflowTests(unittest.TestCase):
         )
         self.assertIn('git rev-parse "${RELEASE_TAG}^{commit}"', commands)
         self.assertIn('--sha "$resolved_sha"', commands)
-        self.assertNotIn('RELEASE_SHA: ${{ github.sha }}', RELEASE_WORKFLOW.read_text())
+        self.assertNotIn("RELEASE_SHA: ${{ github.sha }}", RELEASE_WORKFLOW.read_text())
 
     def test_preflight_exports_ecosystem_versions_and_package_names(self) -> None:
         outputs = self.load_release()["jobs"]["preflight"]["outputs"]

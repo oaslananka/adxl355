@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "validated_commit": "71de69b8727a9f8eef254de586d9bce7bc8fa8ac",
+  "source_release_tag": "v0.1.0-alpha.3",
+  "source_release_url": "https://github.com/oaslananka/adxl355/releases/tag/v0.1.0-alpha.3",
+  "recorded_evidence": {
+    "spi": {
+      "asset": "hil-spi-30736413982.json",
+      "sha256": "3412a51d4f4c400721fa2c36312c6c1857c6d7007f1588dc2139549e5a30329f"
+    },
+    "i2c": {
+      "asset": "hil-i2c-30736668298.json",
+      "sha256": "af78f93ad356159c527dc9b4b21e69aa35bb7a6251708a947102d1e6077dbf3f"
+    }
+  }
+}
