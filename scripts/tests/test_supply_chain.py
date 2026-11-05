@@ -124,40 +124,63 @@ class SupplyChainTests(unittest.TestCase):
                     self.assertRegex(action, SHA_PIN, f"{path.name}:{action}")
 
     def test_reviewed_action_comments_match_immutable_release_pins(self) -> None:
-        expected = {
+        # Infrequently changed CI/toolchain actions remain on explicitly reviewed
+        # SHAs. The two official artifact actions support safe automated PATCH
+        # updates, but each occurrence must still carry the same SHA + semver
+        # annotation and stay on the reviewed major/minor compatibility line.
+        fixed = {
             "actions/checkout": (
-                "3d3c42e5aac5ba805825da76410c181273ba90b1",
-                "v7.0.1",
+                "3d3c42e5aac5ba805825da76410c181273ba90b1", "v7.0.1"
             ),
             "actions/setup-node": (
-                "820762786026740c76f36085b0efc47a31fe5020",
-                "v7.0.0",
+                "820762786026740c76f36085b0efc47a31fe5020", "v7.0.0"
             ),
             "actions/setup-go": (
-                "b7ad1dad31e06c5925ef5d2fc7ad053ef454303e",
-                "v7.0.0",
-            ),
-            "actions/upload-artifact": (
-                "043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
-                "v7.0.1",
-            ),
-            "actions/download-artifact": (
-                "3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c",
-                "v8.0.1",
+                "b7ad1dad31e06c5925ef5d2fc7ad053ef454303e", "v7.0.0"
             ),
         }
+        patch_compatible = {
+            "actions/upload-artifact": (7, 0),
+            "actions/download-artifact": (8, 0),
+        }
+        seen: dict[str, tuple[str, str]] = {}
         for path in sorted(WORKFLOWS.glob("*.yml")):
             for line_number, line in enumerate(
                 path.read_text(encoding="utf-8").splitlines(), start=1
             ):
-                for action, (sha, version) in expected.items():
+                for action, (sha, version) in fixed.items():
+                    if f"{action}@" in line:
+                        self.assertIn(
+                            f"{action}@{sha} # {version}",
+                            line,
+                            f"{path.name}:{line_number}",
+                        )
+                for action, (major, minor) in patch_compatible.items():
                     if f"{action}@" not in line:
                         continue
-                    self.assertIn(
-                        f"{action}@{sha} # {version}",
-                        line,
-                        f"{path.name}:{line_number}",
+                    pattern = re.compile(
+                        rf"^\s*(?:-\s*)?uses:\s*{re.escape(action)}@"
+                        rf"([0-9a-f]{{40}}) # v({major})\.({minor})\.(\d+)\s*$"
                     )
+                    match = pattern.fullmatch(line)
+                    self.assertIsNotNone(
+                        match,
+                        f"{path.name}:{line_number}: immutable SHA and patch semver required",
+                    )
+                    if match is None:
+                        continue
+                    sha, found_major, found_minor, patch = match.groups()
+                    self.assertGreaterEqual(int(patch), 1)
+                    self.assertNotEqual(sha, "0" * 40)
+                    identity = (sha, f"v{found_major}.{found_minor}.{patch}")
+                    if action in seen:
+                        self.assertEqual(
+                            seen[action], identity,
+                            f"{path.name}:{line_number}: mixed {action} pins",
+                        )
+                    else:
+                        seen[action] = identity
+        self.assertEqual(set(seen), set(patch_compatible))
 
     def test_workflows_declare_least_privilege_permissions(self) -> None:
         for path in sorted(WORKFLOWS.glob("*.yml")):

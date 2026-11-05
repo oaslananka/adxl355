@@ -63,12 +63,17 @@ class DependencyAutomationTests(unittest.TestCase):
         )
         protections = config["merge_protections"]
         self.assertEqual(len(protections), 1)
+        self.assertEqual(
+            protections[0]["if"],
+            ["base = main", "author = renovate[bot]", "label = automerge", "label != manual-review"],
+        )
         conditions = protections[0]["success_conditions"]
         self.assertIn("label = automerge", conditions)
         self.assertIn("label != manual-review", conditions)
         self.assertIn("-draft", conditions)
         self.assertIn("check-success = Tests", conditions)
         self.assertIn("check-success = Dependency Audit", conditions)
+        self.assertNotIn("check-success = renovate/stability-days", conditions)
         self.assertEqual(config["merge_queue"]["max_parallel_checks"], 1)
         queue = config["queue_rules"][0]
         self.assertEqual(queue["merge_method"], "squash")
@@ -76,6 +81,7 @@ class DependencyAutomationTests(unittest.TestCase):
         self.assertIn("label = automerge", queue["queue_conditions"])
         self.assertIn("label != manual-review", queue["queue_conditions"])
         self.assertIn("-draft", queue["queue_conditions"])
+        self.assertNotIn("check-success = renovate/stability-days", queue["queue_conditions"])
         self.assertNotIn("merge_conditions", queue)
 
     def test_only_low_risk_updates_receive_automerge_label(self) -> None:
@@ -88,9 +94,23 @@ class DependencyAutomationTests(unittest.TestCase):
         self.assertIn("automerge", stable["addLabels"])
         self.assertFalse(stable["automerge"])
         self.assertEqual(set(stable["matchPackageNames"]), {"!typescript", "!setuptools"})
-        actions = next(rule for rule in rules if rule.get("matchManagers") == ["github-actions"])
-        self.assertFalse(actions["automerge"])
-        self.assertIn("manual-review", actions["addLabels"])
+        actions = [rule for rule in rules if rule.get("matchManagers") == ["github-actions"]]
+        self.assertEqual(len(actions), 4)
+        base, other_actions, artifact_nonpatch, artifact_patch = actions
+        names = {"actions/upload-artifact", "actions/download-artifact"}
+        self.assertEqual(base["addLabels"], ["area/ci"])
+        self.assertFalse(base["automerge"])
+        self.assertEqual(set(other_actions["matchPackageNames"]), {f"!{name}" for name in names})
+        self.assertIn("manual-review", other_actions["addLabels"])
+        self.assertEqual(set(artifact_nonpatch["matchPackageNames"]), names)
+        self.assertNotIn("patch", artifact_nonpatch["matchUpdateTypes"])
+        self.assertIn("major", artifact_nonpatch["matchUpdateTypes"])
+        self.assertIn("minor", artifact_nonpatch["matchUpdateTypes"])
+        self.assertIn("manual-review", artifact_nonpatch["addLabels"])
+        self.assertEqual(set(artifact_patch["matchPackageNames"]), names)
+        self.assertEqual(artifact_patch["matchUpdateTypes"], ["patch"])
+        self.assertEqual(artifact_patch["addLabels"], ["automerge"])
+        self.assertFalse(artifact_patch["automerge"])
         self.assertIn("manual-review", config["vulnerabilityAlerts"]["labels"])
         self.assertNotIn("automerge", config["vulnerabilityAlerts"]["labels"])
 
