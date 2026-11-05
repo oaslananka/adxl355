@@ -53,7 +53,14 @@ normal update PRs. After that release-age check passes, Renovate creates
 the PR immediately so that pull-request CI can run; waiting for branch-level
 status checks would stall on bare Renovate branches. Major updates require
 explicit Dependency Dashboard approval,
-and breaking, pre-1.0 minor, compiler, build-backend, and GitHub Actions changes remain manual.
+and breaking, pre-1.0 minor, compiler, and build-backend changes remain manual.
+GitHub Actions are normally reviewed manually. Only patch updates to the two
+official `actions/upload-artifact` and `actions/download-artifact` actions are
+eligible for the `automerge` label; their major/minor/digest changes still require
+manual review. Each update retains an immutable action SHA, a matching semver
+annotation, and the existing security/package tests. Renovate's verified
+`renovate/stability-days` status must be successful before Mergify queues or
+merges any opted-in dependency PR.
 
 Stable (1.0+) non-major updates in Node, Rust, Go, and Python package metadata,
 plus low-risk Node development updates, receive the `automerge` label.
