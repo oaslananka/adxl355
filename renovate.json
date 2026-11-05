@@ -58,14 +58,67 @@
   },
   "packageRules": [
     {
-      "description": "Label GitHub Actions updates for explicit supply-chain review.",
+      "description": "Route GitHub Actions updates to the CI area; only selected patch releases can auto-queue.",
       "matchManagers": [
         "github-actions"
       ],
       "automerge": false,
       "addLabels": [
-        "area/ci",
+        "area/ci"
+      ]
+    },
+    {
+      "description": "Require manual review for other GitHub Actions, including their patch releases.",
+      "matchManagers": [
+        "github-actions"
+      ],
+      "matchPackageNames": [
+        "!actions/upload-artifact",
+        "!actions/download-artifact"
+      ],
+      "automerge": false,
+      "addLabels": [
         "manual-review"
+      ]
+    },
+    {
+      "description": "Keep non-patch changes to the official artifact actions under manual review.",
+      "matchManagers": [
+        "github-actions"
+      ],
+      "matchPackageNames": [
+        "actions/upload-artifact",
+        "actions/download-artifact"
+      ],
+      "matchUpdateTypes": [
+        "major",
+        "minor",
+        "digest",
+        "pin",
+        "bump",
+        "replacement",
+        "rollback"
+      ],
+      "automerge": false,
+      "addLabels": [
+        "manual-review"
+      ]
+    },
+    {
+      "description": "Queue trusted GitHub artifact Action patch releases only after the seven-day release-age status and all required checks pass.",
+      "matchManagers": [
+        "github-actions"
+      ],
+      "matchPackageNames": [
+        "actions/upload-artifact",
+        "actions/download-artifact"
+      ],
+      "matchUpdateTypes": [
+        "patch"
+      ],
+      "automerge": false,
+      "addLabels": [
+        "automerge"
       ]
     },
     {
