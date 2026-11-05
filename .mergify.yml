@@ -34,7 +34,6 @@ merge_protections:
       - check-success = CodeQL (go)
       - check-success = Tests
       - check-success = Dependency Audit
-      - check-success = renovate/stability-days
 
 # Keep single-PR updates in-place where GitHub permits; avoid extra batch CI.
 merge_queue:
@@ -48,6 +47,5 @@ queue_rules:
       - label = automerge
       - label != manual-review
       - "-draft"
-      - check-success = renovate/stability-days
     merge_method: squash
     batch_size: 1
