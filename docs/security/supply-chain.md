@@ -72,7 +72,11 @@ Updates to TypeScript or setuptools are never opted in, and security advisory
 PRs require manual review even when created immediately.
 Mergify may squash-merge eligible PRs only when the author is `renovate[bot]`, the
 `manual-review` label is absent, the PR is not a draft, and every required CI,
-dependency-review, and CodeQL check succeeds. GitHub rulesets remain the final
+dependency-review, and CodeQL check succeeds. Merge Protections apply the
+additional low-risk update rule **only** to PRs carrying `automerge`; manually
+reviewed security-sensitive action updates do not get a misleading protection
+failure merely for requiring human maintainer evaluation. GitHub's required
+checks remain mandatory for every PR. GitHub rulesets remain the final
 merge authority.
 
 GitHub Dependabot alerts and security graph features remain enabled, but

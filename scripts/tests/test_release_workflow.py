@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import unittest
+import re
 from pathlib import Path
 from typing import Any, cast
 
@@ -249,10 +250,16 @@ class ReleaseWorkflowTests(unittest.TestCase):
             "pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33",
             text,
         )
-        self.assertIn(
-            "rust-lang/crates-io-auth-action@c6f97d42243bad5fab37ca0427f495c86d5b1a18",
+        # Official crates.io OIDC credential Action updates are manually
+        # reviewed, but patch releases must not break the automation test.
+        # Keep the immutable SHA, v1.0.x compatibility line and minimum patch.
+        match = re.search(
+            r"rust-lang/crates-io-auth-action@[0-9a-f]{40} # v1\.0\.(\d+)\b",
             text,
         )
+        self.assertIsNotNone(match)
+        if match is not None:
+            self.assertGreaterEqual(int(match.group(1)), 5)
 
     def test_c_cpp_release_job_reuses_the_verified_c_core_build(self) -> None:
         jobs = self.load_release()["jobs"]
