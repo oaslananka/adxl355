@@ -44,14 +44,17 @@ class PublicDocumentationTests(unittest.TestCase):
         self.assertIn("img.shields.io/pepy/dt/adxl355?label=PyPI%20all-time", readme)
         self.assertIn("img.shields.io/crates/d/adxl355-driver?label=crates.io%20all-time", readme)
         self.assertIn("img.shields.io/npm/dm/%40oaslananka%2Fadxl355", readme)
-        self.assertIn(
-            "img.shields.io/github/downloads/oaslananka/adxl355/"
-            "v0.1.0-alpha.3/adxl355-release-0.1.0-alpha.3-71de69b8727a.tar.gz",
-            readme,
-        )
+        self.assertNotIn("img.shields.io/github/downloads/oaslananka/adxl355/", readme)
+        self.assertIn("bundle-only GitHub badge was omitted", readme)
         self.assertNotIn("img.shields.io/github/downloads/oaslananka/adxl355/total", readme)
         self.assertIn("must not be added into a project-wide total", readme)
-        self.assertIn("## At a glance", readme)
+        self.assertIn("## Language support", readme)
+        self.assertIn('<div align="center">', readme)
+        self.assertIn("## Installation", readme)
+        self.assertIn("## Quick start", readme)
+        self.assertNotIn("Alpha software", readme)
+        self.assertEqual(readme.count("<details>"), readme.count("</details>"))
+        self.assertEqual(readme.count("<details>"), 5)
         self.assertIn("<summary><strong>Full six-language capability", readme)
         self.assertIn("[Measured coverage and reproducible-build evidence]", readme)
 

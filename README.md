@@ -1,63 +1,71 @@
+<div align="center">
+
 # ADXL355
 
+**Precision accelerometer drivers for six languages.**
+
+A shared device contract for **C · C++ · Python · Rust · Node.js/TypeScript · Go**.
+
+[Documentation](docs/api/README.md) · [Install](#installation) · [Quick start](#quick-start) · [Language support](#language-support) · [Hardware](#hardware-validation-status) · [Security](SECURITY.md) · [Ask DeepWiki](https://deepwiki.com/oaslananka/adxl355)
+
+[![PyPI](https://img.shields.io/pypi/v/adxl355?label=PyPI)](https://pypi.org/project/adxl355/)
+[![npm](https://img.shields.io/npm/v/%40oaslananka%2Fadxl355?label=npm)](https://www.npmjs.com/package/@oaslananka/adxl355)
+[![crates.io](https://img.shields.io/crates/v/adxl355-driver?label=crates.io)](https://crates.io/crates/adxl355-driver)
+[![MIT License](https://img.shields.io/github/license/oaslananka/adxl355?label=license)](LICENSE)
 [![GitGem](https://gitgem.org/api/badge/github/oaslananka/adxl355.svg)](https://gitgem.org/github/oaslananka/adxl355)
-[![OpenSSF Best Practices](https://www.bestpractices.dev/projects/13419/badge)](https://www.bestpractices.dev/projects/13419)
+
+[![CI](https://img.shields.io/github/actions/workflow/status/oaslananka/adxl355/ci.yml?branch=main&label=CI)](https://github.com/oaslananka/adxl355/actions/workflows/ci.yml)
+[![CodeQL](https://img.shields.io/github/actions/workflow/status/oaslananka/adxl355/codeql.yml?branch=main&label=CodeQL)](https://github.com/oaslananka/adxl355/actions/workflows/codeql.yml)
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/oaslananka/adxl355/badge)](https://scorecard.dev/viewer/?uri=github.com/oaslananka/adxl355)
-
-**Cross-platform ADXL355 precision-accelerometer drivers** for C, C++, Python,
-Rust, Node.js/TypeScript, and Go — a shared register contract with language-specific
-adapters, mock-based test suites, and documented Raspberry Pi 5 validation.
-
-> **Alpha software — not production certified.** The `v0.1.0-alpha.3` prerelease
-> was validated over SPI and I2C on the exact release commit. Current `main`
-> contains unreleased work; functionality, transport availability, and physical
-> test evidence differ by language. See [feature coverage](#current-status)
-> and [hardware evidence](#hardware-validation-status).
-
-**Navigate:** [Install & download](#packages-and-downloads) ·
-[Quick start](#quick-start-from-the-repository-root) ·
-[Language support](#current-status) ·
-[Hardware evidence](#hardware-validation-status) ·
-[Security & contributions](#participate-and-report-issues) ·
-[Documentation](#documentation)
-
-## At a glance
-
-| Implementation | Supported core | Important boundaries |
-| --- | --- | --- |
-| **C** | Full base driver and callback bus | Extended FIFO, offsets, self-test and DRDY; Linux SPI example only |
-| **C++** | C-core wrapper, exception and no-exception APIs | User-supplied bus; Arduino compile fixture is not physical validation |
-| **Python** | Core driver, Linux SPI and I2C adapters | Extended FIFO, calibration, self-test and a bounded GPIO/DRDY reference |
-| **Rust** | `no_std` core and optional `embedded-hal` | No public FIFO/self-test/DRDY methods or bundled Linux adapter |
-| **Node.js** | Core driver, optional Linux SPI and I2C adapters | No public FIFO/self-test/DRDY methods |
-| **Go** | Core driver with Linux SPI/I2C adapters | No public FIFO/self-test/DRDY methods; current `main` requires Go ≥1.25 |
-
-## Packages and downloads
-
-The **published** version is `0.1.0-alpha.3`. Downloads below are independently
-reported by each registry; counts are **not unique users**, are subject to cache
-and CI/mirror traffic, and **must not be added into a project-wide total**.
+[![OpenSSF Best Practices](https://www.bestpractices.dev/projects/13419/badge)](https://www.bestpractices.dev/projects/13419)
 
 [![PyPI all-time downloads](https://img.shields.io/pepy/dt/adxl355?label=PyPI%20all-time&logo=pypi)](https://pepy.tech/projects/adxl355)
 [![crates.io all-time downloads](https://img.shields.io/crates/d/adxl355-driver?label=crates.io%20all-time&logo=rust)](https://crates.io/crates/adxl355-driver)
 [![npm last-30-days downloads](https://img.shields.io/npm/dm/%40oaslananka%2Fadxl355?label=npm%20last%2030d&logo=npm)](https://www.npmjs.com/package/@oaslananka/adxl355)
-[![GitHub verified bundle downloads](https://img.shields.io/github/downloads/oaslananka/adxl355/v0.1.0-alpha.3/adxl355-release-0.1.0-alpha.3-71de69b8727a.tar.gz?label=GitHub%20bundle&logo=github)](https://github.com/oaslananka/adxl355/releases/tag/v0.1.0-alpha.3)
 
-| Package | Install the published prerelease | Registry |
-| --- | --- | --- |
-| Python (`adxl355`) | `pip install adxl355==0.1.0a3` | [PyPI](https://pypi.org/project/adxl355/) |
-| Rust (`adxl355-driver`) | `cargo add adxl355-driver@0.1.0-alpha.3` | [crates.io](https://crates.io/crates/adxl355-driver) |
-| Node.js (`@oaslananka/adxl355`) | `npm install @oaslananka/adxl355@0.1.0-alpha.3` | [npm](https://www.npmjs.com/package/@oaslananka/adxl355) |
-| Go module | `go get github.com/oaslananka/adxl355/go@v0.1.0-alpha.3` | [Source tag](https://github.com/oaslananka/adxl355/releases/tag/v0.1.0-alpha.3) |
-| C / C++ | Use the CMake source/install targets | [Verified release bundle](https://github.com/oaslananka/adxl355/releases/tag/v0.1.0-alpha.3) |
+</div>
 
-**Counting scope:** The GitHub badge counts **only the release source bundle**, not
-checksums, SBOMs, HIL JSONs, or automatically generated GitHub source archives.
-PyPI's all-time figure comes from Pepy, which includes known mirrors; npm's
-native badge exposes a recent period rather than a reliable all-time total.
-See [release verification](docs/publishing.md) for artifact provenance.
+---
 
-## Quick start from the repository root
+## Overview
+
+ADXL355 provides cross-platform drivers for the Analog Devices ADXL355
+three-axis accelerometer. Each implementation follows the same register,
+data-conversion, and probe-before-use contracts, with language-specific bus
+adapters and hardware-free regression tests.
+
+- **Consistent behavior:** 20-bit XYZ decoding, g/m/s² conversion, range and power control.
+- **Flexible transports:** caller-defined SPI/I²C buses and optional Linux integrations where implemented.
+- **Measured evidence:** cross-language CI, bounded Raspberry Pi 5 SPI/I²C checks, and documented supply-chain controls.
+
+## Installation
+
+| Language | Install | Package |
+| :-- | :-- | :-- |
+| **Python** | `pip install adxl355` | [PyPI](https://pypi.org/project/adxl355/) |
+| **Rust** | `cargo add adxl355-driver` | [crates.io](https://crates.io/crates/adxl355-driver) |
+| **Node.js** | `npm install @oaslananka/adxl355` | [npm](https://www.npmjs.com/package/@oaslananka/adxl355) |
+| **Go** | `go get github.com/oaslananka/adxl355/go@v0.1.0-alpha.3` | [Source tag](https://github.com/oaslananka/adxl355/releases/tag/v0.1.0-alpha.3) |
+| **C / C++** | Build and install with CMake | [Source and releases](https://github.com/oaslananka/adxl355/releases) |
+
+The latest **published** registry packages are still `0.1.0-alpha.3`.
+A new stable version will be published only after the applicable
+[release verification](docs/publishing.md) and hardware evidence are complete.
+Current `main` may contain additional unreleased work; use tagged
+releases when a fixed software revision is required.
+
+## Quick start
+
+Develop and run tests from the repository root without connected sensor hardware.
+For an example, the Python implementation supports a local mock-driven read:
+
+```bash
+python -m pip install --no-deps -e ./python
+PYTHONPATH=python/src python python/examples/basic_read.py
+```
+
+<details>
+<summary><strong>Commands for C, C++, Python, Rust, Node.js, Go and optional Linux adapters</strong></summary>
 
 These commands are reproducible from a clean checkout and do not require real
 hardware.
@@ -169,6 +177,19 @@ Both commands probe identity, read temperature, collect a finite sample count, a
 restore standby before closing the descriptor. SPI and I2C were physically
 verified on Raspberry Pi 5, including the paired final `v0.1.0-alpha.3` HIL runs
 listed above.
+
+</details>
+
+## Language support
+
+| Implementation | Supported core | Important boundaries |
+| --- | --- | --- |
+| **C** | Full base driver and callback bus | Extended FIFO, offsets, self-test and DRDY; Linux SPI example only |
+| **C++** | C-core wrapper, exception and no-exception APIs | User-supplied bus; Arduino compile fixture is not physical validation |
+| **Python** | Core driver, Linux SPI and I2C adapters | Extended FIFO, calibration, self-test and a bounded GPIO/DRDY reference |
+| **Rust** | `no_std` core and optional `embedded-hal` | No public FIFO/self-test/DRDY methods or bundled Linux adapter |
+| **Node.js** | Core driver, optional Linux SPI and I2C adapters | No public FIFO/self-test/DRDY methods |
+| **Go** | Core driver with Linux SPI/I2C adapters | No public FIFO/self-test/DRDY methods; current `main` requires Go ≥1.25 |
 
 ## Current status
 
@@ -301,6 +322,18 @@ and unit-conversion helpers remain usable without a device.
 All transports must return exactly the requested read length. Zero, truncated,
 and overlong responses are rejected before indexing. C and C++ callbacks return
 the exact transferred byte count on success and a negative value on failure.
+
+## Downloads
+
+Download badges above show the best available **source-specific** metrics:
+PyPI and crates.io all-time downloads, plus npm downloads over the last
+30 days. These counts are **not unique users**, may include cache, CI and
+mirror traffic, and **must not be added into a project-wide total**.
+
+GitHub's verified [release bundle and accompanying checksums/SBOMs](https://github.com/oaslananka/adxl355/releases/tag/v0.1.0-alpha.3)
+are available separately. A bundle-only GitHub badge was omitted because the
+provider also displayed the long asset filename instead of a clean total.
+Registry counts are not summed with release-asset downloads.
 
 ## Participate and report issues
 
