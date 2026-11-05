@@ -277,6 +277,130 @@ void test_cpp_short_read_throws_bus_error() {
     }
 }
 
+void test_extended_read_and_control_api() {
+    auto bus = std::make_unique<MockBus>();
+    auto *mock = bus.get();
+    mock->setRawX(256410);
+    mock->regs[ADXL355_REG_STATUS] = 0xA5U;
+    adxl355::Device dev(std::move(bus));
+    dev.probe();
+
+    const auto raw = dev.readRaw();
+    TEST(raw.x == 256410 && raw.y == 0 && raw.z == 0,
+         "C++ raw XYZ accessors return all three axes");
+    const auto accel_g = dev.readG();
+    const auto accel_mps2 = dev.readMps2();
+    TEST(std::fabs(accel_g.x - 1.0F) < 0.001F,
+         "C++ readG returns calibrated X acceleration");
+    TEST(std::fabs(accel_mps2.x - accel_g.x * 9.80665F) < 0.002F,
+         "C++ readMps2 agrees with readG conversion");
+    TEST(std::isfinite(dev.readTemperatureC()), "C++ temperature returns finite Celsius");
+    TEST(dev.readStatus() == 0xA5U, "C++ readStatus preserves the status register");
+
+    TEST(std::fabs(adxl355::Device::rawToMps2(256410, adxl355::Range::G2) -
+                   accel_mps2.x) < 0.002F,
+         "C++ static rawToMps2 matches device conversion");
+    TEST(std::strcmp(adxl355::Device::statusString(ADXL355_ERR_BUS),
+                     "ADXL355_ERR_BUS") == 0,
+         "C++ statusString matches C error mapping");
+
+    dev.setPowerMode(adxl355::PowerMode::Standby);
+    TEST((mock->regs[ADXL355_REG_POWER_CTL] & 1U) == 1U,
+         "C++ standby sets power mode bit");
+    dev.setPowerMode(adxl355::PowerMode::Measurement);
+    TEST((mock->regs[ADXL355_REG_POWER_CTL] & 1U) == 0U,
+         "C++ measurement clears power mode bit");
+}
+
+void test_probe_rejects_bad_identity_and_invalid_range() {
+    auto bad_bus = std::make_unique<MockBus>();
+    bad_bus->regs[ADXL355_REG_PARTID] = 0x00U;
+    adxl355::Device invalid(std::move(bad_bus));
+    try {
+        invalid.probe();
+        TEST(false, "C++ bad part ID should throw");
+    } catch (const adxl355::DeviceNotFoundError &) {
+        TEST(true, "C++ invalid identity maps to DeviceNotFoundError");
+    }
+
+    auto bus = std::make_unique<MockBus>();
+    auto *mock = bus.get();
+    adxl355::Device dev(std::move(bus));
+    dev.probe();
+    const auto original = mock->regs[ADXL355_REG_RANGE];
+    try {
+        dev.setRange(static_cast<adxl355::Range>(0));
+        TEST(false, "C++ invalid range should throw");
+    } catch (const adxl355::InvalidArgumentError &) {
+        TEST(mock->regs[ADXL355_REG_RANGE] == original,
+             "C++ invalid range preserves current configuration");
+    }
+}
+
+void test_move_preserves_bus_callback_owner() {
+    auto bus = std::make_unique<MockBus>();
+    auto *mock = bus.get();
+    mock->regs[ADXL355_REG_STATUS] = 0x7EU;
+    adxl355::Device original(std::move(bus));
+    original.probe();
+    adxl355::Device moved(std::move(original));
+
+    TEST(moved.readStatus() == 0x7EU,
+         "C++ moved device reads through rebound callback context");
+    const size_t writes_before = mock->write_count;
+    moved.setPowerMode(adxl355::PowerMode::Standby);
+    TEST(mock->write_count == writes_before + 1U,
+         "C++ moved device writes through rebound callback context");
+}
+
+class ThrowingMockBus final : public MockBus {
+public:
+    bool throw_reads{false};
+    bool throw_writes{false};
+    bool throw_delays{false};
+
+    int read(void *ctx, uint8_t reg, uint8_t *data, size_t len) override {
+        if (throw_reads) {
+            throw std::runtime_error("read failure");
+        }
+        return MockBus::read(ctx, reg, data, len);
+    }
+
+    int write(void *ctx, uint8_t reg, const uint8_t *data, size_t len) override {
+        if (throw_writes) {
+            throw std::runtime_error("write failure");
+        }
+        return MockBus::write(ctx, reg, data, len);
+    }
+
+    void delayMs(void *ctx, uint32_t ms) override {
+        if (throw_delays) {
+            throw std::runtime_error("delay failure");
+        }
+        MockBus::delayMs(ctx, ms);
+    }
+};
+
+void test_noexcept_bus_contains_native_exceptions() {
+    ThrowingMockBus bus;
+    adxl355::NoexceptDevice dev(bus);
+    TEST(dev.initStatus() == adxl355::Status::Ok,
+         "exception-containing adapter initialized");
+    bus.throw_reads = true;
+    TEST(dev.probe() == adxl355::Status::Bus,
+         "exception in read callback maps to Bus without escaping noexcept");
+    bus.throw_reads = false;
+    TEST(dev.probe() == adxl355::Status::Ok,
+         "exception-containing adapter can recover after failed read");
+    bus.throw_writes = true;
+    TEST(dev.setPowerMode(adxl355::PowerMode::Standby) == adxl355::Status::Bus,
+         "exception in write callback maps to Bus without escaping noexcept");
+    bus.throw_writes = false;
+    bus.throw_delays = true;
+    TEST(dev.reset() == adxl355::Status::Ok,
+         "exception in void delay callback stays contained by noexcept adapter");
+}
+
 int main() {
     std::printf("ADXL355 C++ Test Suite\n");
     std::printf("======================\n");
@@ -293,6 +417,10 @@ int main() {
     test_set_range_preserves_unrelated_bits();
     test_set_range_read_error_prevents_write();
     test_set_range_write_error_preserves_state();
+    test_extended_read_and_control_api();
+    test_probe_rejects_bad_identity_and_invalid_range();
+    test_move_preserves_bus_callback_owner();
+    test_noexcept_bus_contains_native_exceptions();
 
     std::printf("\nResults: %d/%d passed\n", tests_pass, tests_run);
     return (tests_pass == tests_run) ? 0 : 1;
