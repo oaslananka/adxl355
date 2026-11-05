@@ -5,13 +5,13 @@ It is not a blanket OpenSSF Silver claim, a safety certification, or a substitut
 for hardware-in-the-loop tests. The repository retains a single maintainer;
 independent human approval is not a requirement.
 
-## Coverage baseline — 4 November 2026
+## Coverage measurements — 4–5 November 2026
 
 | Implementation and scope | Measured result | Measurement | Status |
 | --- | ---: | --- | --- |
 | Python `python/src/adxl355` | **97%** (816 / 843 statements) | `coverage.py` on all 204 Python tests | Passes 80% for measured source |
 | Go core `go/adxl355` | **88.1%** statements | `go test ./adxl355 -cover` | Passes 80% for measured package |
-| Go Linux SPI/I2C `go/adxl355/linuxio` | **62.1%** statements | `go test ./adxl355/linuxio -cover` | Below 80%; untested raw system calls/hardware paths remain |
+| Go Linux SPI/I2C `go/adxl355/linuxio` | **95.5%** statements (Linux/amd64, Go 1.26.8, 5 November 2026) | `go test ./adxl355/linuxio -coverprofile=/tmp/adxl355-linuxio-coverage.out` | Above 80% on this package; error-path mocks and invalid-FD errno tests, **not** physical HIL |
 | C `c/src/adxl355.c` | **83.83%** executable *lines* (of 637) | GCC `--coverage` + `gcov` after `ctest` | This is **line coverage**, not proven statement coverage |
 | Go example binaries and support | 45.9–74.5% statements across example packages | `go test ./... -cover` | Not representative of core driver coverage |
 | C++ public wrapper, Rust, Node.js | **Not yet independently measured** as complete statement coverage | Tests and CI pass; statement coverage evidence is incomplete | No 80% assertion |
@@ -19,6 +19,12 @@ independent human approval is not a requirement.
 The Go core gained tests for malformed frames, valid/invalid power-mode transitions,
 write/read failures, acceleration conversions and invalid register range. Its
 statement coverage rose from **72.7% to 88.1%**. No production behavior changed.
+The Go Linux adapter improved from **64.8% to 95.5%** statements in a fresh
+same-toolchain before/after measurement, using only error cases, fake
+transports and invalid Linux file descriptors. Neither the source driver
+nor the accepted physical SPI/I2C HIL baseline changed. The remaining
+uncovered branches include real successful kernel ioctl configuration;
+do not count mock coverage as a hardware acceptance result.
 Python coverage includes simulated adapters and the public library. C's percentage
 comes from `gcov` executable lines and must not be relabeled as statements.
 The Silver `test_statement_coverage80` item remains **unverified for the complete
@@ -38,7 +44,9 @@ uvx --from 'coverage==7.10.7' --with 'pytest>=8,<10' coverage run \
 uvx --from 'coverage==7.10.7' coverage report -m
 
 # Go: use the exact Go package and full suite, not just one selected test.
-(cd go && go test ./adxl355 -cover && go test ./adxl355/linuxio -cover)
+(cd go && go test ./adxl355 -cover && \
+  go test ./adxl355/linuxio -coverprofile=/tmp/adxl355-linuxio-coverage.out && \
+  go tool cover -func=/tmp/adxl355-linuxio-coverage.out | tail -1)
 (cd go && go test ./... -coverprofile=/tmp/adxl355-go-cover.out)
 
 # C: build instrumentation in an isolated directory; gcov reports lines.
