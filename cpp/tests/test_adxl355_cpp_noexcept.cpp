@@ -101,6 +101,49 @@ int main() {
     TEST(acceleration.ok() && std::fabs(acceleration.value.x - 1.0F) < 0.001F,
          "readG uses C core conversion and cached range");
 
+    const auto range = device.getRange();
+    TEST(range.ok() && range.value == adxl355::Range::G2,
+         "noexcept getRange returns cached probe range");
+    TEST(static_cast<bool>(range), "noexcept Result explicit bool reports success");
+    TEST(device.setRange(adxl355::Range::G4) == adxl355::Status::Ok,
+         "noexcept setRange accepts 4g");
+    TEST(device.getRange().value == adxl355::Range::G4,
+         "noexcept getRange observes new range");
+    TEST(device.setRange(adxl355::Range::G2) == adxl355::Status::Ok,
+         "noexcept setRange restores original 2g range");
+    TEST(device.setPowerMode(adxl355::PowerMode::Standby) == adxl355::Status::Ok,
+         "noexcept standby power mode accepted");
+    TEST((bus.regs[ADXL355_REG_POWER_CTL] & 1U) == 1U,
+         "noexcept standby sets the control bit");
+    TEST(device.setPowerMode(adxl355::PowerMode::Measurement) == adxl355::Status::Ok,
+         "noexcept measurement power mode accepted");
+    TEST((bus.regs[ADXL355_REG_POWER_CTL] & 1U) == 0U,
+         "noexcept measurement clears the control bit");
+
+    const auto accel_mps2 = device.readMps2();
+    TEST(accel_mps2.ok() &&
+             std::fabs(accel_mps2.value.x - acceleration.value.x * 9.80665F) < 0.002F,
+         "noexcept readMps2 matches g conversion");
+    TEST(std::isfinite(device.readTemperatureC().value),
+         "noexcept temperature is finite");
+    bus.regs[ADXL355_REG_STATUS] = 0x52U;
+    const auto status = device.readStatus();
+    TEST(status.ok() && status.value == 0x52U,
+         "noexcept readStatus returns register value");
+    TEST(adxl355::NoexceptDevice::decodeRaw20(0U, 0U, 16U) == 1,
+         "noexcept decodeRaw20 agrees with core");
+    TEST(std::fabs(adxl355::NoexceptDevice::rawToG(256410, adxl355::Range::G2) -
+                   acceleration.value.x) < 0.001F,
+         "noexcept rawToG agrees with readG");
+    TEST(std::fabs(adxl355::NoexceptDevice::rawToMps2(256410, adxl355::Range::G2) -
+                   accel_mps2.value.x) < 0.002F,
+         "noexcept rawToMps2 agrees with readMps2");
+    TEST(device.setRange(static_cast<adxl355::Range>(0)) ==
+             adxl355::Status::InvalidArgument,
+         "noexcept invalid range returns InvalidArgument");
+    TEST(device.reset() == adxl355::Status::Ok,
+         "noexcept reset restores configuration without exceptions");
+
     bus.fail_reads = true;
     const auto failed = device.readRaw();
     TEST(failed.status == adxl355::Status::Bus, "transport failure maps to Bus status");

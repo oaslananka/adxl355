@@ -16,7 +16,8 @@ independent human approval is not a requirement.
 | Go example binaries and support | 45.9–74.5% statements across example packages | `go test ./... -cover` | Not representative of core driver coverage |
 | Node.js/TypeScript `node/src/**/*.ts` | **90.35%** (309 / 342 statements; 85.38% branches) | Vitest **5.0.5** + ephemeral `@vitest/coverage-v8@5.0.5` on Node **26.13.0**, all **108** tests, 5 November 2026 | Exceeds 80% for the measured source including mocked Linux SPI/I2C adapters; not physical HIL |
 | Rust `rust/src` (all features, 58 unit/integration tests) | **88.20% LLVM regions** (613 / 695); **91.18% executable lines** (424 / 465); **91.18% functions** (62 / 68) | `rustc 1.99.1` / LLVM **23.1.1** source instrumentation (`-C instrument-coverage`), Windows MSVC, 6 November 2026 | LLVM *regions* and lines are **not statement counters**; no exact 80% statement claim or physical HIL |
-| C++ public wrapper | **Not yet independently measured** as complete statement coverage | Existing unit/CI tests run but full C++ source coverage is unquantified | No 80% assertion |
+| C++ exception-enabled header `cpp/include/adxl355/adxl355.hpp` | **97.10%** instrumented executable *lines* (134 / 138; formerly 83.56% of 73) | GCC/gcov **13.3.0**, `--coverage -O0`, 40/40 C++ assertions, Linux/amd64, 6 November 2026 | Header lines instantiated by the compiled tests, **not** full executable statement coverage or physical HIL |
+| C++ exception-free header `cpp/include/adxl355/adxl355.hpp` | **98.10%** instrumented executable *lines* (103 / 105; formerly 90.16% of 61) | Same GCC/gcov, `-fno-exceptions -fno-rtti` and **28/28** assertions | Header lines instantiated by this variant, not full executable statement coverage |
 
 The Go core gained tests for malformed frames, valid/invalid power-mode transitions,
 write/read failures, acceleration conversions and invalid register range. Its
@@ -39,6 +40,7 @@ reached 100% of LLVM regions and lines. The instrumented tests use
 fake transports only; no physical device was accessed. LLVM regions
 are more granular than lines but are **not** the same metric as executable
 statements; this does not certify the project-wide Silver criterion.
+The C++ header is tested in **both** exception-enabled and exception-free builds. GCC/gcov now reports **97.10% (134/138)** and **98.10% (103/105)** instrumented executable source lines respectively; the earlier same-toolchain measurements were 83.56% (61/73) and 90.16% (55/61). Tests exercise public read/control/conversion methods, range and bad-ID errors, moved-device callback rebinding and exception containment in the `NoexceptDevice` bus callbacks. These are **separate compilation variants**, not additive coverage values. Because uninstantiated inline/template methods may not enter gcov's denominator, the percentages are neither complete statement coverage nor device HIL.
 The Silver `test_statement_coverage80` item remains **unverified for the complete
 multi-language product** pending accurate statement counters for remaining source
 and permitted hardware-specific exclusions grounded in real evidence.
@@ -81,6 +83,39 @@ ctest --test-dir /tmp/adxl355-c-cover --output-on-failure
 gcov -o /tmp/adxl355-c-cover/CMakeFiles/adxl355.dir/src/adxl355.c.gcno \
   c/src/adxl355.c
 ```
+
+#### C++ header coverage (Linux GCC, no repository dependency change)
+
+From the repository root on Linux with GCC/gcov 13.3, build both C++ tests
+against the C core using disposable objects. **Only** inspect the gcov record
+for `cpp/include/adxl355/adxl355.hpp`; excluding C, test code and system
+headers avoids inflating the driver wrapper's reported coverage.
+
+```bash
+repo=$PWD
+work=$(mktemp -d)
+mkdir -p "$work"/{except,noexcept}
+gcc --coverage -O0 -g -std=c99 -I"$repo/c/include" -c "$repo/c/src/adxl355.c" -o "$work/c-core.o"
+g++ --coverage -O0 -g -std=c++17 -I"$repo/cpp/include" -I"$repo/c/include" \
+  "$repo/cpp/tests/test_adxl355_cpp.cpp" "$work/c-core.o" -o "$work/except/test_cpp"
+g++ --coverage -O0 -g -std=c++17 -fno-exceptions -fno-rtti \
+  -DADXL355_CPP_NO_EXCEPTIONS=1 -I"$repo/cpp/include" -I"$repo/c/include" \
+  "$repo/cpp/tests/test_adxl355_cpp_noexcept.cpp" "$work/c-core.o" \
+  -o "$work/noexcept/test_cpp_noexcept"
+"$work/except/test_cpp"
+"$work/noexcept/test_cpp_noexcept"
+(cd "$work/except" && gcov -b -c -o test_cpp-test_adxl355_cpp.gcda \
+  "$repo/cpp/tests/test_adxl355_cpp.cpp")
+(cd "$work/noexcept" && gcov -b -c -o \
+  test_cpp_noexcept-test_adxl355_cpp_noexcept.gcda \
+  "$repo/cpp/tests/test_adxl355_cpp_noexcept.cpp")
+# Compare each of the two 'adxl355.hpp' file sections above.
+rm -rf -- "$work" # Only the fresh disposable coverage directory
+```
+
+gcov reports *instrumented executable lines*, not precise statement
+coverage. Never add results from the two builds together or count the
+test/source-C lines as C++ wrapper coverage.
 
 #### Rust source coverage (Windows MSVC, no repository dependency change)
 
