@@ -53,7 +53,18 @@ normal update PRs. After that release-age check passes, Renovate creates
 the PR immediately so that pull-request CI can run; waiting for branch-level
 status checks would stall on bare Renovate branches. Major updates require
 explicit Dependency Dashboard approval,
-and breaking, pre-1.0 minor, compiler, build-backend, and GitHub Actions changes remain manual.
+and breaking, pre-1.0 minor, compiler, and build-backend changes remain manual.
+GitHub Actions are normally reviewed manually. Only patch updates to the two
+official `actions/upload-artifact` and `actions/download-artifact` actions are
+eligible for the `automerge` label; their major/minor/digest changes still require
+manual review. Each update retains an immutable action SHA, a matching semver
+annotation, and the existing security/package tests. Renovate applies the seven-day
+release-age condition before opening normal update PRs. Its per-commit
+`renovate/stability-days` status is **not** a Mergify check requirement:
+updating a PR branch against a newer `main` produces a new commit that does
+not inherit Renovate's earlier status. Mergify still requires the authentic
+Renovate author, opt-in label, no manual-review label and all protected CI
+checks on the exact current PR head.
 
 Stable (1.0+) non-major updates in Node, Rust, Go, and Python package metadata,
 plus low-risk Node development updates, receive the `automerge` label.
