@@ -33,7 +33,7 @@ build_component() {
       cp -- "$SCRATCH/$attempt/c-build/libadxl355.a" "$dest/libadxl355.a"
       ;;
     python)
-      (cd "$ROOT" && uvx --from 'build==1.5.0' --with 'setuptools==84.1.0' \
+      (cd "$ROOT" && uvx --from 'build==1.5.0' --with 'setuptools==84.2.1' \
         pyproject-build --no-isolation python --outdir "$dest" >/dev/null)
       local sdists=("$dest"/*.tar.gz)
       ((${#sdists[@]} == 1)) && [[ -f "${sdists[0]}" ]] || {
