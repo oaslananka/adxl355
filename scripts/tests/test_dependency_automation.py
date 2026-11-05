@@ -69,7 +69,7 @@ class DependencyAutomationTests(unittest.TestCase):
         self.assertIn("-draft", conditions)
         self.assertIn("check-success = Tests", conditions)
         self.assertIn("check-success = Dependency Audit", conditions)
-        self.assertIn("check-success = renovate/stability-days", conditions)
+        self.assertNotIn("check-success = renovate/stability-days", conditions)
         self.assertEqual(config["merge_queue"]["max_parallel_checks"], 1)
         queue = config["queue_rules"][0]
         self.assertEqual(queue["merge_method"], "squash")
@@ -77,7 +77,7 @@ class DependencyAutomationTests(unittest.TestCase):
         self.assertIn("label = automerge", queue["queue_conditions"])
         self.assertIn("label != manual-review", queue["queue_conditions"])
         self.assertIn("-draft", queue["queue_conditions"])
-        self.assertIn("check-success = renovate/stability-days", queue["queue_conditions"])
+        self.assertNotIn("check-success = renovate/stability-days", queue["queue_conditions"])
         self.assertNotIn("merge_conditions", queue)
 
     def test_only_low_risk_updates_receive_automerge_label(self) -> None:
