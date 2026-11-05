@@ -63,6 +63,10 @@ class DependencyAutomationTests(unittest.TestCase):
         )
         protections = config["merge_protections"]
         self.assertEqual(len(protections), 1)
+        self.assertEqual(
+            protections[0]["if"],
+            ["base = main", "author = renovate[bot]", "label = automerge", "label != manual-review"],
+        )
         conditions = protections[0]["success_conditions"]
         self.assertIn("label = automerge", conditions)
         self.assertIn("label != manual-review", conditions)
