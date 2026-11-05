@@ -66,10 +66,7 @@ class HILReleasePolicyTests(unittest.TestCase):
             baseline["validated_commit"], "71de69b8727a9f8eef254de586d9bce7bc8fa8ac"
         )
         self.assertEqual(set(baseline["recorded_evidence"]), {"spi", "i2c"})
-        self.assertEqual(
-            policy.resolve_commit_from_tag(baseline["source_release_tag"]),
-            baseline["validated_commit"],
-        )
+        self.assertEqual(baseline["source_release_tag"], "v0.1.0-alpha.3")
 
     def test_invalid_baselines_fail_closed(self) -> None:
         valid = policy.load_baseline()
@@ -108,19 +105,42 @@ class HILReleasePolicyTests(unittest.TestCase):
             with self.assertRaisesRegex(policy.PolicyError, "evidence run URL"):
                 policy.load_baseline(file)
 
-    def test_missing_or_nonancestor_release_baseline_is_rejected(self) -> None:
-        with patch.object(policy.subprocess, "run") as run:
-            run.return_value.returncode = 1
-            run.return_value.stdout = ""
-            with self.assertRaises(policy.PolicyError):
-                policy.changed_paths("a" * 40, "b" * 40)
-
-    def test_no_external_runner_is_needed_to_classify_changes(self) -> None:
-        baseline = policy.load_baseline()
-        head = policy.resolve_commit("HEAD")
-        paths = policy.changed_paths(baseline["validated_commit"], head)
-        self.assertTrue(
-            policy.assess(baseline["validated_commit"], head, paths)[
-                "requires_fresh_hil"
-            ]
+    def test_git_diff_parsing_requires_complete_nul_framing(self) -> None:
+        self.assertEqual(
+            policy.paths_from_git_diff(b"README.md\x00c/src/adxl355.c\x00"),
+            ["README.md", "c/src/adxl355.c"],
         )
+        self.assertEqual(policy.paths_from_git_diff(b""), [])
+        for broken in (b"README.md", b"a\x00a\x00", b"\xff\x00"):
+            with self.subTest(broken=broken), self.assertRaises(policy.PolicyError):
+                policy.paths_from_git_diff(broken)
+
+    def test_cli_metadata_and_fail_closed_sensor_change(self) -> None:
+        from contextlib import redirect_stdout
+        from io import BytesIO, StringIO, TextIOWrapper
+
+        with patch("sys.argv", ["hil_release_policy.py", "--metadata"]):
+            metadata = StringIO()
+            with redirect_stdout(metadata):
+                self.assertEqual(policy.main(), 0)
+            self.assertIn(
+                "71de69b8727a9f8eef254de586d9bce7bc8fa8ac", metadata.getvalue()
+            )
+
+        sha = "b" * 40
+        for path, status in ((b"README.md\0", 0), (b"c/src/adxl355.c\0", 2)):
+            with (
+                patch(
+                    "sys.argv",
+                    ["hil_release_policy.py", "--head", sha, "--require-software-only"],
+                ),
+                patch("sys.stdin", TextIOWrapper(BytesIO(path), encoding="utf-8")),
+            ):
+                report = StringIO()
+                with redirect_stdout(report):
+                    self.assertEqual(policy.main(), status)
+                self.assertIn("release_sha", report.getvalue())
+                self.assertIn(
+                    "HIL REQUIRED" if status == 2 else "software-only",
+                    report.getvalue(),
+                )

@@ -50,9 +50,9 @@ tagged release commit and its ancestry, not a moving branch.
   Modifying `VERSION` alone is not proof that the existing `0.1.0` candidate
   preserves its previously tested hardware behavior.
 
-Run `python scripts/hil_release_policy.py --head HEAD` locally to see the
-actual path classification; add `--require-software-only` to emulate the
-release publication gate. The report contains no secrets or external uploads.
+Run `bash scripts/check_hil_release.sh "$(git rev-parse HEAD)"` in Git
+Bash or Linux to evaluate the exact checked-out commit. The check exits with
+status 2 and lists the changed hardware-facing paths if new HIL is needed. The report contains no secrets or external uploads.
 This rule does not automatically publish a release and does not change the
 protected publishing environment or `REGISTRY_PUBLISHING_ENABLED=false`.
 

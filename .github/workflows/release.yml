@@ -504,7 +504,7 @@ jobs:
           RELEASE_SHA: ${{ needs.preflight.outputs.release_sha }}
         run: |
           test "$(git rev-parse HEAD)" = "$RELEASE_SHA"
-          python scripts/hil_release_policy.py --head "$RELEASE_SHA" --require-software-only
+          bash scripts/check_hil_release.sh "$RELEASE_SHA"
 
   publish-python:
     name: Publish Python package to PyPI

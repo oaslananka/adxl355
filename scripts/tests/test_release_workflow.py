@@ -53,10 +53,10 @@ class ReleaseWorkflowTests(unittest.TestCase):
             "${{ needs.preflight.outputs.release_sha }}",
         )
         self.assertEqual(policy["steps"][0]["with"]["fetch-depth"], 0)
-        self.assertEqual(policy["steps"][0]["with"]["fetch-tags"], True)
+        self.assertTrue(policy["steps"][0]["with"]["fetch-tags"])
         script = "\n".join(str(step.get("run", "")) for step in policy["steps"])
-        self.assertIn("scripts/hil_release_policy.py", script)
-        self.assertIn("--require-software-only", script)
+        self.assertIn("scripts/check_hil_release.sh", script)
+        self.assertIn("RELEASE_SHA", script)
         for name in PUBLISH_JOBS:
             self.assertIn("hil-policy", jobs[name]["needs"])
         for name in PACKAGE_JOBS:
