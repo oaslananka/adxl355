@@ -25,7 +25,7 @@ Before changing behavior, read the relevant implementation/tests plus:
 
 ## Product-truth and evidence rules
 
-This is an alpha-stage hardware driver family.
+This is a multi-language hardware-driver family. Version labels do not establish production certification; release readiness requires documented test and physical evidence.
 
 - Do not claim production maturity, universal hardware support, factory qualification, safety certification, or fabrication readiness.
 - Register presence does not imply a public API.

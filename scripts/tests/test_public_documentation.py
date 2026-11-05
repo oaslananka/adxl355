@@ -210,7 +210,7 @@ class PublicDocumentationTests(unittest.TestCase):
         self.assertNotIn(
             "does not publish to PyPI, npm, crates.io, GitHub Releases", publishing
         )
-        self.assertIn("[0.1.0-alpha.4] - Unreleased", changelog)
+        self.assertIn("[0.1.0] - Unreleased", changelog)
         self.assertIn("[0.1.0-alpha.3] - 2026-08-02", changelog)
         self.assertIn("[0.1.0-alpha.1]", changelog)
 

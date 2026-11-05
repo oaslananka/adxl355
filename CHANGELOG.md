@@ -5,7 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.1.0-alpha.4] - Unreleased
+## [0.1.0] - Unreleased
+
+This is the proposed first non-prerelease package version. It is **not yet
+published** and must not be tagged until same-commit SPI and I2C hardware
+acceptance, protected release verification, and registry trusted-publishing
+checks succeed. A SemVer release label does not imply hardware certification.
 
 ### Fixed
 
@@ -25,7 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   checks now use a supported Go 1.26 toolchain.
 
 - **Breaking (Python metadata):** The public `adxl355.__version__` value and Python
-  distribution version advance from `0.1.0a3` to `0.1.0a4` for this prerelease.
+  distribution version advance from `0.1.0a3` to `0.1.0` for this release.
 
 ## [0.1.0-alpha.3] - 2026-08-02
 
