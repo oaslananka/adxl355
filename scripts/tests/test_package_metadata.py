@@ -62,10 +62,22 @@ class PackageMetadataTests(unittest.TestCase):
         self.assertEqual(lock["name"], "@oaslananka/adxl355")
         self.assertEqual(lock["packages"][""]["name"], "@oaslananka/adxl355")
         self.assertEqual(package["version"], "0.1.0")
-        self.assertEqual(package["devDependencies"]["vitest"], "5.0.5")
-        self.assertEqual(lock["packages"][""]["devDependencies"]["vitest"], "5.0.5")
-        self.assertEqual(lock["packages"]["node_modules/vitest"]["version"], "5.0.5")
-        self.assertEqual(lock["packages"]["node_modules/@vitest/mocker"]["version"], "5.0.5")
+        # Keep exact dependency pins and lock agreement while allowing
+        # reviewed patch/minor updates without stale test version literals.
+        vitest_version = package["devDependencies"]["vitest"]
+        self.assertRegex(vitest_version, r"^5\.\d+\.\d+$")
+        self.assertGreaterEqual(
+            tuple(int(part) for part in vitest_version.split(".")), (5, 0, 5)
+        )
+        self.assertEqual(
+            lock["packages"][""]["devDependencies"]["vitest"], vitest_version
+        )
+        for package_name in ("vitest", "@vitest/mocker", "@vitest/spy"):
+            self.assertEqual(
+                lock["packages"][f"node_modules/{package_name}"]["version"],
+                vitest_version,
+                package_name,
+            )
         self.assertEqual(package["publishConfig"], {"access": "public"})
         self.assertEqual(set(package["exports"]), {".", "./linux/spi", "./linux/i2c"})
         self.assertEqual(
