@@ -6,7 +6,6 @@ from typing import Any, cast
 
 import yaml  # type: ignore[import-untyped]
 
-
 REPO_ROOT = Path(__file__).resolve().parents[2]
 CI_WORKFLOW = REPO_ROOT / ".github/workflows/ci.yml"
 PYTHON_LOCK_ROOT = REPO_ROOT / "requirements/python"
@@ -47,6 +46,21 @@ class CiQualityGateTests(unittest.TestCase):
             self.assertIn("ASAN_OPTIONS=", environment)
             self.assertIn("UBSAN_OPTIONS=", environment)
         self.assertIn("scripts/smoke_cmake_packages.sh", cpp_commands)
+
+    def test_clang_jobs_use_preinstalled_ubuntu_tools(self) -> None:
+        # GitHub-hosted ubuntu-24.04 images include Clang and CMake; apt-get
+        # introduces network delays and can stall required CI jobs.
+        jobs = self.load_jobs()
+        for job_name in ("native-clang", "fuzz"):
+            with self.subTest(job=job_name):
+                job = jobs[job_name]
+                self.assertEqual(job["runs-on"], "ubuntu-24.04")
+                commands = self.commands(job)
+                for tool in ("clang", "clang++", "cmake"):
+                    self.assertIn(f"command -v {tool}", commands)
+                self.assertIn("clang --version", commands)
+                self.assertIn("cmake --version", commands)
+                self.assertNotIn("apt-get", commands)
 
     def test_python_runs_lint_type_package_wheel_and_examples(self) -> None:
         python_job = self.load_jobs()["python"]

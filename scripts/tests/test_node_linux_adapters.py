@@ -18,7 +18,13 @@ class NodeLinuxAdapterTests(unittest.TestCase):
         self.assertEqual(
             set(package["exports"]), {".", "./linux/spi", "./linux/i2c"}
         )
-        self.assertEqual(package["devDependencies"]["@types/node"], "24.10.1")
+        # A maintainer-approved Node 24 patch/minor type upgrade must not
+        # make an unrelated transport contract test fail on a frozen version.
+        types_version = package["devDependencies"]["@types/node"]
+        self.assertRegex(types_version, r"^24\.\d+\.\d+$")
+        lock = json.loads((NODE / "package-lock.json").read_text())
+        self.assertEqual(lock["packages"][""]["devDependencies"]["@types/node"], types_version)
+        self.assertEqual(lock["packages"]["node_modules/@types/node"]["version"], types_version)
 
     def test_spi_adapter_uses_one_mode_zero_message(self) -> None:
         source = (NODE / "src/linux/spi.ts").read_text()
