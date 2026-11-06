@@ -141,8 +141,8 @@ class DependencyAuditTests(unittest.TestCase):
     def test_go_dependency_advisory_is_fixed_without_exceptions(self) -> None:
         self.assertFalse(GO_OSV_CONFIG.exists())
         go_mod = (REPO_ROOT / "go" / "go.mod").read_text(encoding="utf-8")
-        self.assertIn("go 1.25.0", go_mod)
-        self.assertIn("golang.org/x/sys v0.44.0", go_mod)
+        self.assertIn("go 1.26.0", go_mod)
+        self.assertIn("golang.org/x/sys v0.49.0", go_mod)
         for workflow in (
             "ci.yml",
             "codeql.yml",

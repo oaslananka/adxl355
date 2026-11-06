@@ -15,8 +15,8 @@ CI = REPO_ROOT / ".github" / "workflows" / "ci.yml"
 class GoLinuxTransportTests(unittest.TestCase):
     def test_module_uses_patched_x_sys_and_supported_go_floor(self) -> None:
         go_mod = (GO_ROOT / "go.mod").read_text()
-        self.assertRegex(go_mod, r"(?m)^go 1\.25\.0$")
-        self.assertIn("golang.org/x/sys v0.44.0", go_mod)
+        self.assertRegex(go_mod, r"(?m)^go 1\.26\.0$")
+        self.assertIn("golang.org/x/sys v0.49.0", go_mod)
         self.assertTrue((GO_ROOT / "go.sum").is_file())
 
     def test_ioctl_implementation_is_scoped_to_verified_64_bit_linux_abis(self) -> None:
