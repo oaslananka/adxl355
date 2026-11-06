@@ -120,7 +120,12 @@ class HilWorkflowTests(unittest.TestCase):
             self.assertIn(text, guide)
 
         publishing = PUBLISHING_PATH.read_text()
-        self.assertRegex(publishing, r"(?i)HIL.*30 days")
+        # New releases may disclose unverified sensor hardware, but the
+        # release documentation must never imply that physical HIL passed.
+        self.assertIn("NOT VERIFIED", publishing)
+        self.assertIn("report-only", publishing)
+        self.assertIn("strict manual diagnostic", publishing)
+        self.assertIn("trusted-publisher OIDC", publishing)
         self.assertIn("SPI", publishing)
         self.assertIn("I2C", publishing)
         self.assertIn("revision", publishing.lower())

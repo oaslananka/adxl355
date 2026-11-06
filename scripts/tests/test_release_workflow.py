@@ -37,7 +37,7 @@ class ReleaseWorkflowTests(unittest.TestCase):
         triggers = ci.get("on", ci.get(True, {}))
         self.assertIn("workflow_call", triggers)
 
-    def test_registry_publication_requires_risk_based_hil_without_blocking_ci(
+    def test_registry_publication_discloses_unverified_hardware_without_blocking_ci(
         self,
     ) -> None:
         jobs = self.load_release()["jobs"]
@@ -55,7 +55,11 @@ class ReleaseWorkflowTests(unittest.TestCase):
         self.assertEqual(policy["steps"][0]["with"]["fetch-depth"], 0)
         self.assertTrue(policy["steps"][0]["with"]["fetch-tags"])
         script = "\n".join(str(step.get("run", "")) for step in policy["steps"])
-        self.assertIn("scripts/check_hil_release.sh", script)
+        self.assertIn("scripts/check_hil_release.sh --report-only", script)
+        self.assertIn("hardware-validation-disclosure.json", script)
+        self.assertIn("Hardware validation: NOT VERIFIED", script)
+        self.assertIn("::warning title=Hardware acceptance not verified", script)
+        self.assertNotIn("--require-software-only", script)
         self.assertIn("RELEASE_SHA", script)
         for name in PUBLISH_JOBS:
             self.assertIn("hil-policy", jobs[name]["needs"])

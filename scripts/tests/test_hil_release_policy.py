@@ -105,6 +105,12 @@ class HILReleasePolicyTests(unittest.TestCase):
             with self.assertRaisesRegex(policy.PolicyError, "evidence run URL"):
                 policy.load_baseline(file)
 
+    def test_release_disclosure_retains_strict_manual_hil_gate(self) -> None:
+        script = (policy.ROOT / "scripts/check_hil_release.sh").read_text()
+        self.assertIn('"--report-only"', script)
+        self.assertIn('if [[ "$report_only" == true ]]', script)
+        self.assertIn('--head "$head" --require-software-only', script)
+        self.assertIn('--head "$head"', script)
     def test_git_diff_parsing_requires_complete_nul_framing(self) -> None:
         self.assertEqual(
             policy.paths_from_git_diff(b"README.md\x00c/src/adxl355.c\x00"),
