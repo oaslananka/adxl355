@@ -309,7 +309,7 @@ class SupplyChainTests(unittest.TestCase):
         )
         self.assertEqual(
             scorecard["uses"],
-            "ossf/scorecard-action@2d1146689b8cda280b9bc96326124645441f03bc",
+            "ossf/scorecard-action@fa7117db83c52d787ae5a89f350999701505d78e",
         )
         self.assertEqual(scorecard["with"]["results_format"], "sarif")
         self.assertTrue(scorecard["with"]["publish_results"])
