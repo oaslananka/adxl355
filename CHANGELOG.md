@@ -8,14 +8,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.1.0] - Unreleased
 
 This is the proposed first non-prerelease package version. It is **not yet
-published** and must not be tagged until same-commit SPI and I2C hardware
-acceptance, protected release verification, and registry trusted-publishing
-checks succeed. A SemVer release label does not imply hardware certification.
+published**. The maintainer explicitly accepts publication without renewed
+paired SPI/I2C physical acceptance. **Hardware behavior on the latest
+sensor-facing code is NOT VERIFIED:** the only accepted paired physical
+evidence belongs to the older alpha.3 source commit. A SemVer version is not
+hardware certification. Protected CI, artifact verification and registry
+trusted-publishing requirements are still mandatory.
 
 ### Fixed
 
 - Upgraded the Go driver module's `golang.org/x/sys` dependency to patched
-  `v0.44.0` for `GO-2026-5024` and removed its expired OSV exemptions.
+  `v0.49.0` for `GO-2026-5024` and removed its expired OSV exemptions.
 
 - Refreshed the transitive Node.js PostCSS lock to patched `8.5.25`, restoring
   the required dependency-audit gate after `CVE-2026-69153` was disclosed.
@@ -26,7 +29,7 @@ checks succeed. A SemVer release label does not imply hardware certification.
 ### Changed
 
 - **Breaking (Go):** The minimum Go toolchain for the nested Go module is
-  1.25, raised from 1.21 for the patched `x/sys` dependency; CI and release
+  1.26, raised from 1.21 for the patched `x/sys` dependency; CI and release
   checks now use a supported Go 1.26 toolchain.
 
 - **Breaking (Python metadata):** The public `adxl355.__version__` value and Python

@@ -480,9 +480,9 @@ jobs:
           retention-days: 14
 
   hil-policy:
-    name: Check hardware change against validated HIL baseline
-    # Package checks remain usable with no physical fixture; only a real
-    # registry publication has this additional hardware-change gate.
+    name: Disclose hardware acceptance status (not a physical HIL test)
+    # The owner explicitly accepts publishing without current physical HIL.
+    # Never describe unperformed sensor acceptance as verified.
     if: ${{ vars.REGISTRY_PUBLISHING_ENABLED == 'true' }}
     permissions:
       contents: read
@@ -499,12 +499,26 @@ jobs:
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: "3.11"
-      - name: Verify that physical acceptance may be reused
+      - name: Record hardware validation disclosure
         env:
           RELEASE_SHA: ${{ needs.preflight.outputs.release_sha }}
         run: |
+          set -euo pipefail
           test "$(git rev-parse HEAD)" = "$RELEASE_SHA"
-          bash scripts/check_hil_release.sh "$RELEASE_SHA"
+          report="$RUNNER_TEMP/hardware-validation-disclosure.json"
+          bash scripts/check_hil_release.sh --report-only "$RELEASE_SHA" > "$report"
+          cat "$report"
+          jq -e --arg sha "$RELEASE_SHA" '.release_sha == $sha and (.requires_fresh_hil | type == "boolean")' "$report"
+          if jq -e '.requires_fresh_hil == true and .classification == "hardware-change"' "$report" > /dev/null; then
+            echo "::warning title=Hardware acceptance not verified::This release has sensor-facing changes but no new SPI/I2C physical HIL acceptance. Publication is owner-authorized with this explicit risk disclosure."
+            echo "### Hardware validation: NOT VERIFIED for this release" >> "$GITHUB_STEP_SUMMARY"
+            echo "Sensor-facing changes were detected since the previously validated alpha release. No current paired SPI/I2C acceptance is claimed." >> "$GITHUB_STEP_SUMMARY"
+          elif jq -e '.requires_fresh_hil == false and .classification == "software-only"' "$report" > /dev/null; then
+            echo "### Hardware validation: inherited historical baseline (software-only diff)" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "::error::Unrecognized hardware validation classification."
+            exit 1
+          fi
 
   publish-python:
     name: Publish Python package to PyPI
