@@ -538,6 +538,94 @@ static void test_read_raw_reads_9_bytes(void)
     TEST_END();
 }
 
+/* Public float-read paths must honor range, transport and output contracts. */
+static void test_acceleration_conversion_read_contract(void)
+{
+    TEST_START("acceleration_conversion_read_contract");
+    adxl355_mock_bus_t mock;
+    adxl355_mock_bus_init(&mock);
+    adxl355_mock_bus_set_identity_ok(&mock);
+    mock.regs[ADXL355_REG_RANGE] = ADXL355_RANGE_4G;
+    adxl355_mock_bus_set_xyz_raw(&mock, 100000, -50000, 25000);
+    adxl355_bus_t bus = adxl355_mock_bus_get_interface(&mock);
+    adxl355_t dev;
+    TEST_ASSERT(adxl355_init(&dev, &bus) == ADXL355_OK, "init should succeed");
+
+    adxl355_float_xyz_t accel = {123.0f, -456.0f, 789.0f};
+    TEST_ASSERT(adxl355_read_g(NULL, &accel) == ADXL355_ERR_NULL,
+                "read_g must reject null device");
+    TEST_ASSERT(adxl355_read_g(&dev, NULL) == ADXL355_ERR_NULL,
+                "read_g must reject null output");
+    TEST_ASSERT(adxl355_read_mps2(NULL, &accel) == ADXL355_ERR_NULL,
+                "read_mps2 must reject null device");
+    TEST_ASSERT(adxl355_read_mps2(&dev, NULL) == ADXL355_ERR_NULL,
+                "read_mps2 must reject null output");
+    TEST_ASSERT(adxl355_read_g(&dev, &accel) == ADXL355_ERR_STATE,
+                "read_g before probe must fail");
+    TEST_ASSERT(adxl355_read_mps2(&dev, &accel) == ADXL355_ERR_STATE,
+                "read_mps2 before probe must fail");
+    TEST_ASSERT(accel.x == 123.0f && accel.y == -456.0f && accel.z == 789.0f,
+                "pre-probe failures must preserve all output fields");
+    TEST_ASSERT(mock.call_count == 0U, "pre-probe reads must not access the bus");
+
+    TEST_ASSERT(adxl355_probe(&dev) == ADXL355_OK, "probe must succeed");
+    TEST_ASSERT(dev.range == ADXL355_RANGE_4G, "probe must sync the 4g range");
+    const size_t before_reads = mock.call_count;
+    TEST_ASSERT(adxl355_read_g(&dev, &accel) == ADXL355_OK, "g read must succeed");
+    TEST_ASSERT(approx_eq(accel.x, 0.78f, 0.00001f), "x must be +0.78 g");
+    TEST_ASSERT(approx_eq(accel.y, -0.39f, 0.00001f), "y must be -0.39 g");
+    TEST_ASSERT(approx_eq(accel.z, 0.195f, 0.00001f), "z must be +0.195 g");
+    TEST_ASSERT(adxl355_read_mps2(&dev, &accel) == ADXL355_OK,
+                "m/s^2 read must succeed");
+    TEST_ASSERT(approx_eq(accel.x, 0.78f * 9.80665f, 0.00002f),
+                "x must convert g to m/s^2");
+    TEST_ASSERT(approx_eq(accel.y, -0.39f * 9.80665f, 0.00002f),
+                "negative y must convert g to m/s^2");
+    TEST_ASSERT(approx_eq(accel.z, 0.195f * 9.80665f, 0.00002f),
+                "z must convert g to m/s^2");
+    TEST_ASSERT(mock.call_count == before_reads + 2U,
+                "each successful float read must access one frame");
+    for (size_t i = before_reads; i < mock.call_count; i++) {
+        TEST_ASSERT(!mock.calls[i].is_write &&
+                    mock.calls[i].reg == ADXL355_REG_XDATA3 &&
+                    mock.calls[i].len == 9U,
+                    "float read must use exactly one read-only 9-byte XYZ frame");
+    }
+
+    accel.x = 123.0f;
+    accel.y = -456.0f;
+    accel.z = 789.0f;
+    mock.force_read_error = 1;
+    TEST_ASSERT(adxl355_read_g(&dev, &accel) == ADXL355_ERR_BUS,
+                "g read must propagate bus failure");
+    TEST_ASSERT(adxl355_read_mps2(&dev, &accel) == ADXL355_ERR_BUS,
+                "m/s^2 read must propagate bus failure");
+    TEST_ASSERT(accel.x == 123.0f && accel.y == -456.0f && accel.z == 789.0f,
+                "bus failure must not alter any output");
+    mock.force_read_error = 0;
+
+    mock.short_read_reg = ADXL355_REG_XDATA3;
+    mock.short_read_length = 8U;
+    TEST_ASSERT(adxl355_read_g(&dev, &accel) == ADXL355_ERR_BUS,
+                "g read must reject truncated XYZ frame");
+    TEST_ASSERT(adxl355_read_mps2(&dev, &accel) == ADXL355_ERR_BUS,
+                "m/s^2 read must reject truncated XYZ frame");
+    TEST_ASSERT(accel.x == 123.0f && accel.y == -456.0f && accel.z == 789.0f,
+                "truncated reads must preserve output");
+    mock.short_read_reg = -1;
+
+    TEST_ASSERT(adxl355_set_range(&dev, ADXL355_RANGE_8G) == ADXL355_OK,
+                "range transition to 8g must succeed");
+    TEST_ASSERT(adxl355_read_mps2(&dev, &accel) == ADXL355_OK,
+                "m/s^2 read after range change must succeed");
+    TEST_ASSERT(approx_eq(accel.x, 1.56f * 9.80665f, 0.00002f),
+                "range transition must double the x scale");
+    TEST_ASSERT(approx_eq(accel.y, -0.78f * 9.80665f, 0.00002f),
+                "range transition must double the negative y scale");
+    TEST_ASSERT(approx_eq(accel.z, 0.39f * 9.80665f, 0.00002f),
+                "range transition must double the z scale");
+    TEST_END();
+}
 static void test_status_string(void)
 {
     TEST_START("status_string");
@@ -1726,6 +1814,7 @@ int main(void)
     test_set_range_read_error_prevents_write();
     test_set_range_write_error_preserves_cache();
     test_read_raw_reads_9_bytes();
+    test_acceleration_conversion_read_contract();
     test_status_string();
     test_set_power_mode();
     test_reset();
