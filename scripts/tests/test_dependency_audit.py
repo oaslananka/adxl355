@@ -106,15 +106,15 @@ class DependencyAuditTests(unittest.TestCase):
         self.assertIn("go mod verify", commands)
         self.assertIn("go build -mod=readonly", commands)
         self.assertIn('runner.temp }}/govulncheck" ./...', commands)
-        self.assertIn("golang.org/x/vuln v1.6.0", GOVULNCHECK_MOD.read_text())
+        self.assertIn("golang.org/x/vuln v1.9.0", GOVULNCHECK_MOD.read_text())
         self.assertTrue(GOVULNCHECK_SUM.is_file())
-        self.assertIn("golang.org/x/vuln v1.6.0", GOVULNCHECK_SUM.read_text())
+        self.assertIn("golang.org/x/vuln v1.9.0", GOVULNCHECK_SUM.read_text())
         setup_go = next(
             step
             for step in go_job["steps"]
             if "actions/setup-go@" in str(step.get("uses", ""))
         )
-        self.assertEqual(setup_go["with"]["go-version"], "1.25")
+        self.assertEqual(setup_go["with"]["go-version"], "1.26")
 
         osv_job = jobs["osv-scan"]
         self.assertRegex(str(osv_job["uses"]), SHA_PIN)
