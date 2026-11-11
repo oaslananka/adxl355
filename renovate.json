@@ -58,7 +58,7 @@
   },
   "packageRules": [
     {
-      "description": "Route GitHub Actions updates to the CI area; only selected patch releases can auto-queue.",
+      "description": "Route GitHub Actions changes to CI; only reviewed patch updates can use the Mergify queue.",
       "matchManagers": [
         "github-actions"
       ],
@@ -68,13 +68,15 @@
       ]
     },
     {
-      "description": "Require manual review for other GitHub Actions, including their patch releases.",
+      "description": "Require manual review for GitHub Actions outside the trusted patch allowlist.",
       "matchManagers": [
         "github-actions"
       ],
       "matchPackageNames": [
         "!actions/upload-artifact",
-        "!actions/download-artifact"
+        "!actions/download-artifact",
+        "!github/codeql-action",
+        "!SonarSource/sonarqube-scan-action"
       ],
       "automerge": false,
       "addLabels": [
@@ -82,13 +84,15 @@
       ]
     },
     {
-      "description": "Keep non-patch changes to the official artifact actions under manual review.",
+      "description": "Keep major/minor/digest/pin and other non-patch changes to trusted actions under manual review.",
       "matchManagers": [
         "github-actions"
       ],
       "matchPackageNames": [
         "actions/upload-artifact",
-        "actions/download-artifact"
+        "actions/download-artifact",
+        "github/codeql-action",
+        "SonarSource/sonarqube-scan-action"
       ],
       "matchUpdateTypes": [
         "major",
@@ -105,13 +109,15 @@
       ]
     },
     {
-      "description": "Queue trusted GitHub artifact Action patch releases only after the seven-day release-age status and all required checks pass.",
+      "description": "Queue patch releases of selected trusted GitHub Actions after seven-day stability and required checks.",
       "matchManagers": [
         "github-actions"
       ],
       "matchPackageNames": [
         "actions/upload-artifact",
-        "actions/download-artifact"
+        "actions/download-artifact",
+        "github/codeql-action",
+        "SonarSource/sonarqube-scan-action"
       ],
       "matchUpdateTypes": [
         "patch"
@@ -190,9 +196,7 @@
       ],
       "matchUpdateTypes": [
         "minor",
-        "patch",
-        "pin",
-        "digest"
+        "patch"
       ],
       "automerge": false,
       "addLabels": [
@@ -200,7 +204,8 @@
       ],
       "matchPackageNames": [
         "!typescript"
-      ]
+      ],
+      "matchCurrentVersion": "!/^0/"
     },
     {
       "description": "Label stable, non-major runtime dependency updates for Mergify after required CI checks.",
