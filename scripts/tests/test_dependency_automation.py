@@ -88,7 +88,11 @@ class DependencyAutomationTests(unittest.TestCase):
         config = cast(dict[str, Any], json.loads(RENOVATE.read_text(encoding="utf-8")))
         self.assertEqual(config["schedule"], ["before 8am every weekday"])
         rules = config["packageRules"]
-        stable = next(rule for rule in rules if rule.get("matchCurrentVersion") == "!/^0/")
+        stable = next(
+            rule for rule in rules
+            if set(rule.get("matchManagers", [])) == {"npm", "cargo", "gomod", "pep621"}
+            and rule.get("matchCurrentVersion") == "!/^0/"
+        )
         self.assertEqual(set(stable["matchManagers"]), {"npm", "cargo", "gomod", "pep621"})
         self.assertEqual(set(stable["matchUpdateTypes"]), {"minor", "patch"})
         self.assertIn("automerge", stable["addLabels"])
@@ -97,7 +101,12 @@ class DependencyAutomationTests(unittest.TestCase):
         actions = [rule for rule in rules if rule.get("matchManagers") == ["github-actions"]]
         self.assertEqual(len(actions), 4)
         base, other_actions, artifact_nonpatch, artifact_patch = actions
-        names = {"actions/upload-artifact", "actions/download-artifact"}
+        names = {
+            "actions/upload-artifact",
+            "actions/download-artifact",
+            "github/codeql-action",
+            "SonarSource/sonarqube-scan-action",
+        }
         self.assertEqual(base["addLabels"], ["area/ci"])
         self.assertFalse(base["automerge"])
         self.assertEqual(set(other_actions["matchPackageNames"]), {f"!{name}" for name in names})
@@ -111,6 +120,12 @@ class DependencyAutomationTests(unittest.TestCase):
         self.assertEqual(artifact_patch["matchUpdateTypes"], ["patch"])
         self.assertEqual(artifact_patch["addLabels"], ["automerge"])
         self.assertFalse(artifact_patch["automerge"])
+        node_dev = next(rule for rule in rules if rule.get("matchDepTypes") == ["devDependencies"])
+        self.assertEqual(set(node_dev["matchUpdateTypes"]), {"minor", "patch"})
+        self.assertEqual(node_dev["matchCurrentVersion"], "!/^0/")
+        self.assertEqual(set(node_dev["matchPackageNames"]), {"!typescript"})
+        self.assertIn("manual-review", config["lockFileMaintenance"]["addLabels"])
+        self.assertNotIn("automerge", config["lockFileMaintenance"]["addLabels"])
         self.assertIn("manual-review", config["vulnerabilityAlerts"]["labels"])
         self.assertNotIn("automerge", config["vulnerabilityAlerts"]["labels"])
 
