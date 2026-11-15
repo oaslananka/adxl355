@@ -17,7 +17,7 @@ class PackageMetadataTests(unittest.TestCase):
         self.assertEqual(project["name"], "adxl355")
         self.assertEqual(project["version"], "0.1.0")
         self.assertEqual(project["readme"], "README.md")
-        self.assertEqual(project["license"], "MIT")
+        self.assertEqual(project["license"], "GPL-3.0-only")
         self.assertEqual(
             project["urls"]["Repository"], "https://github.com/oaslananka/adxl355"
         )
@@ -49,7 +49,7 @@ class PackageMetadataTests(unittest.TestCase):
         self.assertEqual(package["documentation"], "https://docs.rs/adxl355-driver")
         self.assertEqual(
             package["include"],
-            ["src/**", "Cargo.toml", "Cargo.lock", "README.md", "LICENSE"],
+            ["src/**", "Cargo.toml", "Cargo.lock", "README.md", "LICENSE", "COPYRIGHT"],
         )
 
     def test_node_distribution_uses_owned_scope_and_optional_linux_exports(
@@ -87,7 +87,7 @@ class PackageMetadataTests(unittest.TestCase):
             lock["packages"][""]["optionalDependencies"],
             package["optionalDependencies"],
         )
-        self.assertEqual(package["files"], ["dist", "README.md", "LICENSE"])
+        self.assertEqual(package["files"], ["dist", "README.md", "LICENSE", "COPYRIGHT"])
 
     def test_registry_package_readmes_link_policy_and_history(self) -> None:
         for relative in ("node/README.md", "rust/README.md"):
