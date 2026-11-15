@@ -69,4 +69,4 @@ test: add mock bus test for probe
 
 ## License
 
-By contributing, you agree that your contributions will be licensed under the MIT License.
+By contributing, you agree that your contributions will be licensed under the GNU GPL v3.0 (GPL-3.0-only).

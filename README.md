@@ -11,17 +11,25 @@ A shared device contract for **C · C++ · Python · Rust · Node.js/TypeScript 
 [![PyPI](https://img.shields.io/pypi/v/adxl355?label=PyPI)](https://pypi.org/project/adxl355/)
 [![npm](https://img.shields.io/npm/v/%40oaslananka%2Fadxl355?label=npm)](https://www.npmjs.com/package/@oaslananka/adxl355)
 [![crates.io](https://img.shields.io/crates/v/adxl355-driver?label=crates.io)](https://crates.io/crates/adxl355-driver)
-[![MIT License](https://img.shields.io/github/license/oaslananka/adxl355?label=license)](LICENSE)
-[![GitGem](https://gitgem.org/api/badge/github/oaslananka/adxl355.svg)](https://gitgem.org/github/oaslananka/adxl355)
+[![GPL-3.0-only License](https://img.shields.io/github/license/oaslananka/adxl355?label=license)](LICENSE)
 
 [![CI](https://img.shields.io/github/actions/workflow/status/oaslananka/adxl355/ci.yml?branch=main&label=CI)](https://github.com/oaslananka/adxl355/actions/workflows/ci.yml)
 [![CodeQL](https://img.shields.io/github/actions/workflow/status/oaslananka/adxl355/codeql.yml?branch=main&label=CodeQL)](https://github.com/oaslananka/adxl355/actions/workflows/codeql.yml)
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/oaslananka/adxl355/badge)](https://scorecard.dev/viewer/?uri=github.com/oaslananka/adxl355)
 [![OpenSSF Best Practices](https://www.bestpractices.dev/projects/13419/badge)](https://www.bestpractices.dev/projects/13419)
 
-[![PyPI all-time downloads](https://img.shields.io/pepy/dt/adxl355?label=PyPI%20all-time&logo=pypi)](https://pepy.tech/projects/adxl355)
-[![crates.io all-time downloads](https://img.shields.io/crates/d/adxl355-driver?label=crates.io%20all-time&logo=rust)](https://crates.io/crates/adxl355-driver)
-[![npm last-30-days downloads](https://img.shields.io/npm/dm/%40oaslananka%2Fadxl355?label=npm%20last%2030d&logo=npm)](https://www.npmjs.com/package/@oaslananka/adxl355)
+<p align="center">
+  <a href="https://pepy.tech/projects/adxl355"><img src="https://img.shields.io/pepy/dt/adxl355?label=PyPI%20total" alt="PyPI total downloads" /></a>
+  <a href="https://crates.io/crates/adxl355-driver"><img src="https://img.shields.io/crates/d/adxl355-driver?label=crates.io%20total" alt="crates.io total downloads" /></a>
+  <a href="https://www.npmjs.com/package/@oaslananka/adxl355"><img src="https://img.shields.io/npm/dt/%40oaslananka%2Fadxl355?label=npm%20total" alt="npm total downloads" /></a>
+  <a href="https://gitgem.org/github/oaslananka/adxl355"><img src="https://gitgem.org/api/badge/github/oaslananka/adxl355.svg" alt="GitGem" /></a>
+</p>
+
+<p align="center">
+  <a href="https://github.com/sponsors/oaslananka"><img src="https://img.shields.io/badge/GitHub-Sponsors-ea4aaa?logo=githubsponsors" alt="GitHub Sponsors" /></a>
+  <a href="https://www.buymeacoffee.com/oaslananka"><img src="https://img.shields.io/badge/Buy%20Me%20a%20Coffee-Support-ffdd00?logo=buymeacoffee&amp;logoColor=black" alt="Buy Me a Coffee" /></a>
+  <a href="https://github.com/oaslananka/adxl355"><img src="https://img.shields.io/github/stars/oaslananka/adxl355?label=Stars&amp;color=8e65d3" alt="Stars" /></a>
+</p>
 
 </div>
 

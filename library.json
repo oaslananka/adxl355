@@ -22,7 +22,7 @@
       "maintainer": true
     }
   ],
-  "license": "MIT",
+  "license": "GPL-3.0-only",
   "frameworks": [
     "arduino"
   ],
