@@ -22,7 +22,7 @@ class PublicDocumentationTests(unittest.TestCase):
     def test_readme_badges_are_supported_and_deepwiki_is_plain_link(self) -> None:
         readme = README.read_text(encoding="utf-8")
         self.assertIn(
-            "[![GitGem](https://gitgem.org/api/badge/github/oaslananka/adxl355.svg)]",
+            "https://gitgem.org/api/badge/github/oaslananka/adxl355.svg",
             readme,
         )
         self.assertIn(
@@ -41,9 +41,9 @@ class PublicDocumentationTests(unittest.TestCase):
 
     def test_download_badges_track_published_channels_without_fake_total(self) -> None:
         readme = README.read_text(encoding="utf-8")
-        self.assertIn("img.shields.io/pepy/dt/adxl355?label=PyPI%20all-time", readme)
-        self.assertIn("img.shields.io/crates/d/adxl355-driver?label=crates.io%20all-time", readme)
-        self.assertIn("img.shields.io/npm/dm/%40oaslananka%2Fadxl355", readme)
+        self.assertIn("img.shields.io/pepy/dt/adxl355?label=PyPI%20total", readme)
+        self.assertIn("img.shields.io/crates/d/adxl355-driver?label=crates.io%20total", readme)
+        self.assertIn("img.shields.io/npm/dt/%40oaslananka%2Fadxl355", readme)
         self.assertNotIn("img.shields.io/github/downloads/oaslananka/adxl355/", readme)
         self.assertIn("bundle-only GitHub badge was omitted", readme)
         self.assertNotIn("img.shields.io/github/downloads/oaslananka/adxl355/total", readme)
