@@ -15,6 +15,7 @@ if (!metadata || !Array.isArray(metadata.files)) {
 
 const files = metadata.files.map((entry) => entry.path).sort();
 const required = [
+  "COPYRIGHT",
   "LICENSE",
   "README.md",
   "dist/index.d.ts",
@@ -40,7 +41,7 @@ for (const path of files) {
   }
   if (
     !path.startsWith("dist/") &&
-    !["LICENSE", "README.md", "package.json"].includes(path)
+    !["COPYRIGHT", "LICENSE", "README.md", "package.json"].includes(path)
   ) {
     throw new Error(`package contains unexpected file: ${path}`);
   }
