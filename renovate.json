@@ -21,11 +21,10 @@
     "before 8am every weekday"
   ],
   "minimumReleaseAge": "7 days",
-  "dependencyDashboardTitle": "Dependency Dashboard",
-  "dependencyDashboardLabels": [
-    "dependencies",
-    "dependency-lifecycle"
-  ],
+  "dependencyDashboard": {
+    "title": "Dependency Dashboard",
+    "labels": ["dependencies", "dependency-lifecycle"]
+  },
   "labels": [
     "dependencies",
     "dependency-lifecycle"
